@@ -10,7 +10,7 @@ export const TournamentModel = {
     create: async ({ clubId, name, type, startDate, endDate = null, }) => {
         return db.query(
             `INSERT INTO tournaments (club_id, name, type, start_date, end_date, status)
-             VALUES (?, ?, ?, ?, ?, 'upcoming')
+             VALUES ($1, $2, $3, $4, $5, 'upcoming')
              RETURNING *`,
             [clubId, name, type, startDate, endDate]
         ).then(r => r.first);
@@ -20,17 +20,17 @@ export const TournamentModel = {
 
     findById: async (id) => {
         return db.query(
-            `SELECT * FROM tournaments WHERE id = ?`,
+            `SELECT * FROM tournaments WHERE id = $1`,
             [id]
         ).then(r => r.first);
     },
 
     findByClub: async (clubId, { status } = {}) => {
-        const conditions = ['club_id = ?'];
+        const conditions = ['club_id = $1'];
         const params = [clubId];
 
         if (status) {
-            conditions.push('status = ?');
+            conditions.push('status = $2');
             params.push(status);
         }
 
@@ -71,7 +71,7 @@ export const TournamentModel = {
              JOIN players p  ON p.id = tp.player_id
              LEFT JOIN matches m ON m.tournament_id = tp.tournament_id
                  AND (m.white_player_id = p.id OR m.black_player_id = p.id)
-             WHERE tp.tournament_id = ?
+             WHERE tp.tournament_id = $1
              GROUP BY p.id, p.name
              ORDER BY score DESC, wins DESC`,
             [tournamentId]
@@ -85,7 +85,7 @@ export const TournamentModel = {
             `SELECT p.*
              FROM players p
              JOIN tournament_players tp ON tp.player_id = p.id
-             WHERE tp.tournament_id = ?
+             WHERE tp.tournament_id = $1
              ORDER BY p.name ASC`,
             [tournamentId]
         ).then(r => r.rows);
@@ -94,7 +94,7 @@ export const TournamentModel = {
     addPlayer: async (tournamentId, playerId) => {
         return db.query(
             `INSERT INTO tournament_players (tournament_id, player_id)
-             VALUES (?, ?)
+             VALUES ($1, $2)
              ON CONFLICT DO NOTHING
              RETURNING *`,
             [tournamentId, playerId]
@@ -104,7 +104,7 @@ export const TournamentModel = {
     removePlayer: async (tournamentId, playerId) => {
         return db.query(
             `DELETE FROM tournament_players
-             WHERE tournament_id = ? AND player_id = ?
+             WHERE tournament_id = $1 AND player_id = $2
              RETURNING player_id`,
             [tournamentId, playerId]
         ).then(r => r.first);
@@ -115,11 +115,11 @@ export const TournamentModel = {
     update: async (id, { name, startDate, endDate }) => {
         return db.query(
             `UPDATE tournaments
-             SET name       = COALESCE(?, name),
-                 start_date = COALESCE(?, start_date),
-                 end_date   = COALESCE(?, end_date),
+             SET name       = COALESCE($1, name),
+                 start_date = COALESCE($2, start_date),
+                 end_date   = COALESCE($3, end_date),
                  updated_at = NOW()
-             WHERE id = ?
+             WHERE id = $4
              RETURNING *`,
             [name, startDate, endDate, id]
         ).then(r => r.first);
@@ -128,8 +128,8 @@ export const TournamentModel = {
     setStatus: async (id, status) => {
         return db.query(
             `UPDATE tournaments
-             SET status = ?, updated_at = NOW()
-             WHERE id = ?
+             SET status = $1, updated_at = NOW()
+             WHERE id = $2
              RETURNING *`,
             [status, id]
         ).then(r => r.first);
@@ -139,7 +139,7 @@ export const TournamentModel = {
 
     delete: async (id) => {
         return db.query(
-            `DELETE FROM tournaments WHERE id = ? RETURNING id`,
+            `DELETE FROM tournaments WHERE id = $1 RETURNING id`,
             [id]
         ).then(r => r.first);
     },

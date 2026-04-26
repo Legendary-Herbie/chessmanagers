@@ -1,7 +1,4 @@
 import pg from 'pg';
-import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { types } from 'pg';
 import env from '../config/env.js';
 
@@ -12,8 +9,9 @@ const { DATABASE_URL, NODE_ENV } = env;
 // Parse int8 and NUMERIC as JS numbers rather than strings.
 types.setTypeParser(20,   v => v === null ? null : Number(v));   // int8
 types.setTypeParser(1700, v => v === null ? null : Number(v));   // numeric
-// Parse boolean as true/false rather than 't'/'f' strings.
-types.setTypeParser(16,   v => v === null ? null : v === 't');   // bool
+// pg already returns real Postgres booleans as JS true/false —
+// this parser is kept as an explicit safeguard against driver version drift.
+types.setTypeParser(16,   v => v === null ? null : v === true || v === 't');  // bool
 
 // ─── Connection pool ──────────────────────────────────────────────────────────
 
@@ -25,44 +23,48 @@ const pool = new Pool({
     connectionTimeoutMillis: 2_000,
 });
 
-// ─── Schema ───────────────────────────────────────────────────────────────────
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const schemaSQL = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-
 // ─── Init ─────────────────────────────────────────────────────────────────────
+// Validates database connection. Schema migrations are run by database.js.
 
 export const initPg = async () => {
     if (!DATABASE_URL) {
-        throw new Error('DATABASE_URL is not defined in environment variables.');
+        throw new Error(
+            'DATABASE_URL is not defined. ' +
+            'Expected format: postgresql://USER:PASSWORD@HOST:5432/DBNAME'
+        );
     }
 
     let client;
     try {
         client = await pool.connect();
-        await client.query(schemaSQL);
-        console.log('[DB] PostgreSQL initialised successfully.');
+        console.log('[DB] PostgreSQL connected successfully.');
     } catch (err) {
-        // Provide actionable error messages for the most common connection failures
-
+        // Enrich the error with an actionable message, then re-throw.
+        // The caller (server bootstrap) decides whether to exit.
         if (err.message?.includes('client password must be a string')) {
-            console.error('\n\x1b[31m[FATAL] PostgreSQL: Missing password in DATABASE_URL\x1b[0m');
-            console.error('Expected format: postgresql://USER:PASSWORD@HOST:5432/DBNAME\n');
-            process.exit(1);
+            throw Object.assign(err, {
+                friendlyMessage:
+                    'PostgreSQL: Missing password in DATABASE_URL.\n' +
+                    'Expected format: postgresql://USER:PASSWORD@HOST:5432/DBNAME',
+            });
         }
 
         if (err.code === 'ECONNREFUSED') {
-            console.error('\n\x1b[31m[FATAL] PostgreSQL: Connection refused\x1b[0m');
-            console.error(`Could not reach PostgreSQL at ${err.address ?? 'localhost'}:${err.port ?? 5432}`);
-            console.error('Is the PostgreSQL server running?\n');
-            process.exit(1);
+            throw Object.assign(err, {
+                friendlyMessage:
+                    `PostgreSQL: Connection refused at ` +
+                    `${err.address ?? 'localhost'}:${err.port ?? 5432}.\n` +
+                    'Is the PostgreSQL server running?',
+            });
         }
 
         if (err.code === '3D000') {
-            console.error('\n\x1b[31m[FATAL] PostgreSQL: Database does not exist\x1b[0m');
-            console.error('Create it with: createdb chess_club_manager');
-            console.error('Or update DATABASE_URL to point to an existing database.\n');
-            process.exit(1);
+            throw Object.assign(err, {
+                friendlyMessage:
+                    'PostgreSQL: Database does not exist.\n' +
+                    'Create it with: createdb chessmanagers\n' +
+                    'Or update DATABASE_URL to point to an existing database.',
+            });
         }
 
         throw err;

@@ -1,4 +1,11 @@
 import pgDb from './pg_database.js';
+import { runner } from 'node-pg-migrate';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import env from '../config/env.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const { DATABASE_URL } = env;
 
 // ─── JSON field normalisation ──────────────────────────────────────────────────
 // Add any future JSON columns here — one place to maintain.
@@ -23,12 +30,6 @@ function mapJsonFields(row) {
     return processed;
 }
 
-// ─── Postgres placeholder conversion ──────────────────────────────────────────
-function toPostgresParams(text) {
-    let i = 0;
-    return text.replace(/\?/g, () => `$${++i}`);
-}
-
 // ─── Normalised result shape ───────────────────────────────────────────────────
 function normaliseRows(rows, rowCount) {
     const mapped = rows.map(mapJsonFields);
@@ -39,16 +40,41 @@ function normaliseRows(rows, rowCount) {
     };
 }
 
+async function executeQuery(queryFn, text, params = []) {
+    const res = await queryFn(text, params);
+    return normaliseRows(res.rows, res.rowCount);
+}
+
 // ─── db ───────────────────────────────────────────────────────────────────────
 
 const db = {
     init: async () => {
+        // Validate connection first
         await pgDb.initPg();
+
+        // Run migrations
+        try {
+            const migrationsRan = await runner({
+                databaseUrl: DATABASE_URL,
+                dir: path.join(__dirname, 'migrations'),
+                migrationsTable: 'pgmigrations',
+            });
+
+            if (migrationsRan.length > 0) {
+                console.log(`[DB] Applied ${migrationsRan.length} migration(s): ${migrationsRan.join(', ')}`);
+            } else {
+                console.log('[DB] Migrations up to date.');
+            }
+
+            console.log('[DB] Schema initialised successfully.');
+        } catch (err) {
+            console.error('[DB] Migration failed:', err.message);
+            throw err;
+        }
     },
 
     query: async (text, params = []) => {
-        const res = await pgDb.query(toPostgresParams(text), params);
-       return(res.rows, res.rowCount)
+        return executeQuery(pgDb.query.bind(pgDb), text, params);
     },
 
     // transaction() runs a callback with a transactional query function.
@@ -58,10 +84,7 @@ const db = {
         try {
             await client.query('BEGIN');
             const result = await cb({
-                query: async (text, params = []) => {
-                    const res = await client.query(toPostgresParams(text), params);
-                    return(res.rows, res.rowCount)
-                },
+                query: (text, params = []) => executeQuery(client.query.bind(client), text, params),
             });
             await client.query('COMMIT');
             return result;

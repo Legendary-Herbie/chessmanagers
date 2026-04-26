@@ -9,7 +9,7 @@ export const UserModel = {
     create: async ({ email, name, passwordHash, role = 'member' }) => {
         return db.query(
             `INSERT INTO users (email, name, password_hash, role)
-             VALUES (?, ?, ?, ?)
+             VALUES ($1, $2, $3, $4)
              RETURNING *`,
             [email, name, passwordHash, role]
         ).then(r => r.first);
@@ -19,21 +19,21 @@ export const UserModel = {
 
     findById: async (id) => {
         return db.query(
-            `SELECT * FROM users WHERE id = ?`,
+            `SELECT * FROM users WHERE id = $1`,
             [id]
         ).then(r => r.first);
     },
 
     findByEmail: async (email) => {
         return db.query(
-            `SELECT * FROM users WHERE email = ?`,
+            `SELECT * FROM users WHERE email = $1`,
             [email]
         ).then(r => r.first);
     },
 
     findByName: async (name) => {
         return db.query(
-            `SELECT * FROM users WHERE name = ?`,
+            `SELECT * FROM users WHERE name = $1`,
             [name]
         ).then(r => r.first);
     },
@@ -42,8 +42,8 @@ export const UserModel = {
 
     updatePassword: async (id, passwordHash) => {
         return db.query(
-            `UPDATE users SET password_hash = ?, updated_at = NOW()
-             WHERE id = ?
+            `UPDATE users SET password_hash = $1, updated_at = NOW()
+             WHERE id = $2
              RETURNING *`,
             [passwordHash, id]
         ).then(r => r.first);
@@ -51,8 +51,8 @@ export const UserModel = {
 
     updateRole: async (id, role) => {
         return db.query(
-            `UPDATE users SET role = ?, updated_at = NOW()
-             WHERE id = ?
+            `UPDATE users SET role = $1, updated_at = NOW()
+             WHERE id = $2
              RETURNING *`,
             [role, id]
         ).then(r => r.first);
@@ -62,7 +62,7 @@ export const UserModel = {
 
     delete: async (id) => {
         return db.query(
-            `DELETE FROM users WHERE id = ? RETURNING id`,
+            `DELETE FROM users WHERE id = $1 RETURNING id`,
             [id]
         ).then(r => r.first);
     },

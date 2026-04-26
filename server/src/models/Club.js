@@ -9,7 +9,7 @@ export const ClubModel = {
     create: async ({ name, ownerId, description = null, logo = null, contactInfo = null }) => {
         return db.query(
             `INSERT INTO clubs (name, owner_id, description, logo, contact_info)
-             VALUES (?, ?, ?, ?, ?)
+             VALUES ($1, $2, $3, $4, $5)
              RETURNING *`,
             [name, ownerId, description, logo, contactInfo]
         ).then(r => r.first);
@@ -19,7 +19,7 @@ export const ClubModel = {
 
     findById: async (id) => {
         return db.query(
-            `SELECT * FROM clubs WHERE id = ?`,
+            `SELECT * FROM clubs WHERE id = $1`,
             [id]
         ).then(r => r.first);
     },
@@ -31,7 +31,7 @@ export const ClubModel = {
             `SELECT c.*
              FROM clubs c
              JOIN user_clubs uc ON uc.club_id = c.id
-             WHERE uc.user_id = ?
+             WHERE uc.user_id = $1
              LIMIT 1`,
             [userId]
         ).then(r => r.first);
@@ -42,12 +42,12 @@ export const ClubModel = {
     update: async (id, { name, description, logo, contactInfo }) => {
         return db.query(
             `UPDATE clubs
-             SET name         = COALESCE(?, name),
-                 description  = COALESCE(?, description),
-                 logo         = COALESCE(?, logo),
-                 contact_info = COALESCE(?, contact_info),
+             SET name         = COALESCE($1, name),
+                 description  = COALESCE($2, description),
+                 logo         = COALESCE($3, logo),
+                 contact_info = COALESCE($4, contact_info),
                  updated_at   = NOW()
-             WHERE id = ?
+             WHERE id = $5
              RETURNING *`,
             [name, description, logo, contactInfo, id]
         ).then(r => r.first);
@@ -60,7 +60,7 @@ export const ClubModel = {
             `SELECT u.id, u.email, u.role, uc.joined_at
              FROM users u
              JOIN user_clubs uc ON uc.user_id = u.id
-             WHERE uc.club_id = ?
+             WHERE uc.club_id = $1
              ORDER BY uc.joined_at ASC`,
             [clubId]
         ).then(r => r.rows);
@@ -69,7 +69,7 @@ export const ClubModel = {
     addMember: async (clubId, userId) => {
         return db.query(
             `INSERT INTO user_clubs (club_id, user_id)
-             VALUES (?, ?)
+             VALUES ($1, $2)
              ON CONFLICT DO NOTHING
              RETURNING *`,
             [clubId, userId]
@@ -79,7 +79,7 @@ export const ClubModel = {
     removeMember: async (clubId, userId) => {
         return db.query(
             `DELETE FROM user_clubs
-             WHERE club_id = ? AND user_id = ?
+             WHERE club_id = $1 AND user_id = $2
              RETURNING user_id`,
             [clubId, userId]
         ).then(r => r.first);

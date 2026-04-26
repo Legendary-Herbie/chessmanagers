@@ -1,0 +1,9 @@
+{
+  "migrationsTable": "pgmigrations",
+  "migrationsSchema": "public",
+  "dir": "src/database/migrations",
+  "ignorePattern": "^\\.",
+  "createMigrationsFolder": true,
+  "reverse": false,
+  "autosync": true
+}

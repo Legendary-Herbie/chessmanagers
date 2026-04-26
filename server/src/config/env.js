@@ -5,7 +5,6 @@ import dotenv from 'dotenv';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-// Load .env from server root, then parent — first file wins for any given key
 dotenv.config({ path: path.resolve(__dirname, '../../.env'), quiet: true });
 dotenv.config({ path: path.resolve(__dirname, '../.env'),  quiet: true });
 

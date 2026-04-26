@@ -60,7 +60,6 @@ const isOriginAllowed = createOriginMatcher(CORS_ORIGIN);
 
 // ─── Core Middleware ───────────────────────────────────────────────────────────
 
-// trust proxy: 1 assumes a single reverse proxy hop (Nginx, Railway, Heroku, etc.)
 app.set('trust proxy', 1);
 
 app.use(helmet());
@@ -96,18 +95,14 @@ app.use(globalLimiter);
 
 // ─── API Routes ───────────────────────────────────────────────────────────────
 
-// Health check — before all route handlers
 app.get('/health', (req, res) =>
     res.json({ status: 'ok', timestamp: new Date().toISOString() })
 );
 
-// Standalone routes
 app.use('/api/v1/auth',   authRoutes);
 app.use('/api/v1/public', publicRoutes);
 app.use('/api/v1/clubs',  clubRoutes);
 
-// Club-scoped routes — nested under /api/v1/clubs/:clubId
-// Each router uses mergeParams: true to inherit :clubId
 app.use('/api/v1/clubs/:clubId/players',     playerRoutes);
 app.use('/api/v1/clubs/:clubId/matches',     matchRoutes);
 app.use('/api/v1/clubs/:clubId/tournaments', tournamentRoutes);
@@ -126,8 +121,6 @@ if (NODE_ENV === 'production' && SERVE_FRONTEND && !shouldServeFrontend) {
 
 if (shouldServeFrontend) {
     app.use(express.static(distPath));
-
-    // SPA catch-all: serve index.html for all non-API, non-health routes
     app.get('*', (req, res, next) => {
         if (!req.path.startsWith('/api/') && req.path !== '/health') {
             return res.sendFile(distIndexPath);
@@ -145,7 +138,6 @@ if (shouldServeFrontend) {
 }
 
 // ─── Error Handling ───────────────────────────────────────────────────────────
-// notFound catches unmatched routes; errorHandler catches all thrown errors.
 
 app.use(notFound);
 app.use(errorHandler);
@@ -155,13 +147,13 @@ app.use(errorHandler);
 export default app;
 
 // ─── Server Bootstrap ──────────────────────────────────────────────────────────
-// Skipped in test mode so test runners can import `app` without side effects.
+// process.exit() lives here — not inside the DB layer — so pg_database.js
+// remains testable and reusable without side effects.
 
 if (NODE_ENV !== 'test') {
     db.init()
         .then(() => {
             console.log(`[INFO] Allowed CORS origins: ${CORS_ORIGIN.join(', ')}`);
-
             const server = app.listen(PORT, () => {
                 console.log(`[INFO] Server running on port ${PORT}`);
             });
@@ -182,7 +174,9 @@ if (NODE_ENV !== 'test') {
             process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
         })
         .catch(err => {
-            console.error('[FATAL] Database initialisation failed:', err);
+            // pg_database.js attaches a friendlyMessage for known failure modes.
+            const message = err.friendlyMessage ?? err.message;
+            console.error(`\n\x1b[31m[FATAL] Database initialisation failed:\x1b[0m\n${message}\n`);
             process.exit(1);
         });
 }

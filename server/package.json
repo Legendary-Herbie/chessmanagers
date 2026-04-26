@@ -19,7 +19,9 @@
         "jsonwebtoken": "^9.0.3",
         "nodemailer": "^7.0.13",
         "pg": "^8.18.0",
-        "zod": "^3.25.76"
+        "zod": "^3.25.76",
+        "node-pg-migrate": "^8.0.4"
+
     },
     "devDependencies": {
         "nodemon": "^3.1.14",
@@ -31,6 +33,11 @@
         "dev": "nodemon index.js",
         "test": "vitest run",
         "test:ui": "vitest run --ui",
-        "lint": "eslint ."
+        "lint": "eslint .",
+        "migrate:create": "node-pg-migrate create --migrations-dir src/database/migrations --envPath .env",
+        "migrate:up": "node-pg-migrate up --migrations-dir src/database/migrations --migrations-table pgmigrations --envPath .env",
+        "migrate:down": "node-pg-migrate down --migrations-dir src/database/migrations --migrations-table pgmigrations --envPath .env",
+        "migrate:redo": "node-pg-migrate redo --migrations-dir src/database/migrations --migrations-table pgmigrations --envPath .env"
+
     }
 }

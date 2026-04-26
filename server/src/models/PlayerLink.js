@@ -17,7 +17,7 @@ export const PlayerLinkModel = {
     requestLink: async (userId, playerId) => {
         return db.query(
             `INSERT INTO player_links (user_id, player_id, status)
-             VALUES (?, ?, 'pending')
+             VALUES ($1, $2, 'pending')
              RETURNING *`,
             [userId, playerId]
         ).then(r => r.first);
@@ -30,7 +30,7 @@ export const PlayerLinkModel = {
             `SELECT pl.*, u.email AS user_email
              FROM player_links pl
              JOIN users u ON u.id = pl.user_id
-             WHERE pl.player_id = ?
+             WHERE pl.player_id = $1
              ORDER BY pl.created_at DESC`,
             [playerId]
         ).then(r => r.rows);
@@ -41,7 +41,8 @@ export const PlayerLinkModel = {
             `SELECT pl.*, p.name AS player_name
              FROM player_links pl
              JOIN players p ON p.id = pl.player_id
-             WHERE pl.user_id = ?`,
+             WHERE pl.user_id = $1
+             ORDER BY pl.created_at DESC`,
             [userId]
         ).then(r => r.first);
     },
@@ -53,7 +54,7 @@ export const PlayerLinkModel = {
              FROM player_links pl
              JOIN players p ON p.id  = pl.player_id
              JOIN users   u ON u.id  = pl.user_id
-             WHERE p.club_id = ? AND pl.status = 'pending'
+             WHERE p.club_id = $1 AND pl.status = 'pending'
              ORDER BY pl.created_at ASC`,
             [clubId]
         ).then(r => r.rows);
@@ -65,7 +66,7 @@ export const PlayerLinkModel = {
         return db.query(
             `UPDATE player_links
              SET status = 'approved', reviewed_at = NOW()
-             WHERE id = ?
+             WHERE id = $1
              RETURNING *`,
             [linkId]
         ).then(r => r.first);
@@ -75,7 +76,7 @@ export const PlayerLinkModel = {
         return db.query(
             `UPDATE player_links
              SET status = 'rejected', reviewed_at = NOW()
-             WHERE id = ?
+             WHERE id = $1
              RETURNING *`,
             [linkId]
         ).then(r => r.first);
@@ -86,7 +87,7 @@ export const PlayerLinkModel = {
     unlink: async (userId, playerId) => {
         return db.query(
             `DELETE FROM player_links
-             WHERE user_id = ? AND player_id = ?
+             WHERE user_id = $1 AND player_id = $2
              RETURNING id`,
             [userId, playerId]
         ).then(r => r.first);

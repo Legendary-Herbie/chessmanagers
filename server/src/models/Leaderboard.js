@@ -30,10 +30,10 @@ export const LeaderboardModel = {
                 (m.white_player_id = p.id OR m.black_player_id = p.id)
                 AND m.club_id = p.club_id
              LEFT JOIN player_links pl ON pl.player_id = p.id AND pl.status = 'approved'
-             WHERE p.club_id = ?
+             WHERE p.club_id = $1
              GROUP BY p.id, p.name, p.rating, pl.status
              ORDER BY p.rating DESC
-             LIMIT ? OFFSET ?`,
+             LIMIT $2 OFFSET $3`,
             [clubId, limit, offset]
         ).then(r => r.rows);
     },
@@ -46,9 +46,9 @@ export const LeaderboardModel = {
                 rh.rating_after  AS rating
              FROM rating_history rh
              JOIN matches m ON m.id = rh.match_id
-             WHERE rh.player_id = ?
+             WHERE rh.player_id = $1
              ORDER BY m.played_at ASC
-             LIMIT ?`,
+             LIMIT $2`,
             [playerId, limit]
         ).then(r => r.rows);
     },
@@ -58,22 +58,22 @@ export const LeaderboardModel = {
         return db.query(
             `SELECT
                 SUM(CASE
-                    WHEN white_player_id = ? AND result = 'white' THEN 1
-                    WHEN black_player_id = ? AND result = 'black' THEN 1
+                    WHEN white_player_id = $1 AND result = 'white' THEN 1
+                    WHEN black_player_id = $2 AND result = 'black' THEN 1
                     ELSE 0
                 END) AS player_a_wins,
                 SUM(CASE
-                    WHEN white_player_id = ? AND result = 'white' THEN 1
-                    WHEN black_player_id = ? AND result = 'black' THEN 1
+                    WHEN white_player_id = $3 AND result = 'white' THEN 1
+                    WHEN black_player_id = $4 AND result = 'black' THEN 1
                     ELSE 0
                 END) AS player_b_wins,
                 SUM(CASE WHEN result = 'draw' THEN 1 ELSE 0 END) AS draws,
                 COUNT(*) AS total
              FROM matches
              WHERE
-                (white_player_id = ? AND black_player_id = ?)
+                (white_player_id = $5 AND black_player_id = $6)
                 OR
-                (white_player_id = ? AND black_player_id = ?)`,
+                (white_player_id = $7 AND black_player_id = $8)`,
             [playerAId, playerAId, playerBId, playerBId,
              playerAId, playerBId, playerBId, playerAId]
         ).then(r => r.first);
@@ -92,7 +92,7 @@ export const LeaderboardModel = {
              FROM players p
              LEFT JOIN matches     m ON m.club_id = p.club_id
              LEFT JOIN tournaments t ON t.club_id = p.club_id
-             WHERE p.club_id = ?`,
+             WHERE p.club_id = $1`,
             [clubId]
         ).then(r => r.first);
     },

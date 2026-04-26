@@ -11,7 +11,7 @@ export const PlayerModel = {
     create: async ({ clubId, name, rating = 1500, bio = null }) => {
         return db.query(
             `INSERT INTO players (club_id, name, rating, bio)
-             VALUES (?, ?, ?, ?)
+             VALUES ($1, $2, $3, $4)
              RETURNING *`,
             [clubId, name, rating, bio]
         ).then(r => r.first);
@@ -26,7 +26,7 @@ export const PlayerModel = {
                     pl.status       AS link_status
              FROM players p
              LEFT JOIN player_links pl ON pl.player_id = p.id AND pl.status = 'approved'
-             WHERE p.id = ?`,
+             WHERE p.id = $1`,
             [id]
         ).then(r => r.first);
     },
@@ -40,7 +40,7 @@ export const PlayerModel = {
              FROM players p
              LEFT JOIN player_links pl ON pl.player_id = p.id
                  AND pl.status IN ('approved', 'pending')
-             WHERE p.club_id = ?
+             WHERE p.club_id = $1
              ORDER BY p.rating DESC`,
             [clubId]
         ).then(r => r.rows);
@@ -52,7 +52,7 @@ export const PlayerModel = {
             `SELECT p.*
              FROM players p
              JOIN player_links pl ON pl.player_id = p.id
-             WHERE pl.user_id = ? AND pl.status = 'approved'
+             WHERE pl.user_id = $1 AND pl.status = 'approved'
              LIMIT 1`,
             [userId]
         ).then(r => r.first);
@@ -63,10 +63,10 @@ export const PlayerModel = {
     update: async (id, { name, bio }) => {
         return db.query(
             `UPDATE players
-             SET name       = COALESCE(?, name),
-                 bio        = COALESCE(?, bio),
+             SET name       = COALESCE($1, name),
+                 bio        = COALESCE($2, bio),
                  updated_at = NOW()
-             WHERE id = ?
+             WHERE id = $3
              RETURNING *`,
             [name, bio, id]
         ).then(r => r.first);
@@ -76,9 +76,9 @@ export const PlayerModel = {
     updateRating: async (id, rating) => {
         return db.query(
             `UPDATE players
-             SET rating     = ?,
+             SET rating     = $1,
                  updated_at = NOW()
-             WHERE id = ?
+             WHERE id = $2
              RETURNING id, rating`,
             [rating, id]
         ).then(r => r.first);
@@ -104,12 +104,12 @@ export const PlayerModel = {
         return db.query(
             `UPDATE players
              SET games       = games + 1,
-                 wins        = wins + ?,
-                 draws       = draws + ?,
-                 losses      = losses + ?,
+                 wins        = wins + $1,
+                 draws       = draws + $2,
+                 losses      = losses + $3,
                  last_played = NOW(),
                  updated_at  = NOW()
-             WHERE id = ?
+             WHERE id = $4
              RETURNING *`,
             [winChange, drawChange, lossChange, id]
         ).then(r => r.first);
@@ -119,7 +119,7 @@ export const PlayerModel = {
 
     delete: async (id) => {
         return db.query(
-            `DELETE FROM players WHERE id = ? RETURNING id`,
+            `DELETE FROM players WHERE id = $1 RETURNING id`,
             [id]
         ).then(r => r.first);
     },
