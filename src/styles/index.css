@@ -1,0 +1,136 @@
+@font-face {
+    font-family: 'Inter';
+    src: url('/fonts/InterVariable.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: normal;
+    font-display: swap;
+}
+
+@font-face {
+    font-family: 'Inter';
+    src: url('/fonts/InterVariable-Italic.woff2') format('woff2');
+    font-weight: 100 900;
+    font-style: italic;
+    font-display: swap;
+}
+
+/* App colors and base them styles*/
+:root {
+    /* Primary */
+    --primary: #0004ff;
+    --primary-600: #4f46e5;
+    --primary-700: #4338ca;
+    --primary-contrast: #ffffff;
+
+    /* Accent / states */
+    --accent: #10b981;
+    --accent-light: #34d399;
+    --danger: #f43f5e;
+    --warning: #f59e0b;
+
+    /* Surfaces */
+    --bg-page: #f7f8fa;
+    --bg-surface: #ffffff;
+    --bg-muted: #f3f4f6;
+    --glass: rgba(255, 255, 255, 0.8);
+
+    /* Text */
+    --text-strong: #111827;
+    --text: #374151;
+  --text-muted: #6b7280;        
+  --text-placeholder: #9ca3af;   
+  --text-green: #16a34a; 
+  --text-red: #ef4444;
+
+  /* Borders */
+  --border: #9ca3af;             /* solid equivalent of old alpha value — predictable across all surfaces */
+  --border-emphasis: #6b7280;    /* for stronger strokes where more contrast is needed */
+  --border-accent: #c6d9f7;      /* renamed from --border-strong; a color accent, not a weight */
+    --focus-ring: 0 0 0 4px rgba(99, 102, 241, 0.15);
+
+    /* Motion */
+    --motion-fast: 120ms;
+    --motion-normal: 200ms;
+    --motion-slow: 300ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);   /* consolidated; --ease-standard removed */
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+    /* Radius & spacing */
+    --radius-xs: 2px;
+    --radius-sm: 4px;
+    --radius: 6px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --radius-2xl: 24px;
+
+    --gap-xs: 8px;
+    --gap-sm: 12px;
+    --gap-md: 20px;
+    --gap-lg: 32px;
+    --gap-xl: 48px;
+
+    /* Layout */
+  --content-max-width: 1000px;
+
+    /* Shadows */
+    --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+    --shadow-md: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+    --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+
+
+  /* Typography scale */
+    --font-size-xs: 0.75rem;
+    --font-size-sm: 0.875rem;
+    --font-size-base: 1rem;
+    --font-size-lg: 1.125rem;
+    --font-size-xl: 1.25rem;
+    --font-size-2xl: 1.5rem;
+    --font-size-3xl: 2rem;
+    --font-size-4xl: 2.5rem;
+
+  /* Font weights */
+    --font-normal: 400;
+    --font-medium: 500;
+    --font-bold: 600;
+    --font-black: 800;
+
+    --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --line-height: 1.5;
+
+    /* Accessibility */
+    --min-tap-size: 44px;
+
+  /* Icon sizes — scaled set replacing the single 50px value */
+  --icon-size-sm: 16px;
+  --icon-size: 24px;
+  --icon-size-lg: 32px;
+  --icon-size-xl: 48px;
+}
+
+/* Dark theme overrides */
+[data-theme='dark'] {
+    --bg-page: #0a0f1e;
+    --bg-surface: #111827;
+    --bg-muted: #1f2937;
+    --glass: rgba(17, 24, 39, 0.8);
+
+    --text-strong: #f9fafb;
+    --text: #e5e7eb;
+    --text-muted: #9ca3af;
+  --text-success: #34d399;       /* bumped from #16a34a — passes AA on dark surfaces */
+  --text-danger: #f87171;       
+
+  --border: #374151;
+    --border-emphasis: #4b5563;
+  --border-accent: #3b5a8a;      /* muted blue, visible on dark surfaces */
+
+  --warning: #fbbf24;            /* softened amber for dark backgrounds */
+
+  /* Shadows — mapped to the unified naming system */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow: 0 12px 20px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 32px 64px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 48px 80px rgba(0, 0, 0, 0.6);
+}
