@@ -1,46 +1,41 @@
--- ─── Users ────────────────────────────────────────────────────────────────────
+-- PostgreSQL schema (Postgres-only, no SQLite compatibility layer)
 
 CREATE TABLE IF NOT EXISTS users (
-    id            TEXT    PRIMARY KEY,
-    email         TEXT    UNIQUE NOT NULL,
-    name         TEXT,
-    password_hash TEXT    NOT NULL,
-    role          TEXT    NOT NULL DEFAULT 'member', -- 'admin' | 'linked_player' | 'member' | 'staff'
-    created_at    BIGINT  NOT NULL,
-    updated_at    BIGINT  NOT NULL DEFAULT 0
+    id            TEXT PRIMARY KEY DEFAULT ('usr_' || md5(random()::text || clock_timestamp()::text)),
+    email         TEXT UNIQUE NOT NULL,
+    name          TEXT UNIQUE,
+    password_hash TEXT NOT NULL,
+    role          TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin', 'linked_player', 'member', 'staff')),
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
--- ─── Clubs ────────────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS clubs (
-    id           TEXT    PRIMARY KEY,
-    name         TEXT    NOT NULL,
-    description  TEXT,
-    logo         TEXT,                               -- URL to logo image
-    contact_info TEXT,
-    owner_id     TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    share_token  TEXT,
-    public_leaderboard INTEGER NOT NULL DEFAULT 0,
-    share_expires BIGINT,
-    settings_json TEXT   NOT NULL DEFAULT '{}',
-    created_at   BIGINT  NOT NULL,
-    updated_at   BIGINT  NOT NULL DEFAULT 0
+    id                 TEXT PRIMARY KEY DEFAULT ('club_' || md5(random()::text || clock_timestamp()::text)),
+    name               TEXT NOT NULL,
+    description        TEXT,
+    logo               TEXT,
+    contact_info       TEXT,
+    owner_id           TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    share_token        TEXT,
+    public_leaderboard INTEGER NOT NULL DEFAULT 0 CHECK (public_leaderboard IN (0, 1)),
+    share_expires      TIMESTAMPTZ,
+    settings_json      TEXT NOT NULL DEFAULT '{}',
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Club membership — many users can belong to a club
 CREATE TABLE IF NOT EXISTS user_clubs (
-    user_id   TEXT   NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
-    club_id   TEXT   NOT NULL REFERENCES clubs(id)  ON DELETE CASCADE,
-    joined_at BIGINT NOT NULL DEFAULT 0,
+    user_id   TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    club_id   TEXT NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+    joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (user_id, club_id)
 );
 
--- ─── Players ──────────────────────────────────────────────────────────────────
-
 CREATE TABLE IF NOT EXISTS players (
-    id           TEXT    PRIMARY KEY,
-    club_id      TEXT    NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
-    name         TEXT    NOT NULL,
+    id           TEXT PRIMARY KEY DEFAULT ('player_' || md5(random()::text || clock_timestamp()::text)),
+    club_id      TEXT NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+    name         TEXT NOT NULL,
     bio          TEXT,
     rating       INTEGER NOT NULL DEFAULT 1200,
     start_rating INTEGER NOT NULL DEFAULT 1200,
@@ -48,136 +43,118 @@ CREATE TABLE IF NOT EXISTS players (
     wins         INTEGER NOT NULL DEFAULT 0,
     draws        INTEGER NOT NULL DEFAULT 0,
     losses       INTEGER NOT NULL DEFAULT 0,
-    last_played  BIGINT,
-    created_at   BIGINT  NOT NULL,
-    updated_at   BIGINT  NOT NULL DEFAULT 0
+    last_played  TIMESTAMPTZ,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
-
--- Player ↔ User link — optional, requires admin approval
-CREATE TABLE IF NOT EXISTS player_links (
-    id          TEXT   PRIMARY KEY,
-    player_id   TEXT   NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-    user_id     TEXT   NOT NULL REFERENCES users(id)   ON DELETE CASCADE,
-    status      TEXT   NOT NULL DEFAULT 'pending',     -- 'pending' | 'approved' | 'rejected'
-    created_at  BIGINT NOT NULL,
-    reviewed_at BIGINT,
-    UNIQUE (player_id),                                -- one approved link per player
-    UNIQUE (user_id)                                   -- one player per user account
-);
-
--- ─── Matches ──────────────────────────────────────────────────────────────────
-
-CREATE TABLE IF NOT EXISTS matches (
-    id              TEXT    PRIMARY KEY,
-    club_id         TEXT    NOT NULL REFERENCES clubs(id)   ON DELETE CASCADE,
-    white_player_id TEXT    NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-    black_player_id TEXT    NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-    result          TEXT    NOT NULL,                       -- 'white' | 'black' | 'draw'
-    type            TEXT    NOT NULL DEFAULT 'casual',      -- 'casual' | 'practice' | 'tournament'
-    tournament_id   TEXT    REFERENCES tournaments(id)      ON DELETE SET NULL,
-    notes           TEXT,
-    played_at       BIGINT  NOT NULL,
-    created_at      BIGINT  NOT NULL,
-    updated_at      BIGINT  NOT NULL DEFAULT 0
-);
-
--- Rating snapshot per match per player — feeds sparklines and history graphs
-CREATE TABLE IF NOT EXISTS rating_history (
-    id           TEXT    PRIMARY KEY,
-    player_id    TEXT    NOT NULL REFERENCES players(id) ON DELETE CASCADE,
-    match_id     TEXT    NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
-    rating_before INTEGER NOT NULL,
-    rating_after  INTEGER NOT NULL,
-    created_at   BIGINT  NOT NULL,
-    UNIQUE (player_id, match_id)
-);
-
--- ─── Tournaments ──────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS tournaments (
-    id         TEXT    PRIMARY KEY,
-    club_id    TEXT    NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
-    name       TEXT    NOT NULL,
-    type       TEXT    NOT NULL,                           -- 'round_robin' | 'knockout'
-    status     TEXT    NOT NULL DEFAULT 'upcoming',        -- 'upcoming' | 'active' | 'completed'
-    start_date BIGINT  NOT NULL,
-    end_date   BIGINT,
-    settings_json TEXT NOT NULL DEFAULT '{}',              -- reserved for future pairing config
-    created_at BIGINT  NOT NULL,
-    updated_at BIGINT  NOT NULL DEFAULT 0
+    id            TEXT PRIMARY KEY DEFAULT ('tour_' || md5(random()::text || clock_timestamp()::text)),
+    club_id       TEXT NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+    name          TEXT NOT NULL,
+    type          TEXT NOT NULL CHECK (type IN ('round_robin', 'knockout', 'swiss', 'arena')),
+    status        TEXT NOT NULL DEFAULT 'upcoming' CHECK (status IN ('upcoming', 'active', 'completed')),
+    start_date    TIMESTAMPTZ NOT NULL,
+    end_date      TIMESTAMPTZ,
+    settings_json TEXT NOT NULL DEFAULT '{}',
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
--- Tournament roster — players entered in a tournament
 CREATE TABLE IF NOT EXISTS tournament_players (
-    tournament_id TEXT   NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
-    player_id     TEXT   NOT NULL REFERENCES players(id)     ON DELETE CASCADE,
-    joined_at     BIGINT NOT NULL DEFAULT 0,
+    tournament_id TEXT NOT NULL REFERENCES tournaments(id) ON DELETE CASCADE,
+    player_id     TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    joined_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     PRIMARY KEY (tournament_id, player_id)
 );
 
--- ─── Auth ─────────────────────────────────────────────────────────────────────
+CREATE TABLE IF NOT EXISTS matches (
+    id              TEXT PRIMARY KEY DEFAULT ('match_' || md5(random()::text || clock_timestamp()::text)),
+    club_id         TEXT NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+    white_player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    black_player_id TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    result          TEXT NOT NULL CHECK (result IN ('white', 'black', 'draw')),
+    type            TEXT NOT NULL DEFAULT 'casual' CHECK (type IN ('casual', 'rated', 'tournament')),
+    tournament_id   TEXT REFERENCES tournaments(id) ON DELETE SET NULL,
+    notes           TEXT,
+    played_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS rating_history (
+    id            TEXT PRIMARY KEY DEFAULT ('rh_' || md5(random()::text || clock_timestamp()::text)),
+    player_id     TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    match_id      TEXT NOT NULL REFERENCES matches(id) ON DELETE CASCADE,
+    rating_before INTEGER NOT NULL,
+    rating_after  INTEGER NOT NULL,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    UNIQUE (player_id, match_id)
+);
+
+CREATE TABLE IF NOT EXISTS player_links (
+    id          TEXT PRIMARY KEY DEFAULT ('plink_' || md5(random()::text || clock_timestamp()::text)),
+    player_id   TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    user_id     TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    status      TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    reviewed_at TIMESTAMPTZ,
+    UNIQUE (player_id, user_id)
+);
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
-    id          TEXT    PRIMARY KEY,
-    user_id     TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash  TEXT    NOT NULL,
-    expires_at  BIGINT  NOT NULL,
-    created_at  BIGINT  NOT NULL,
-    revoked     INTEGER NOT NULL DEFAULT 0
+    id         TEXT PRIMARY KEY DEFAULT ('rt_' || md5(random()::text || clock_timestamp()::text)),
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    revoked    INTEGER NOT NULL DEFAULT 0 CHECK (revoked IN (0, 1))
 );
 
 CREATE TABLE IF NOT EXISTS password_resets (
-    id          TEXT    PRIMARY KEY,
-    user_id     TEXT    NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    token_hash  TEXT    NOT NULL,
-    expires_at  BIGINT  NOT NULL,
-    created_at  BIGINT  NOT NULL,
-    used_at     BIGINT,
-    request_ip  TEXT,
-    user_agent  TEXT,
-    attempts    INTEGER NOT NULL DEFAULT 0
+    id         TEXT PRIMARY KEY DEFAULT ('pr_' || md5(random()::text || clock_timestamp()::text)),
+    user_id    TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash TEXT NOT NULL,
+    expires_at TIMESTAMPTZ NOT NULL,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    used_at    TIMESTAMPTZ,
+    request_ip TEXT,
+    user_agent TEXT,
+    attempts   INTEGER NOT NULL DEFAULT 0
 );
 
--- ─── Indices ──────────────────────────────────────────────────────────────────
+CREATE INDEX IF NOT EXISTS idx_clubs_owner               ON clubs(owner_id);
+CREATE INDEX IF NOT EXISTS idx_clubs_share_token         ON clubs(share_token);
+CREATE INDEX IF NOT EXISTS idx_user_clubs_user           ON user_clubs(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_clubs_club           ON user_clubs(club_id);
 
--- Users
-CREATE INDEX IF NOT EXISTS idx_users_email              ON users(email);
+CREATE INDEX IF NOT EXISTS idx_players_club              ON players(club_id);
+CREATE INDEX IF NOT EXISTS idx_players_rating_sort       ON players(club_id, rating DESC);
+CREATE INDEX IF NOT EXISTS idx_players_name_search       ON players(club_id, name);
 
--- Clubs
-CREATE INDEX IF NOT EXISTS idx_clubs_owner              ON clubs(owner_id);
-CREATE INDEX IF NOT EXISTS idx_clubs_share_token        ON clubs(share_token);
-CREATE INDEX IF NOT EXISTS idx_user_clubs_user          ON user_clubs(user_id);
-CREATE INDEX IF NOT EXISTS idx_user_clubs_club          ON user_clubs(club_id);
+CREATE INDEX IF NOT EXISTS idx_player_links_player       ON player_links(player_id);
+CREATE INDEX IF NOT EXISTS idx_player_links_user         ON player_links(user_id);
+CREATE INDEX IF NOT EXISTS idx_player_links_status       ON player_links(status);
+CREATE UNIQUE INDEX IF NOT EXISTS ux_player_links_active_player ON player_links(player_id)
+    WHERE status IN ('pending', 'approved');
+CREATE UNIQUE INDEX IF NOT EXISTS ux_player_links_active_user ON player_links(user_id)
+    WHERE status IN ('pending', 'approved');
 
--- Players
-CREATE INDEX IF NOT EXISTS idx_players_club             ON players(club_id);
-CREATE INDEX IF NOT EXISTS idx_players_rating_sort      ON players(club_id, rating DESC);
-CREATE INDEX IF NOT EXISTS idx_players_name_search      ON players(club_id, name);
+CREATE INDEX IF NOT EXISTS idx_matches_club              ON matches(club_id);
+CREATE INDEX IF NOT EXISTS idx_matches_date_sort         ON matches(club_id, played_at DESC);
+CREATE INDEX IF NOT EXISTS idx_matches_white_player      ON matches(white_player_id);
+CREATE INDEX IF NOT EXISTS idx_matches_black_player      ON matches(black_player_id);
+CREATE INDEX IF NOT EXISTS idx_matches_tournament        ON matches(tournament_id);
 
--- Player links
-CREATE INDEX IF NOT EXISTS idx_player_links_player      ON player_links(player_id);
-CREATE INDEX IF NOT EXISTS idx_player_links_user        ON player_links(user_id);
-CREATE INDEX IF NOT EXISTS idx_player_links_status      ON player_links(status);
+CREATE INDEX IF NOT EXISTS idx_rating_history_player     ON rating_history(player_id);
+CREATE INDEX IF NOT EXISTS idx_rating_history_match      ON rating_history(match_id);
 
--- Matches
-CREATE INDEX IF NOT EXISTS idx_matches_club             ON matches(club_id);
-CREATE INDEX IF NOT EXISTS idx_matches_date_sort        ON matches(club_id, played_at DESC);
-CREATE INDEX IF NOT EXISTS idx_matches_white_player     ON matches(white_player_id);
-CREATE INDEX IF NOT EXISTS idx_matches_black_player     ON matches(black_player_id);
-CREATE INDEX IF NOT EXISTS idx_matches_tournament       ON matches(tournament_id);
-
--- Rating history
-CREATE INDEX IF NOT EXISTS idx_rating_history_player    ON rating_history(player_id);
-CREATE INDEX IF NOT EXISTS idx_rating_history_match     ON rating_history(match_id);
-
--- Tournaments
-CREATE INDEX IF NOT EXISTS idx_tournaments_club         ON tournaments(club_id);
-CREATE INDEX IF NOT EXISTS idx_tournaments_status       ON tournaments(club_id, status);
-CREATE INDEX IF NOT EXISTS idx_tournament_players_tour  ON tournament_players(tournament_id);
+CREATE INDEX IF NOT EXISTS idx_tournaments_club          ON tournaments(club_id);
+CREATE INDEX IF NOT EXISTS idx_tournaments_status        ON tournaments(club_id, status);
+CREATE INDEX IF NOT EXISTS idx_tournament_players_tour   ON tournament_players(tournament_id);
 CREATE INDEX IF NOT EXISTS idx_tournament_players_player ON tournament_players(player_id);
 
--- Auth
-CREATE INDEX IF NOT EXISTS idx_refresh_token_user       ON refresh_tokens(user_id);
-CREATE INDEX IF NOT EXISTS idx_refresh_token_hash       ON refresh_tokens(token_hash);
-CREATE INDEX IF NOT EXISTS idx_password_resets_token    ON password_resets(token_hash);
-CREATE INDEX IF NOT EXISTS idx_password_resets_user     ON password_resets(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_token_user        ON refresh_tokens(user_id);
+CREATE INDEX IF NOT EXISTS idx_refresh_token_hash        ON refresh_tokens(token_hash);
+CREATE INDEX IF NOT EXISTS idx_password_resets_token     ON password_resets(token_hash);
+CREATE INDEX IF NOT EXISTS idx_password_resets_user      ON password_resets(user_id);

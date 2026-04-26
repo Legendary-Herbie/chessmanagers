@@ -48,16 +48,7 @@ const db = {
 
     query: async (text, params = []) => {
         const res = await pgDb.query(toPostgresParams(text), params);
-        const isSelect = text.trim().toUpperCase().startsWith('SELECT');
-
-        if (isSelect) {
-            return normaliseRows(res.rows, res.rowCount);
-        }
-        return {
-            rows: [],
-            rowCount: res.rowCount,
-            first: null,
-        };
+       return(res.rows, res.rowCount)
     },
 
     // transaction() runs a callback with a transactional query function.
@@ -69,16 +60,7 @@ const db = {
             const result = await cb({
                 query: async (text, params = []) => {
                     const res = await client.query(toPostgresParams(text), params);
-                    const isSelect = text.trim().toUpperCase().startsWith('SELECT');
-
-                    if (isSelect) {
-                        return normaliseRows(res.rows, res.rowCount);
-                    }
-                    return {
-                        rows: [],
-                        rowCount: res.rowCount,
-                        first: null,
-                    };
+                    return(res.rows, res.rowCount)
                 },
             });
             await client.query('COMMIT');

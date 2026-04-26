@@ -3,7 +3,7 @@ import db from '../database/database.js';
 // Represents a match between two players.
 // Rating updates are handled by the ratings utility (utils/ratings.js)
 // and applied via Player.updateRating() — not here.
-// Match type: 'casual' | 'practice' | 'tournament'
+// Match type: 'casual' | 'rated' | 'tournament'
 // Result (from white's perspective): 'white' | 'black' | 'draw'
 export const MatchModel = {
 
@@ -122,6 +122,18 @@ export const MatchModel = {
              WHERE id = ?
              RETURNING *`,
             [result, notes, id]
+        ).then(r => r.first);
+    },
+
+    // ── Record rating history for a player after a match ──────────────────────
+
+    recordRatingHistory: async (playerId, matchId, ratingBefore, ratingAfter) => {
+        return db.query(
+            `INSERT INTO rating_history
+                (player_id, match_id, rating_before, rating_after)
+             VALUES (?, ?, ?, ?)
+             RETURNING *`,
+            [playerId, matchId, ratingBefore, ratingAfter]
         ).then(r => r.first);
     },
 

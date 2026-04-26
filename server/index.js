@@ -6,8 +6,23 @@ import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
 import env from './src/config/env.js';
 import db from './src/database/database.js';
+
+// ─── Routes ───────────────────────────────────────────────────────────────────
+
+import authRoutes        from './src/routes/authRoutes.js';
+import clubRoutes        from './src/routes/clubRoutes.js';
+import playerRoutes      from './src/routes/playerRoutes.js';
+import matchRoutes       from './src/routes/matchRoutes.js';
+import tournamentRoutes  from './src/routes/tournamentRoutes.js';
+import leaderboardRoutes from './src/routes/leaderboardRoutes.js';
+import publicRoutes      from './src/routes/publicRoutes.js';
+
+// ─── Error Handling Middleware ─────────────────────────────────────────────────
+
+import { notFound, errorHandler } from './src/middleware/errorHandler.js';
 
 const app = express();
 const { PORT, CORS_ORIGIN, NODE_ENV, SERVE_FRONTEND } = env;
@@ -79,11 +94,24 @@ const globalLimiter = rateLimit({
 });
 app.use(globalLimiter);
 
-// ─── Routes ───────────────────────────────────────────────────────────────────
+// ─── API Routes ───────────────────────────────────────────────────────────────
 
+// Health check — before all route handlers
 app.get('/health', (req, res) =>
     res.json({ status: 'ok', timestamp: new Date().toISOString() })
 );
+
+// Standalone routes
+app.use('/api/v1/auth',   authRoutes);
+app.use('/api/v1/public', publicRoutes);
+app.use('/api/v1/clubs',  clubRoutes);
+
+// Club-scoped routes — nested under /api/v1/clubs/:clubId
+// Each router uses mergeParams: true to inherit :clubId
+app.use('/api/v1/clubs/:clubId/players',     playerRoutes);
+app.use('/api/v1/clubs/:clubId/matches',     matchRoutes);
+app.use('/api/v1/clubs/:clubId/tournaments', tournamentRoutes);
+app.use('/api/v1/clubs/:clubId/leaderboard', leaderboardRoutes);
 
 // ─── Static Frontend (Production) ─────────────────────────────────────────────
 
@@ -99,6 +127,7 @@ if (NODE_ENV === 'production' && SERVE_FRONTEND && !shouldServeFrontend) {
 if (shouldServeFrontend) {
     app.use(express.static(distPath));
 
+    // SPA catch-all: serve index.html for all non-API, non-health routes
     app.get('*', (req, res, next) => {
         if (!req.path.startsWith('/api/') && req.path !== '/health') {
             return res.sendFile(distIndexPath);
@@ -106,7 +135,6 @@ if (shouldServeFrontend) {
         next();
     });
 } else {
-    // Homepage — dev / API-only mode
     app.get('/', (req, res) => {
         res.json({
             status: 'ok',
@@ -116,31 +144,11 @@ if (shouldServeFrontend) {
     });
 }
 
-// ─── 404 ──────────────────────────────────────────────────────────────────────
-// Catches all unmatched routes and returns a consistent JSON response.
+// ─── Error Handling ───────────────────────────────────────────────────────────
+// notFound catches unmatched routes; errorHandler catches all thrown errors.
 
-app.use((req, res) => {
-    res.status(404).json({ error: 'Route not found' });
-});
-
-// ─── Global Error Handler ──────────────────────────────────────────────────────
-// Express requires exactly 4 arguments to identify an error handler.
-// eslint-disable-next-line no-unused-vars
-app.use((err, req, res, _next) => {
-    console.error('[ERROR] Unhandled:', err);
-
-    if (err instanceof SyntaxError && err.status === 400 && 'body' in err) {
-        return res.status(400).json({ error: 'Invalid JSON payload' });
-    }
-
-    const isProd = NODE_ENV === 'production';
-
-    res.status(err.status || 500).json({
-        error: isProd ? 'Internal Server Error' : (err.message || 'Internal Server Error'),
-        details: isProd ? undefined : err.message,
-        stack: isProd ? undefined : err.stack,
-    });
-});
+app.use(notFound);
+app.use(errorHandler);
 
 // ─── Export (for testing) ──────────────────────────────────────────────────────
 
@@ -171,7 +179,7 @@ if (NODE_ENV !== 'test') {
             };
 
             process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-            process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+            process.on('SIGINT',  () => gracefulShutdown('SIGINT'));
         })
         .catch(err => {
             console.error('[FATAL] Database initialisation failed:', err);

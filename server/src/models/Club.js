@@ -6,12 +6,12 @@ export const ClubModel = {
 
     // ── Create ────────────────────────────────────────────────────────────────
 
-    create: async ({ name, description = null, logo = null, contactInfo = null }) => {
+    create: async ({ name, ownerId, description = null, logo = null, contactInfo = null }) => {
         return db.query(
-            `INSERT INTO clubs (name, description, logo, contact_info)
-             VALUES (?, ?, ?, ?)
+            `INSERT INTO clubs (name, owner_id, description, logo, contact_info)
+             VALUES (?, ?, ?, ?, ?)
              RETURNING *`,
-            [name, description, logo, contactInfo]
+            [name, ownerId, description, logo, contactInfo]
         ).then(r => r.first);
     },
 

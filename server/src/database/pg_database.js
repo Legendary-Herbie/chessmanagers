@@ -9,8 +9,8 @@ const { Pool } = pg;
 const { DATABASE_URL, NODE_ENV } = env;
 
 // ─── Type parsers ─────────────────────────────────────────────────────────────
-// Parse BIGINT and NUMERIC as JS numbers rather than strings.
-types.setTypeParser(20,   v => v === null ? null : Number(v));   // int8 / BIGINT
+// Parse int8 and NUMERIC as JS numbers rather than strings.
+types.setTypeParser(20,   v => v === null ? null : Number(v));   // int8
 types.setTypeParser(1700, v => v === null ? null : Number(v));   // numeric
 // Parse boolean as true/false rather than 't'/'f' strings.
 types.setTypeParser(16,   v => v === null ? null : v === 't');   // bool

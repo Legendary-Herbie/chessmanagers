@@ -84,6 +84,37 @@ export const PlayerModel = {
         ).then(r => r.first);
     },
 
+    // Update match counters and last_played after a match result.
+    // result: 'white' | 'black' | 'draw'
+    // isWhite: true if this player played white, false if played black
+    recordMatchResult: async (id, result, isWhite) => {
+        // Determine if player won, lost, or drew
+        let winChange = 0, drawChange = 0, lossChange = 0;
+
+        if (result === 'draw') {
+            drawChange = 1;
+        } else if ((isWhite && result === 'white') || (!isWhite && result === 'black')) {
+            // Player won
+            winChange = 1;
+        } else {
+            // Player lost
+            lossChange = 1;
+        }
+
+        return db.query(
+            `UPDATE players
+             SET games       = games + 1,
+                 wins        = wins + ?,
+                 draws       = draws + ?,
+                 losses      = losses + ?,
+                 last_played = NOW(),
+                 updated_at  = NOW()
+             WHERE id = ?
+             RETURNING *`,
+            [winChange, drawChange, lossChange, id]
+        ).then(r => r.first);
+    },
+
     // ── Delete ────────────────────────────────────────────────────────────────
 
     delete: async (id) => {
