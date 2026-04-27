@@ -1,13 +1,10 @@
 import db from '../database/database.js';
 
-// Represents a tournament within a club.
-// Tournament type: 'round_robin' | 'knockout'
-// Status: 'upcoming' | 'active' | 'completed'
 export const TournamentModel = {
 
     // ── Create ────────────────────────────────────────────────────────────────
 
-    create: async ({ clubId, name, type, startDate, endDate = null, }) => {
+    create: async ({ clubId, name, type, startDate, endDate = null }) => {
         return db.query(
             `INSERT INTO tournaments (club_id, name, type, start_date, end_date, status)
              VALUES ($1, $2, $3, $4, $5, 'upcoming')
@@ -42,37 +39,19 @@ export const TournamentModel = {
         ).then(r => r.rows);
     },
 
-    // Standings: players ranked by score within a tournament.
-    // Score is derived from match results (win=1, draw=0.5, loss=0).
+    // Standings from VIEW — no CASE logic in application code.
     getStandings: async (tournamentId) => {
         return db.query(
             `SELECT
-                p.id,
-                p.name,
-                COUNT(m.id)                                             AS played,
-                SUM(CASE
-                    WHEN m.white_player_id = p.id AND m.result = 'white' THEN 1
-                    WHEN m.black_player_id = p.id AND m.result = 'black' THEN 1
-                    ELSE 0
-                END)                                                    AS wins,
-                SUM(CASE WHEN m.result = 'draw' THEN 1 ELSE 0 END)     AS draws,
-                SUM(CASE
-                    WHEN m.white_player_id = p.id AND m.result = 'black' THEN 1
-                    WHEN m.black_player_id = p.id AND m.result = 'white' THEN 1
-                    ELSE 0
-                END)                                                    AS losses,
-                SUM(CASE
-                    WHEN m.white_player_id = p.id AND m.result = 'white' THEN 1
-                    WHEN m.black_player_id = p.id AND m.result = 'black' THEN 1
-                    WHEN m.result = 'draw' THEN 0.5
-                    ELSE 0
-                END)                                                    AS score
-             FROM tournament_players tp
-             JOIN players p  ON p.id = tp.player_id
-             LEFT JOIN matches m ON m.tournament_id = tp.tournament_id
-                 AND (m.white_player_id = p.id OR m.black_player_id = p.id)
-             WHERE tp.tournament_id = $1
-             GROUP BY p.id, p.name
+                player_id  AS id,
+                name,
+                played,
+                wins,
+                draws,
+                losses,
+                score
+             FROM v_tournament_standings
+             WHERE tournament_id = $1
              ORDER BY score DESC, wins DESC`,
             [tournamentId]
         ).then(r => r.rows);

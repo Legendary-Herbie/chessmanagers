@@ -1,10 +1,8 @@
 import db from '../database/database.js';
 
-// Represents a match between two players.
-// Rating updates are handled by the ratings utility (utils/ratings.js)
-// and applied via Player.updateRating() — not here.
-// Match type: 'casual' | 'rated' | 'tournament'
-// Result (from white's perspective): 'white' | 'black' | 'draw'
+// ─── helpers ──────────────────────────────────────────────────────────────────
+const qry = (trx) => trx ? trx.query.bind(trx) : db.query.bind(db);
+
 export const MatchModel = {
 
     // ── Create ────────────────────────────────────────────────────────────────
@@ -17,8 +15,8 @@ export const MatchModel = {
         type = 'casual',
         tournamentId = null,
         notes = null,
-    }) => {
-        return db.query(
+    }, trx) => {
+        return qry(trx)(
             `INSERT INTO matches
                 (club_id, white_player_id, black_player_id, result, type, tournament_id, notes)
              VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -42,30 +40,25 @@ export const MatchModel = {
         ).then(r => r.first);
     },
 
-    // All matches for a club, with optional filters.
     findByClub: async (clubId, { type, tournamentId, playerId, limit = 50, offset = 0 } = {}) => {
         const conditions = ['m.club_id = $1'];
         const params = [clubId];
-        let placeholderIndex = 2;
+        let i = 2;
 
         if (type) {
-            conditions.push(`m.type = $${placeholderIndex}`);
+            conditions.push(`m.type = $${i++}`);
             params.push(type);
-            placeholderIndex++;
         }
         if (tournamentId) {
-            conditions.push(`m.tournament_id = $${placeholderIndex}`);
+            conditions.push(`m.tournament_id = $${i++}`);
             params.push(tournamentId);
-            placeholderIndex++;
         }
         if (playerId) {
-            conditions.push(`(m.white_player_id = $${placeholderIndex} OR m.black_player_id = $${placeholderIndex + 1})`);
-            params.push(playerId, playerId);
-            placeholderIndex += 2;
+            conditions.push(`(m.white_player_id = $${i} OR m.black_player_id = $${i})`);
+            params.push(playerId);
+            i++;
         }
 
-        const limitPlaceholder = placeholderIndex;
-        const offsetPlaceholder = placeholderIndex + 1;
         params.push(limit, offset);
 
         return db.query(
@@ -77,12 +70,11 @@ export const MatchModel = {
              JOIN players bp ON bp.id = m.black_player_id
              WHERE ${conditions.join(' AND ')}
              ORDER BY m.played_at DESC
-             LIMIT $${limitPlaceholder} OFFSET $${offsetPlaceholder}`,
+             LIMIT $${i} OFFSET $${i + 1}`,
             params
         ).then(r => r.rows);
     },
 
-    // Match history for a single player across both colours.
     findByPlayer: async (playerId, { limit = 20, offset = 0 } = {}) => {
         return db.query(
             `SELECT m.*,
@@ -91,14 +83,13 @@ export const MatchModel = {
              FROM matches m
              JOIN players wp ON wp.id = m.white_player_id
              JOIN players bp ON bp.id = m.black_player_id
-             WHERE m.white_player_id = $1 OR m.black_player_id = $2
+             WHERE m.white_player_id = $1 OR m.black_player_id = $1
              ORDER BY m.played_at DESC
-             LIMIT $3 OFFSET $4`,
-            [playerId, playerId, limit, offset]
+             LIMIT $2 OFFSET $3`,
+            [playerId, limit, offset]
         ).then(r => r.rows);
     },
 
-    // Head-to-head record between two specific players.
     findHeadToHead: async (playerAId, playerBId) => {
         return db.query(
             `SELECT m.*,
@@ -118,7 +109,6 @@ export const MatchModel = {
 
     // ── Update ────────────────────────────────────────────────────────────────
 
-    // Admin correction of a match result.
     updateResult: async (id, { result, notes }) => {
         return db.query(
             `UPDATE matches
@@ -131,10 +121,10 @@ export const MatchModel = {
         ).then(r => r.first);
     },
 
-    // ── Record rating history for a player after a match ──────────────────────
+    // ── Rating history ────────────────────────────────────────────────────────
 
-    recordRatingHistory: async (playerId, matchId, ratingBefore, ratingAfter) => {
-        return db.query(
+    recordRatingHistory: async (playerId, matchId, ratingBefore, ratingAfter, trx) => {
+        return qry(trx)(
             `INSERT INTO rating_history
                 (player_id, match_id, rating_before, rating_after)
              VALUES ($1, $2, $3, $4)

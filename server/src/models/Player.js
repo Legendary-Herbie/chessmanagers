@@ -1,14 +1,14 @@
 import db from '../database/database.js';
 
-// Represents a real-world chess player within a club.
+// ─── helpers ────────────────────────────────────────────────────────────────── 
+const qry = (trx) => trx ? trx.query.bind(trx) : db.query.bind(db);
+
 // Players are owned by the club, not the user — a player record exists
-// independently of any user account. Users may request to link to a player,
-// subject to admin approval (see PlayerLink model).
 export const PlayerModel = {
 
     // ── Create ────────────────────────────────────────────────────────────────
 
-    create: async ({ clubId, name, rating = 1500, bio = null }) => {
+    create: async ({ clubId, name, rating = 1200, bio = null }) => {
         return db.query(
             `INSERT INTO players (club_id, name, rating, bio)
              VALUES ($1, $2, $3, $4)
@@ -22,8 +22,8 @@ export const PlayerModel = {
     findById: async (id) => {
         return db.query(
             `SELECT p.*,
-                    pl.user_id      AS linked_user_id,
-                    pl.status       AS link_status
+                    pl.user_id  AS linked_user_id,
+                    pl.status   AS link_status
              FROM players p
              LEFT JOIN player_links pl ON pl.player_id = p.id AND pl.status = 'approved'
              WHERE p.id = $1`,
@@ -31,7 +31,6 @@ export const PlayerModel = {
         ).then(r => r.first);
     },
 
-    // All players in a club, with their link status for display.
     findByClub: async (clubId) => {
         return db.query(
             `SELECT p.*,
@@ -46,7 +45,6 @@ export const PlayerModel = {
         ).then(r => r.rows);
     },
 
-    // The player linked to a specific approved user account.
     findByUserId: async (userId) => {
         return db.query(
             `SELECT p.*
@@ -72,9 +70,10 @@ export const PlayerModel = {
         ).then(r => r.first);
     },
 
-    // Called after each match to persist the newly calculated rating.
-    updateRating: async (id, rating) => {
-        return db.query(
+    // Called after each match to persist the newly calculated ELO rating.
+    // Accepts trx so it runs inside the match-creation transaction.
+    updateRating: async (id, rating, trx) => {
+        return qry(trx)(
             `UPDATE players
              SET rating     = $1,
                  updated_at = NOW()
@@ -83,38 +82,6 @@ export const PlayerModel = {
             [rating, id]
         ).then(r => r.first);
     },
-
-    // Update match counters and last_played after a match result.
-    // result: 'white' | 'black' | 'draw'
-    // isWhite: true if this player played white, false if played black
-    recordMatchResult: async (id, result, isWhite) => {
-        // Determine if player won, lost, or drew
-        let winChange = 0, drawChange = 0, lossChange = 0;
-
-        if (result === 'draw') {
-            drawChange = 1;
-        } else if ((isWhite && result === 'white') || (!isWhite && result === 'black')) {
-            // Player won
-            winChange = 1;
-        } else {
-            // Player lost
-            lossChange = 1;
-        }
-
-        return db.query(
-            `UPDATE players
-             SET games       = games + 1,
-                 wins        = wins + $1,
-                 draws       = draws + $2,
-                 losses      = losses + $3,
-                 last_played = NOW(),
-                 updated_at  = NOW()
-             WHERE id = $4
-             RETURNING *`,
-            [winChange, drawChange, lossChange, id]
-        ).then(r => r.first);
-    },
-
     // ── Delete ────────────────────────────────────────────────────────────────
 
     delete: async (id) => {

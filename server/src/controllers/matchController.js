@@ -30,11 +30,7 @@ export async function getMatches(req, res, next) {
 export async function getMatch(req, res, next) {
     try {
         const match = await MatchModel.findById(req.params.matchId);
-
-        if (!match) {
-            return res.status(404).json({ error: 'Match not found.' });
-        }
-
+        if (!match) return res.status(404).json({ error: 'Match not found.' });
         res.json({ match });
     } catch (err) {
         next(err);
@@ -42,7 +38,15 @@ export async function getMatch(req, res, next) {
 }
 
 // POST /api/v1/clubs/:clubId/matches — admin only
-// Creates the match and immediately recalculates both player ratings.
+//
+// Transaction steps:
+//   1. Insert match row  →  DB trigger (trg_player_stats) fires and updates
+//      player games/wins/draws/losses automatically — no app-level stat calls needed.
+//   2. Calculate new ELO ratings.
+//   3. Update both players' ratings (via trx so it stays in the same transaction).
+//   4. Insert rating_history rows for both players (via trx).
+//
+// PlayerModel.recordMatchResult() is NOT called — the trigger handles it.
 export async function createMatch(req, res, next) {
     try {
         const { clubId } = req.params;
@@ -62,7 +66,7 @@ export async function createMatch(req, res, next) {
             return res.status(400).json({ error: `Type must be one of: ${VALID_TYPES.join(', ')}.` });
         }
 
-        // ── Fetch players ─────────────────────────────────────────────────────
+        // ── Pre-fetch players (read-only, outside transaction) ─────────────────
         const [white, black] = await Promise.all([
             PlayerModel.findById(whitePlayerId),
             PlayerModel.findById(blackPlayerId),
@@ -71,49 +75,41 @@ export async function createMatch(req, res, next) {
         if (!white) return res.status(404).json({ error: 'White player not found.' });
         if (!black) return res.status(404).json({ error: 'Black player not found.' });
 
+        // Belt-and-suspenders club check — schema composite FKs are the definitive guard.
+        if (white.club_id !== clubId || black.club_id !== clubId) {
+            return res.status(400).json({ error: 'Both players must belong to this club.' });
+        }
+
+        // ── Atomic transaction ─────────────────────────────────────────────────
         const { match } = await db.transaction(async (trx) => {
-        // 1. Create match record
-        const match = await MatchModel.create({
-            clubId, whitePlayerId, blackPlayerId, result,
-            type: type || 'casual',
-            tournamentId: tournamentId || null,
-            notes: notes || null,
-        }, trx);
 
-        // 2. Calculate new ratings
-        const { newWhiteRating, newBlackRating } = calculateNewRatings(
-            white.rating, black.rating, result, match.type
-        );
+            // Step 1: insert match. The trg_player_stats trigger fires here,
+            // updating both players' counters inside the same transaction.
+            const match = await MatchModel.create({
+                clubId, whitePlayerId, blackPlayerId,
+                result,
+                type: type || 'casual',
+                tournamentId: tournamentId || null,
+                notes: notes || null,
+            }, trx);
 
-        // 3. Update ratings in player records
-        await Promise.all([
-            PlayerModel.updateRating(whitePlayerId, newWhiteRating, trx),
-            PlayerModel.updateRating(blackPlayerId, newBlackRating, trx),
-        ]);
+            // Step 2: calculate ELO.
+            const { newWhiteRating, newBlackRating } = calculateNewRatings(
+                white.rating, black.rating, result, white, black,
+            );
 
-        // 4. Record rating history for both players
-        await Promise.all([
-            MatchModel.recordRatingHistory(
-                whitePlayerId,
-                match.id,
-                white.rating,
-                newWhiteRating,
-                trx
-            ),
-            MatchModel.recordRatingHistory(
-                blackPlayerId,
-                match.id,
-                black.rating,
-                newBlackRating,
-                trx
-            ),
-        ]);
+            // Step 3: persist ratings — trx ensures atomicity.
+            await Promise.all([
+                PlayerModel.updateRating(whitePlayerId, newWhiteRating, trx),
+                PlayerModel.updateRating(blackPlayerId, newBlackRating, trx),
+            ]);
 
-        // 5. Update match counters
-        await Promise.all([
-            PlayerModel.recordMatchResult(whitePlayerId, result, true, trx),
-            PlayerModel.recordMatchResult(blackPlayerId, result, false, trx),
-        ]);
+            // Step 4: audit trail.
+            await Promise.all([
+                MatchModel.recordRatingHistory(whitePlayerId, match.id, white.rating, newWhiteRating, trx),
+                MatchModel.recordRatingHistory(blackPlayerId, match.id, black.rating, newBlackRating, trx),
+            ]);
+
             return { match };
         });
 
@@ -124,8 +120,6 @@ export async function createMatch(req, res, next) {
 }
 
 // PATCH /api/v1/clubs/:clubId/matches/:matchId — admin only
-// Corrects a match result. Does NOT recalculate ratings automatically —
-// rating corrections are a separate admin action to avoid cascading recalculations.
 export async function updateMatch(req, res, next) {
     try {
         const { result, notes } = req.body;
@@ -135,10 +129,7 @@ export async function updateMatch(req, res, next) {
         }
 
         const match = await MatchModel.updateResult(req.params.matchId, { result, notes });
-
-        if (!match) {
-            return res.status(404).json({ error: 'Match not found.' });
-        }
+        if (!match) return res.status(404).json({ error: 'Match not found.' });
 
         res.json({ match });
     } catch (err) {
@@ -150,11 +141,7 @@ export async function updateMatch(req, res, next) {
 export async function deleteMatch(req, res, next) {
     try {
         const deleted = await MatchModel.delete(req.params.matchId);
-
-        if (!deleted) {
-            return res.status(404).json({ error: 'Match not found.' });
-        }
-
+        if (!deleted) return res.status(404).json({ error: 'Match not found.' });
         res.json({ message: 'Match deleted.' });
     } catch (err) {
         next(err);

@@ -6,8 +6,6 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql;
 
--- Helper macro to attach the trigger to any table that has updated_at.
--- Call once per table after CREATE TABLE.
 CREATE OR REPLACE FUNCTION create_updated_at_trigger(tbl TEXT)
 RETURNS VOID AS $$
 BEGIN
@@ -18,6 +16,38 @@ BEGIN
          FOR EACH ROW EXECUTE FUNCTION set_updated_at();',
         tbl, tbl
     );
+END;
+$$ LANGUAGE plpgsql;
+
+-- ─── Trigger: auto-maintain player stats after a match insert ─────────────────
+-- Centralises win/draw/loss/games accounting in one place.
+-- matchController no longer needs to call PlayerModel.recordMatchResult() at all.
+-- Runs inside the same transaction as the INSERT — always consistent.
+
+CREATE OR REPLACE FUNCTION update_player_stats_on_match()
+RETURNS TRIGGER AS $$
+BEGIN
+    -- White player
+    UPDATE players SET
+        games       = games  + 1,
+        wins        = wins   + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
+        draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
+        losses      = losses + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
+        last_played = NEW.played_at,
+        updated_at  = NOW()
+    WHERE id = NEW.white_player_id;
+
+    -- Black player
+    UPDATE players SET
+        games       = games  + 1,
+        wins        = wins   + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
+        draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
+        losses      = losses + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
+        last_played = NEW.played_at,
+        updated_at  = NOW()
+    WHERE id = NEW.black_player_id;
+
+    RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -43,10 +73,8 @@ CREATE TABLE IF NOT EXISTS clubs (
     contact_info       TEXT,
     owner_id           TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     share_token        TEXT,
-    -- Was INTEGER 0/1; now a real boolean. pg driver returns true/false natively.
     public_leaderboard BOOLEAN     NOT NULL DEFAULT FALSE,
     share_expires      TIMESTAMPTZ,
-    -- Was TEXT; now JSONB so Postgres validates structure and supports operators/indexes.
     settings_json      JSONB       NOT NULL DEFAULT '{}',
     created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -74,8 +102,9 @@ CREATE TABLE IF NOT EXISTS players (
     last_played  TIMESTAMPTZ,
     created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    -- wins + draws + losses must not exceed games
-    CONSTRAINT chk_player_stats CHECK (wins + draws + losses <= games)
+    CONSTRAINT chk_player_stats CHECK (wins + draws + losses <= games),
+    -- Expose (id, club_id) as a unique pair so matches can FK to both columns.
+    UNIQUE (id, club_id)
 );
 SELECT create_updated_at_trigger('players');
 
@@ -104,9 +133,9 @@ CREATE TABLE IF NOT EXISTS tournament_players (
 
 CREATE TABLE IF NOT EXISTS matches (
     id              TEXT        PRIMARY KEY DEFAULT ('match_' || md5(random()::text || clock_timestamp()::text)),
-    club_id         TEXT        NOT NULL REFERENCES clubs(id)    ON DELETE CASCADE,
-    white_player_id TEXT        NOT NULL REFERENCES players(id)  ON DELETE CASCADE,
-    black_player_id TEXT        NOT NULL REFERENCES players(id)  ON DELETE CASCADE,
+    club_id         TEXT        NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+    white_player_id TEXT        NOT NULL,
+    black_player_id TEXT        NOT NULL,
     result          TEXT        NOT NULL CHECK (result IN ('white', 'black', 'draw')),
     type            TEXT        NOT NULL DEFAULT 'casual'
                                 CHECK (type IN ('casual', 'rated', 'tournament')),
@@ -116,21 +145,18 @@ CREATE TABLE IF NOT EXISTS matches (
     created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 
-    -- Prevent a player from being matched against themselves.
     CONSTRAINT chk_match_different_players
         CHECK (white_player_id <> black_player_id),
 
-    -- Both players must belong to the same club as the match record.
-    -- Enforced at application level too, but the DB constraint is the safety net.
-    CONSTRAINT fk_match_white_player_club
+    -- Composite FKs: both players must belong to this match's club.
+    -- DB-level guard against cross-club match records.
+    CONSTRAINT fk_white_player_club
         FOREIGN KEY (white_player_id, club_id)
         REFERENCES players(id, club_id) ON DELETE CASCADE,
-    CONSTRAINT fk_match_black_player_club
+    CONSTRAINT fk_black_player_club
         FOREIGN KEY (black_player_id, club_id)
         REFERENCES players(id, club_id) ON DELETE CASCADE,
-    -- Note: full cross-club enforcement requires triggers; these FKs are the base layer.
 
-    -- Tournament matches must reference a tournament; non-tournament matches must not.
     CONSTRAINT chk_match_tournament_consistency
         CHECK (
             (type = 'tournament' AND tournament_id IS NOT NULL) OR
@@ -138,6 +164,12 @@ CREATE TABLE IF NOT EXISTS matches (
         )
 );
 SELECT create_updated_at_trigger('matches');
+
+-- Attach the player-stats trigger AFTER INSERT.
+DROP TRIGGER IF EXISTS trg_player_stats ON matches;
+CREATE TRIGGER trg_player_stats
+    AFTER INSERT ON matches
+    FOR EACH ROW EXECUTE FUNCTION update_player_stats_on_match();
 
 CREATE TABLE IF NOT EXISTS rating_history (
     id            TEXT        PRIMARY KEY DEFAULT ('rh_' || md5(random()::text || clock_timestamp()::text)),
@@ -160,7 +192,6 @@ CREATE TABLE IF NOT EXISTS player_links (
     UNIQUE (player_id, user_id)
 );
 
--- Only one pending-or-approved link per player, and per user.
 CREATE UNIQUE INDEX IF NOT EXISTS ux_player_links_active_player
     ON player_links(player_id) WHERE status IN ('pending', 'approved');
 CREATE UNIQUE INDEX IF NOT EXISTS ux_player_links_active_user
@@ -172,7 +203,6 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     token_hash TEXT        NOT NULL,
     expires_at TIMESTAMPTZ NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    -- Was INTEGER 0/1; now a real boolean.
     revoked    BOOLEAN     NOT NULL DEFAULT FALSE
 );
 
@@ -187,6 +217,56 @@ CREATE TABLE IF NOT EXISTS password_resets (
     user_agent TEXT,
     attempts   INTEGER     NOT NULL DEFAULT 0 CHECK (attempts >= 0)
 );
+
+-- ─── Views ────────────────────────────────────────────────────────────────────
+
+-- Club leaderboard — models now query this instead of repeating CASE blocks.
+CREATE OR REPLACE VIEW v_club_leaderboard AS
+SELECT
+    p.id,
+    p.club_id,
+    p.name,
+    p.rating,
+    p.games                     AS played,
+    p.wins,
+    p.draws,
+    p.losses,
+    p.last_played               AS last_active,
+    pl.status                   AS link_status,
+    (p.wins + p.draws * 0.5)    AS points
+FROM players p
+LEFT JOIN player_links pl ON pl.player_id = p.id AND pl.status = 'approved';
+
+-- Tournament standings — models now query this instead of repeating CASE blocks.
+CREATE OR REPLACE VIEW v_tournament_standings AS
+SELECT
+    tp.tournament_id,
+    p.id                                                            AS player_id,
+    p.name,
+    COUNT(m.id)                                                     AS played,
+    SUM(CASE
+        WHEN m.white_player_id = p.id AND m.result = 'white' THEN 1
+        WHEN m.black_player_id = p.id AND m.result = 'black' THEN 1
+        ELSE 0
+    END)                                                            AS wins,
+    SUM(CASE WHEN m.result = 'draw' THEN 1 ELSE 0 END)             AS draws,
+    SUM(CASE
+        WHEN m.white_player_id = p.id AND m.result = 'black' THEN 1
+        WHEN m.black_player_id = p.id AND m.result = 'white' THEN 1
+        ELSE 0
+    END)                                                            AS losses,
+    SUM(CASE
+        WHEN m.white_player_id = p.id AND m.result = 'white' THEN 1.0
+        WHEN m.black_player_id = p.id AND m.result = 'black' THEN 1.0
+        WHEN m.result = 'draw'                                THEN 0.5
+        ELSE 0.0
+    END)                                                            AS score
+FROM tournament_players tp
+JOIN  players p ON p.id = tp.player_id
+LEFT JOIN matches m
+    ON  m.tournament_id = tp.tournament_id
+    AND (m.white_player_id = p.id OR m.black_player_id = p.id)
+GROUP BY tp.tournament_id, p.id, p.name;
 
 -- ─── Indexes ──────────────────────────────────────────────────────────────────
 
