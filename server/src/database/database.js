@@ -18,10 +18,26 @@ async function execQuery(client, text, params = []) {
 }
 
 // ─── db ───────────────────────────────────────────────────────────────────────
+import path from 'path';
+import { fileURLToPath } from 'url';
+import * as pgMigratePkg from 'node-pg-migrate';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const runner = pgMigratePkg.default || pgMigratePkg.runner || pgMigratePkg;
 
 const db = {
     init: async () => {
         await pgDb.initPg();
+        console.log('[DB] Running migrations...');
+        await runner({
+            dbClient: pgDb.pool,
+            dir: path.join(__dirname, 'migrations'),
+            direction: 'up',
+            migrationsTable: 'pgmigrations',
+            log: (msg) => console.log(`[Migrate] ${msg}`)
+        });
+        console.log('[DB] Migrations complete.');
     },
 
     query: async (text, params = []) => {

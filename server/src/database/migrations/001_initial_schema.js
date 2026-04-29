@@ -26,6 +26,96 @@ export const up = pgm => {
         $$ LANGUAGE plpgsql;
     `);
 
+    pgm.sql(`
+        CREATE OR REPLACE FUNCTION update_player_stats_on_match()
+        RETURNS TRIGGER AS $$
+        BEGIN
+            IF TG_OP = 'DELETE' THEN
+                -- Revert stats for White player
+                UPDATE players SET
+                    games       = games  - 1,
+                    wins        = wins   - CASE WHEN OLD.result = 'white' THEN 1 ELSE 0 END,
+                    draws       = draws  - CASE WHEN OLD.result = 'draw'  THEN 1 ELSE 0 END,
+                    losses      = losses - CASE WHEN OLD.result = 'black' THEN 1 ELSE 0 END,
+                    updated_at  = NOW()
+                WHERE id = OLD.white_player_id;
+
+                -- Revert stats for Black player
+                UPDATE players SET
+                    games       = games  - 1,
+                    wins        = wins   - CASE WHEN OLD.result = 'black' THEN 1 ELSE 0 END,
+                    draws       = draws  - CASE WHEN OLD.result = 'draw'  THEN 1 ELSE 0 END,
+                    losses      = losses - CASE WHEN OLD.result = 'white' THEN 1 ELSE 0 END,
+                    updated_at  = NOW()
+                WHERE id = OLD.black_player_id;
+
+                RETURN OLD;
+
+            ELSIF TG_OP = 'UPDATE' THEN
+                -- Revert OLD stats
+                UPDATE players SET
+                    games       = games  - 1,
+                    wins        = wins   - CASE WHEN OLD.result = 'white' THEN 1 ELSE 0 END,
+                    draws       = draws  - CASE WHEN OLD.result = 'draw'  THEN 1 ELSE 0 END,
+                    losses      = losses - CASE WHEN OLD.result = 'black' THEN 1 ELSE 0 END
+                WHERE id = OLD.white_player_id;
+
+                UPDATE players SET
+                    games       = games  - 1,
+                    wins        = wins   - CASE WHEN OLD.result = 'black' THEN 1 ELSE 0 END,
+                    draws       = draws  - CASE WHEN OLD.result = 'draw'  THEN 1 ELSE 0 END,
+                    losses      = losses - CASE WHEN OLD.result = 'white' THEN 1 ELSE 0 END
+                WHERE id = OLD.black_player_id;
+
+                -- Apply NEW stats
+                UPDATE players SET
+                    games       = games  + 1,
+                    wins        = wins   + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
+                    draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
+                    losses      = losses + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
+                    last_played = GREATEST(last_played, NEW.played_at),
+                    updated_at  = NOW()
+                WHERE id = NEW.white_player_id;
+
+                UPDATE players SET
+                    games       = games  + 1,
+                    wins        = wins   + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
+                    draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
+                    losses      = losses + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
+                    last_played = GREATEST(last_played, NEW.played_at),
+                    updated_at  = NOW()
+                WHERE id = NEW.black_player_id;
+
+                RETURN NEW;
+
+            ELSIF TG_OP = 'INSERT' THEN
+                -- White player
+                UPDATE players SET
+                    games       = games  + 1,
+                    wins        = wins   + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
+                    draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
+                    losses      = losses + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
+                    last_played = GREATEST(last_played, NEW.played_at),
+                    updated_at  = NOW()
+                WHERE id = NEW.white_player_id;
+
+                -- Black player
+                UPDATE players SET
+                    games       = games  + 1,
+                    wins        = wins   + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
+                    draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
+                    losses      = losses + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
+                    last_played = GREATEST(last_played, NEW.played_at),
+                    updated_at  = NOW()
+                WHERE id = NEW.black_player_id;
+
+                RETURN NEW;
+            END IF;
+            RETURN NULL;
+        END;
+        $$ LANGUAGE plpgsql;
+    `);
+
     // ─── Users ───────────────────────────────────────────────────────────────
 
     pgm.createTable('users', {
@@ -158,6 +248,13 @@ export const up = pgm => {
 
     pgm.sql(`SELECT create_updated_at_trigger('matches');`);
 
+    pgm.sql(`
+        DROP TRIGGER IF EXISTS trg_player_stats ON matches;
+        CREATE TRIGGER trg_player_stats
+            AFTER INSERT OR UPDATE OR DELETE ON matches
+            FOR EACH ROW EXECUTE FUNCTION update_player_stats_on_match();
+    `);
+
     // ─── Rating History ──────────────────────────────────────────────────────
 
     pgm.createTable('rating_history', {
@@ -252,9 +349,63 @@ export const up = pgm => {
 
     pgm.createIndex('password_resets', 'token_hash', { name: 'idx_password_resets_token' });
     pgm.createIndex('password_resets', 'user_id', { name: 'idx_password_resets_user' });
+    // ─── Views ───────────────────────────────────────────────────────────────
+
+    pgm.sql(`
+        CREATE OR REPLACE VIEW v_club_leaderboard AS
+        SELECT
+            p.id,
+            p.club_id,
+            p.name,
+            p.rating,
+            p.games                     AS played,
+            p.wins,
+            p.draws,
+            p.losses,
+            p.last_played               AS last_active,
+            pl.status                   AS link_status,
+            (p.wins + p.draws * 0.5)    AS points
+        FROM players p
+        LEFT JOIN player_links pl ON pl.player_id = p.id AND pl.status = 'approved';
+    `);
+
+    pgm.sql(`
+        CREATE OR REPLACE VIEW v_tournament_standings AS
+        SELECT
+            tp.tournament_id,
+            p.id                                                            AS player_id,
+            p.name,
+            COUNT(m.id)                                                     AS played,
+            SUM(CASE
+                WHEN m.white_player_id = p.id AND m.result = 'white' THEN 1
+                WHEN m.black_player_id = p.id AND m.result = 'black' THEN 1
+                ELSE 0
+            END)                                                            AS wins,
+            SUM(CASE WHEN m.result = 'draw' THEN 1 ELSE 0 END)             AS draws,
+            SUM(CASE
+                WHEN m.white_player_id = p.id AND m.result = 'black' THEN 1
+                WHEN m.black_player_id = p.id AND m.result = 'white' THEN 1
+                ELSE 0
+            END)                                                            AS losses,
+            SUM(CASE
+                WHEN m.white_player_id = p.id AND m.result = 'white' THEN 1.0
+                WHEN m.black_player_id = p.id AND m.result = 'black' THEN 1.0
+                WHEN m.result = 'draw'                                THEN 0.5
+                ELSE 0.0
+            END)                                                            AS score
+        FROM tournament_players tp
+        JOIN  players p ON p.id = tp.player_id
+        LEFT JOIN matches m
+            ON  m.tournament_id = tp.tournament_id
+            AND (m.white_player_id = p.id OR m.black_player_id = p.id)
+        GROUP BY tp.tournament_id, p.id, p.name;
+    `);
 };
 
 export const down = pgm => {
+    pgm.sql(`DROP VIEW IF EXISTS v_tournament_standings;`);
+    pgm.sql(`DROP VIEW IF EXISTS v_club_leaderboard;`);
+
     pgm.dropTable('password_resets', { ifExists: true });
     pgm.dropTable('refresh_tokens', { ifExists: true });
     pgm.dropTable('player_links', { ifExists: true });
@@ -267,6 +418,7 @@ export const down = pgm => {
     pgm.dropTable('clubs', { ifExists: true });
     pgm.dropTable('users', { ifExists: true });
 
+    pgm.sql(`DROP FUNCTION IF EXISTS update_player_stats_on_match();`);
     pgm.sql(`DROP FUNCTION IF EXISTS create_updated_at_trigger(TEXT);`);
     pgm.sql(`DROP FUNCTION IF EXISTS set_updated_at();`);
 };

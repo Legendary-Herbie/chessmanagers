@@ -1,14 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-
-// Shape of `user`:
-// {
-//   id: string,
-//   email: string,
-//   name: string,
-//   role: 'admin' | 'linked_player' | 'member',
-//   playerId: string | null,
-//   linkStatus: 'pending' | 'approved' | null,
-// }
+import { api, getToken, setToken, clearToken } from '../config/api.js';
 
 const AuthContext = createContext(null);
 
@@ -17,37 +8,32 @@ export function AuthProvider({ children }) {
     const [loading, setLoading] = useState(true);
 
     // On mount: validate stored JWT against the server.
-    // If the token is missing or rejected, clear it and stay logged out.
     useEffect(() => {
-        const token = localStorage.getItem('cm_token');
+        const token = getToken();
         if (!token) { setLoading(false); return; }
 
-        fetch('/api/v1/auth/me', {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then(r => r.ok ? r.json() : Promise.reject())
+        api.get('/auth/me')
             .then(data => setUser(data.user))
-            .catch(() => localStorage.removeItem('cm_token'))
+            .catch(() => clearToken())
             .finally(() => setLoading(false));
     }, []);
 
-    const login = useCallback(async (email, password) => {
-        const res = await fetch('/api/v1/auth/login', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email, password }),
-        });
-        if (!res.ok) {
-            const data = await res.json();
-            throw new Error(data.error || 'Login failed.');
-        }
-        const { token, user } = await res.json();
-        localStorage.setItem('cm_token', token);
-        setUser(user);
+    const login = useCallback(async ({ email, password }) => {
+        const data = await api.post('/auth/login', { email, password });
+        setToken(data.token);
+        setUser(data.user);
+        return data.user;
+    }, []);
+
+    const register = useCallback(async ({ email, name, password }) => {
+        const data = await api.post('/auth/register', { email, name, password });
+        setToken(data.token);
+        setUser(data.user);
+        return data.user;
     }, []);
 
     const logout = useCallback(() => {
-        localStorage.removeItem('cm_token');
+        clearToken();
         setUser(null);
     }, []);
 
@@ -55,7 +41,7 @@ export function AuthProvider({ children }) {
     const isLinked = user?.linkStatus === 'approved';
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, isAdmin, isLinked }}>
+        <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, isLinked }}>
             {children}
         </AuthContext.Provider>
     );

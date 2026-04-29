@@ -269,7 +269,7 @@ CMD ["npm", "start"]
 
 ### Schema
 
-The PostgreSQL schema is auto-initialized on server startup via `server/src/database/schema.sql`. Tables include:
+The PostgreSQL schema is auto-initialized on server startup via the migrations in `server/src/database/migrations/`. Tables include:
 
 - **users** — User accounts with email, password hash, role
 - **clubs** — Chess clubs owned by users

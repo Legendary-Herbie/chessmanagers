@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthProvider.jsx';
+import { api } from '../config/api.js';
 
 // Holds the active club's metadata. Fetched once after auth resolves.
 // Consumed by leaderboard, match, and player features.
@@ -27,13 +28,8 @@ export function ClubProvider({ children }) {
         }
 
         setLoading(true);
-        const token = localStorage.getItem('cm_token');
-
-        fetch('/api/v1/clubs/mine', {
-            headers: { Authorization: `Bearer ${token}` },
-        })
-            .then(r => r.ok ? r.json() : Promise.reject(new Error('Failed to load club.')))
-            .then(data => setClub(data.club))
+        api.get('/clubs/mine')
+            .then(data => setClub(data.club ?? null))
             .catch(err => setError(err.message))
             .finally(() => setLoading(false));
     }, [user, authLoading]);
@@ -41,13 +37,9 @@ export function ClubProvider({ children }) {
     const refreshClub = useCallback(async () => {
         if (!user) return;
         setLoading(true);
-        const token = localStorage.getItem('cm_token');
         try {
-            const res  = await fetch('/api/v1/clubs/mine', {
-                headers: { Authorization: `Bearer ${token}` },
-            });
-            const data = await res.json();
-            setClub(data.club);
+            const data = await api.get('/clubs/mine');
+            setClub(data.club ?? null);
         } catch (err) {
             setError(err.message);
         } finally {

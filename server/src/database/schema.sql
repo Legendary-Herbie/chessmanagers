@@ -27,27 +27,88 @@ $$ LANGUAGE plpgsql;
 CREATE OR REPLACE FUNCTION update_player_stats_on_match()
 RETURNS TRIGGER AS $$
 BEGIN
-    -- White player
-    UPDATE players SET
-        games       = games  + 1,
-        wins        = wins   + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
-        draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
-        losses      = losses + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
-        last_played = NEW.played_at,
-        updated_at  = NOW()
-    WHERE id = NEW.white_player_id;
+    IF TG_OP = 'DELETE' THEN
+        -- Revert stats for White player
+        UPDATE players SET
+            games       = games  - 1,
+            wins        = wins   - CASE WHEN OLD.result = 'white' THEN 1 ELSE 0 END,
+            draws       = draws  - CASE WHEN OLD.result = 'draw'  THEN 1 ELSE 0 END,
+            losses      = losses - CASE WHEN OLD.result = 'black' THEN 1 ELSE 0 END,
+            updated_at  = NOW()
+        WHERE id = OLD.white_player_id;
 
-    -- Black player
-    UPDATE players SET
-        games       = games  + 1,
-        wins        = wins   + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
-        draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
-        losses      = losses + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
-        last_played = NEW.played_at,
-        updated_at  = NOW()
-    WHERE id = NEW.black_player_id;
+        -- Revert stats for Black player
+        UPDATE players SET
+            games       = games  - 1,
+            wins        = wins   - CASE WHEN OLD.result = 'black' THEN 1 ELSE 0 END,
+            draws       = draws  - CASE WHEN OLD.result = 'draw'  THEN 1 ELSE 0 END,
+            losses      = losses - CASE WHEN OLD.result = 'white' THEN 1 ELSE 0 END,
+            updated_at  = NOW()
+        WHERE id = OLD.black_player_id;
 
-    RETURN NEW;
+        RETURN OLD;
+
+    ELSIF TG_OP = 'UPDATE' THEN
+        -- Revert OLD stats
+        UPDATE players SET
+            games       = games  - 1,
+            wins        = wins   - CASE WHEN OLD.result = 'white' THEN 1 ELSE 0 END,
+            draws       = draws  - CASE WHEN OLD.result = 'draw'  THEN 1 ELSE 0 END,
+            losses      = losses - CASE WHEN OLD.result = 'black' THEN 1 ELSE 0 END
+        WHERE id = OLD.white_player_id;
+
+        UPDATE players SET
+            games       = games  - 1,
+            wins        = wins   - CASE WHEN OLD.result = 'black' THEN 1 ELSE 0 END,
+            draws       = draws  - CASE WHEN OLD.result = 'draw'  THEN 1 ELSE 0 END,
+            losses      = losses - CASE WHEN OLD.result = 'white' THEN 1 ELSE 0 END
+        WHERE id = OLD.black_player_id;
+
+        -- Apply NEW stats
+        UPDATE players SET
+            games       = games  + 1,
+            wins        = wins   + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
+            draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
+            losses      = losses + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
+            last_played = GREATEST(last_played, NEW.played_at),
+            updated_at  = NOW()
+        WHERE id = NEW.white_player_id;
+
+        UPDATE players SET
+            games       = games  + 1,
+            wins        = wins   + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
+            draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
+            losses      = losses + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
+            last_played = GREATEST(last_played, NEW.played_at),
+            updated_at  = NOW()
+        WHERE id = NEW.black_player_id;
+
+        RETURN NEW;
+
+    ELSIF TG_OP = 'INSERT' THEN
+        -- White player
+        UPDATE players SET
+            games       = games  + 1,
+            wins        = wins   + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
+            draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
+            losses      = losses + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
+            last_played = GREATEST(last_played, NEW.played_at),
+            updated_at  = NOW()
+        WHERE id = NEW.white_player_id;
+
+        -- Black player
+        UPDATE players SET
+            games       = games  + 1,
+            wins        = wins   + CASE WHEN NEW.result = 'black' THEN 1 ELSE 0 END,
+            draws       = draws  + CASE WHEN NEW.result = 'draw'  THEN 1 ELSE 0 END,
+            losses      = losses + CASE WHEN NEW.result = 'white' THEN 1 ELSE 0 END,
+            last_played = GREATEST(last_played, NEW.played_at),
+            updated_at  = NOW()
+        WHERE id = NEW.black_player_id;
+
+        RETURN NEW;
+    END IF;
+    RETURN NULL;
 END;
 $$ LANGUAGE plpgsql;
 
@@ -165,10 +226,10 @@ CREATE TABLE IF NOT EXISTS matches (
 );
 SELECT create_updated_at_trigger('matches');
 
--- Attach the player-stats trigger AFTER INSERT.
+-- Attach the player-stats trigger AFTER INSERT OR UPDATE OR DELETE.
 DROP TRIGGER IF EXISTS trg_player_stats ON matches;
 CREATE TRIGGER trg_player_stats
-    AFTER INSERT ON matches
+    AFTER INSERT OR UPDATE OR DELETE ON matches
     FOR EACH ROW EXECUTE FUNCTION update_player_stats_on_match();
 
 CREATE TABLE IF NOT EXISTS rating_history (

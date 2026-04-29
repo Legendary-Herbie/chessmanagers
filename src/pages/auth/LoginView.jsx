@@ -1,14 +1,14 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../app/providers.jsx';
-import Button from '../../components/Button.jsx';
+import { useNavigate, Link } from 'react-router-dom';
+import { useAuth } from '../../app/AuthProvider.jsx';
+import Button from '../../shared/common/Button.jsx';
 
-const LoginView = ({ onSwitch }) => {
-    const { login } = useAuth();
-    const navigate   = useNavigate();
+export default function LoginView() {
+    const { login }   = useAuth();
+    const navigate    = useNavigate();
 
     const [fields, setFields] = useState({ email: '', password: '' });
-    const [error,  setError]  = useState(null);
+    const [error,  setError]  = useState('');
     const [busy,   setBusy]   = useState(false);
 
     const handleChange = (e) =>
@@ -16,60 +16,89 @@ const LoginView = ({ onSwitch }) => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setError(null);
+        setError('');
+
+        if (!fields.email || !fields.password) {
+            setError('Please fill in all fields.');
+            return;
+        }
+
         setBusy(true);
         try {
             await login(fields);
             navigate('/dashboard');
         } catch (err) {
-            setError(err.response?.data?.error ?? 'Login failed. Please try again.');
+            setError(err.message || 'Login failed. Please try again.');
         } finally {
             setBusy(false);
         }
     };
 
     return (
-        <div className="">
-            <h1>Sign in</h1>
+        <div className="auth-form-wrapper">
+            <div className="auth-form-header">
+                <h1 className="auth-form-title">Welcome back</h1>
+                <p className="auth-form-subtitle">Sign in to your account</p>
+            </div>
 
-            {error && <p className="" role="alert">{error}</p>}
+            {error && (
+                <div className="auth-error" role="alert">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
+                        <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    </svg>
+                    {error}
+                </div>
+            )}
 
-            <form onSubmit={handleSubmit} noValidate>
-                <label htmlFor="email">Email</label>
-                <input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    value={fields.email}
-                    onChange={handleChange}
-                />
+            <form onSubmit={handleSubmit} noValidate className="auth-form">
+                <div className="auth-field">
+                    <label htmlFor="email" className="auth-label">Email</label>
+                    <input
+                        id="email"
+                        name="email"
+                        type="email"
+                        autoComplete="email"
+                        required
+                        className="auth-input"
+                        placeholder="you@example.com"
+                        value={fields.email}
+                        onChange={handleChange}
+                        disabled={busy}
+                    />
+                </div>
 
-                <label htmlFor="password">Password</label>
-                <input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    value={fields.password}
-                    onChange={handleChange}
-                />
+                <div className="auth-field">
+                    <label htmlFor="password" className="auth-label">Password</label>
+                    <input
+                        id="password"
+                        name="password"
+                        type="password"
+                        autoComplete="current-password"
+                        required
+                        className="auth-input"
+                        placeholder="••••••••"
+                        value={fields.password}
+                        onChange={handleChange}
+                        disabled={busy}
+                    />
+                </div>
 
-                <Button type="submit" disabled={busy}>
-                    {busy ? 'Signing in…' : 'Sign in'}
+                <Button
+                    type="submit"
+                    variant="primary"
+                    className="auth-submit"
+                    loading={busy}
+                    disabled={busy}
+                >
+                    Sign in
                 </Button>
             </form>
 
-            <p>
-                No account?{' '}
-                <Button type="button" className="" onClick={onSwitch}>
-                    Create one
-                </Button>
+            <p className="auth-switch">
+                Don't have an account?{' '}
+                <Link to="/auth/register" className="auth-link">Create one</Link>
             </p>
         </div>
     );
-};
-
-export default LoginView;
+}

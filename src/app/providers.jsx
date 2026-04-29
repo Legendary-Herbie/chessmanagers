@@ -7,6 +7,11 @@ import { NotificationsProvider } from './NotificationsProvider.jsx';
 import { AuthProvider }          from './AuthProvider.jsx';
 import { ClubProvider }          from './ClubProvider.jsx';
 
+// Re-export hooks so consumers can import from either location.
+export { useAuth }          from './AuthProvider.jsx';
+export { useTheme }         from './ThemeProvider.jsx';
+export { useNotifications } from './NotificationsProvider.jsx';
+export { useClub }          from './ClubProvider.jsx';
 
 export default function Providers({ children }) {
     return (
