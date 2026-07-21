@@ -7,7 +7,13 @@ const { JWT_SECRET, JWT_EXPIRES_IN = '7d' } = env;
 
 const signToken = (user) =>
     jwt.sign(
-        { id: user.id, email: user.email, role: user.role },
+        {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            playerId: user.player_id ?? null,
+            linkStatus: user.link_status ?? null,
+        },
         JWT_SECRET,
         { expiresIn: JWT_EXPIRES_IN }
     );

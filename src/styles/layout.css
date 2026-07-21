@@ -1,0 +1,321 @@
+@import './variables.css';
+
+.app-shell {
+    min-height: 100dvh;
+    background: var(--bg-page);
+    color: var(--text);
+    font-family: var(--font-sans);
+}
+
+.app-nav {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    background: var(--glass);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(18px);
+    box-shadow: var(--shadow-sm);
+}
+
+.app-nav__inner {
+    width: min(100%, calc(var(--content-max-width) + 48px));
+    min-height: 64px;
+    margin: 0 auto;
+    padding: 0 var(--gap-md);
+    display: flex;
+    align-items: center;
+    gap: var(--gap-sm);
+}
+
+.app-nav__brand {
+    min-height: var(--min-tap-size);
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: var(--text-strong);
+    text-decoration: none;
+    flex: 0 0 auto;
+}
+
+.app-nav__brand-mark {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    align-items: end;
+    gap: 4px;
+    color: var(--primary);
+}
+
+.app-nav__brand-mark span {
+    display: block;
+    border-radius: var(--radius-xs);
+    background: currentColor;
+}
+
+.app-nav__brand-mark span:nth-child(1) {
+    height: 12px;
+    opacity: 0.85;
+}
+
+.app-nav__brand-mark span:nth-child(2) {
+    height: 22px;
+}
+
+.app-nav__brand-mark span:nth-child(3) {
+    height: 28px;
+    opacity: 0.65;
+}
+
+.app-nav__brand-name {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-bold);
+    letter-spacing: -0.02em;
+    white-space: nowrap;
+}
+
+.app-nav__links {
+    min-width: 0;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.app-nav__links::-webkit-scrollbar {
+    display: none;
+}
+
+.app-nav__link {
+    min-height: 38px;
+    display: inline-flex;
+    align-items: center;
+    padding: 0 12px;
+    border-radius: var(--radius-md);
+    color: var(--text-muted);
+    text-decoration: none;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-medium);
+    white-space: nowrap;
+    transition:
+        background-color var(--motion-fast) var(--ease),
+        color var(--motion-fast) var(--ease);
+}
+
+.app-nav__link:hover {
+    background: var(--bg-muted);
+    color: var(--text-strong);
+}
+
+.app-nav__link--active {
+    background: color-mix(in srgb, var(--primary) 12%, transparent);
+    color: var(--primary);
+}
+
+.app-nav__account {
+    position: relative;
+    flex: 0 0 auto;
+}
+
+.app-nav__menu-button {
+    min-height: var(--min-tap-size);
+    max-width: 240px;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px 4px 4px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+    box-shadow: var(--shadow-sm);
+    transition:
+        border-color var(--motion-fast) var(--ease),
+        box-shadow var(--motion-fast) var(--ease),
+        background-color var(--motion-fast) var(--ease);
+}
+
+.app-nav__menu-button:hover,
+.app-nav__menu-button[aria-expanded='true'] {
+    border-color: var(--border-emphasis);
+    box-shadow: var(--shadow);
+}
+
+.app-nav__menu-button:focus-visible {
+    outline: none;
+    box-shadow: var(--focus-ring), var(--shadow);
+}
+
+.app-nav__avatar {
+    width: 34px;
+    height: 34px;
+    display: inline-grid;
+    place-items: center;
+    border-radius: var(--radius-md);
+    background: var(--primary);
+    color: var(--primary-contrast);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-bold);
+    flex: 0 0 auto;
+}
+
+.app-nav__account-copy {
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    line-height: 1.2;
+}
+
+.app-nav__account-name,
+.app-nav__account-club {
+    max-width: 145px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.app-nav__account-name {
+    color: var(--text-strong);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-bold);
+}
+
+.app-nav__account-club {
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.app-nav__chevron {
+    width: 8px;
+    height: 8px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    transform: rotate(45deg) translateY(-1px);
+    transition: transform var(--motion-fast) var(--ease);
+    flex: 0 0 auto;
+    color: var(--text-muted);
+}
+
+.app-nav__menu-button[aria-expanded='true'] .app-nav__chevron {
+    transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.app-nav__dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: min(280px, calc(100vw - 24px));
+    display: none;
+    padding: 8px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    color: var(--text);
+    box-shadow: var(--shadow-lg);
+    z-index: 30;
+}
+
+.app-nav__dropdown--open {
+    display: block;
+}
+
+.app-nav__dropdown-header {
+    padding: 10px 10px 12px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.app-nav__dropdown-header strong {
+    color: var(--text-strong);
+    font-size: var(--font-size-sm);
+}
+
+.app-nav__dropdown-header span {
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.app-nav__dropdown-item {
+    width: 100%;
+    min-height: 40px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    padding: 0 10px;
+    border: 0;
+    border-radius: var(--radius-md);
+    background: transparent;
+    color: var(--text);
+    text-align: left;
+    text-decoration: none;
+    font: inherit;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-medium);
+    cursor: pointer;
+}
+
+.app-nav__dropdown-item:hover,
+.app-nav__dropdown-item:focus-visible {
+    outline: none;
+    background: var(--bg-muted);
+    color: var(--text-strong);
+}
+
+.app-nav__dropdown-item--danger {
+    color: var(--danger);
+}
+
+.app-nav__dropdown-item--danger:hover,
+.app-nav__dropdown-item--danger:focus-visible {
+    background: color-mix(in srgb, var(--danger) 10%, transparent);
+    color: var(--danger);
+}
+
+.app-main {
+    width: min(100%, calc(var(--content-max-width) + 48px));
+    margin: 0 auto;
+    padding: var(--gap-lg) var(--gap-md);
+}
+
+@media (max-width: 760px) {
+    .app-nav__inner {
+        min-height: auto;
+        padding: 10px var(--gap-sm);
+        flex-wrap: wrap;
+    }
+
+    .app-nav__brand {
+        flex: 1 1 auto;
+    }
+
+    .app-nav__links {
+        order: 3;
+        flex-basis: 100%;
+        padding-top: 2px;
+    }
+
+    .app-nav__menu-button {
+        max-width: 150px;
+    }
+
+    .app-nav__account-copy {
+        display: none;
+    }
+
+    .app-main {
+        padding: var(--gap-md) var(--gap-sm);
+    }
+}
+
+@media (max-width: 420px) {
+    .app-nav__brand-name {
+        display: none;
+    }
+}

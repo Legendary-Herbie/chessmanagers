@@ -1,5 +1,6 @@
 import { PlayerModel } from '../models/Player.js';
 import { PlayerLinkModel } from '../models/PlayerLink.js';
+import { UserModel } from '../models/User.js';
 
 // GET /api/v1/clubs/:clubId/players
 export async function getPlayers(req, res, next) {
@@ -122,6 +123,16 @@ export async function approveLink(req, res, next) {
 
         if (!link) {
             return res.status(404).json({ error: 'Link request not found.' });
+        }
+
+        // Grant the user the `linked_player` role so role-based checks reflect
+        // the newly approved link. This keeps role-based middleware working
+        // without requiring the user to re-login immediately.
+        try {
+            await UserModel.updateRole(link.user_id, 'linked_player');
+        } catch (e) {
+            // Non-fatal: log and continue returning the approved link
+            console.error('[WARN] Failed to update user role on link approval:', e);
         }
 
         res.json({ link });

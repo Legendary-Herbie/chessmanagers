@@ -1,6 +1,30 @@
 @import './variables.css';
 @import './common.css';
 
+* {
+    box-sizing: border-box;
+}
+
+html {
+    background: var(--bg-page);
+}
+
+body {
+    margin: 0;
+    min-width: 320px;
+    background: var(--bg-page);
+    color: var(--text);
+    font-family: var(--font-sans);
+    line-height: var(--line-height);
+}
+
+button,
+input,
+textarea,
+select {
+    font: inherit;
+}
+
 @font-face {
     font-family: 'Inter';
     src: url('/fonts/InterVariable.woff2') format('woff2');

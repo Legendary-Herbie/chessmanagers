@@ -1,7 +1,8 @@
 import db from '../database/database.js';
 
-// Represents a user account. Separate from Player —
-// a user may or may not be linked to a player record.
+// Represents a user account. A user may optionally have an approved
+// `player_links` row; models and controllers often want the linked
+// `player_id` and the `link_status` alongside the user record.
 export const UserModel = {
 
     // ── Create ────────────────────────────────────────────────────────────────
@@ -17,23 +18,35 @@ export const UserModel = {
 
     // ── Read ──────────────────────────────────────────────────────────────────
 
+    // Note: read helpers include a LEFT JOIN to the `player_links` table
+    // to surface any approved link for this user as `player_id` and
+    // `link_status`. Only one active link per user is enforced by the DB.
     findById: async (id) => {
         return db.query(
-            `SELECT * FROM users WHERE id = $1`,
+            `SELECT u.*, pl.player_id AS player_id, pl.status AS link_status
+             FROM users u
+             LEFT JOIN player_links pl ON pl.user_id = u.id AND pl.status = 'approved'
+             WHERE u.id = $1`,
             [id]
         ).then(r => r.first);
     },
 
     findByEmail: async (email) => {
         return db.query(
-            `SELECT * FROM users WHERE email = $1`,
+            `SELECT u.*, pl.player_id AS player_id, pl.status AS link_status
+             FROM users u
+             LEFT JOIN player_links pl ON pl.user_id = u.id AND pl.status = 'approved'
+             WHERE u.email = $1`,
             [email]
         ).then(r => r.first);
     },
 
     findByName: async (name) => {
         return db.query(
-            `SELECT * FROM users WHERE name = $1`,
+            `SELECT u.*, pl.player_id AS player_id, pl.status AS link_status
+             FROM users u
+             LEFT JOIN player_links pl ON pl.user_id = u.id AND pl.status = 'approved'
+             WHERE u.name = $1`,
             [name]
         ).then(r => r.first);
     },
