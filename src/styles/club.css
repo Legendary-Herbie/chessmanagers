@@ -1,0 +1,16 @@
+/* Club management styles */
+.club-page { padding:1.25rem; }
+.tabs { display:flex; gap:0.5rem; margin-bottom:1rem; }
+.tabs button { padding:0.5rem 0.75rem; border-radius:0.5rem; border:1px solid #e5e7eb; background:white; }
+.tabs button.active { background:#eef2ff; border-color:#c7d2fe; }
+.tab-panel { background:white; border:1px solid #f3f4f6; padding:1rem; border-radius:0.75rem; }
+.form-row { margin-bottom:0.75rem; display:flex; flex-direction:column; }
+.form-row .label { font-weight:700; margin-bottom:0.25rem; }
+.input { padding:0.5rem; border:1px solid #e5e7eb; border-radius:0.5rem; }
+.logo-preview img { max-width:140px; max-height:140px; object-fit:contain; border-radius:8px; border:1px solid #e6e6e6; }
+.form-actions { margin-top:1rem; display:flex; gap:0.5rem; }
+.invite-section { margin-top:1rem; }
+.invite-row { display:flex; gap:0.5rem; align-items:center; }
+.members-table { width:100%; border-collapse:collapse; }
+.members-table th, .members-table td { padding:0.5rem 0.75rem; border-bottom:1px solid rgba(0,0,0,0.06); }
+.muted { color:#6b7280; }

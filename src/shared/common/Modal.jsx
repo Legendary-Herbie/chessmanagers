@@ -1,7 +1,7 @@
 import React, { useRef, useEffect } from 'react';
 import { useFocusTrap } from '../hooks/useFocusTrap.jsx';
-import Button from 'Button.jsx';
-import Icon from 'Icon.jsx';
+import Button from './Button.jsx';
+import Icon from './Icon.jsx';
 
 export default function Modal({ modal, modalInput, setModalInput, closeModal }) {
     const modalContentRef = useRef(null);
