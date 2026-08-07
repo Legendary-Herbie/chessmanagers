@@ -3,6 +3,7 @@ import {
     getPlayers,
     getPlayer,
     createPlayer,
+    createPlayersBulk,
     updatePlayer,
     deletePlayer,
     claimPlayer,
@@ -17,7 +18,6 @@ import {
     validate,
     createPlayerSchema,
     updatePlayerSchema,
-    unlinkPlayerSchema,
 } from '../middleware/validate.js';
 
 const router = Router({ mergeParams: true }); // mergeParams to access :clubId from parent
@@ -25,13 +25,33 @@ const router = Router({ mergeParams: true }); // mergeParams to access :clubId f
 // All player routes require authentication and club membership
 router.use(requireAuth, requireClubMember);
 
-// ── Player CRUD ───────────────────────────────────────────────────────────────
+// ── Static & Special Routes (MUST be placed before /:playerId to avoid route collision) ──
 
 // GET /api/v1/clubs/:clubId/players
 router.get('/', getPlayers);
 
 // POST /api/v1/clubs/:clubId/players
 router.post('/', requireRole('admin'), validate(createPlayerSchema), createPlayer);
+
+// POST /api/v1/clubs/:clubId/players/bulk — admin only
+router.post('/bulk', requireRole('admin'), createPlayersBulk);
+
+// GET /api/v1/clubs/:clubId/players/links/pending — admin only
+router.get('/links/pending', requireRole('admin'), getPendingLinks);
+// Also accept legacy/client variant: /player-links/pending
+router.get('/player-links/pending', requireRole('admin'), getPendingLinks);
+
+// PATCH /api/v1/clubs/:clubId/players/links/:linkId/approve — admin only
+router.patch('/links/:linkId/approve', requireRole('admin'), approveLink);
+// Also accept legacy/client variant: /player-links/:linkId/approve
+router.patch('/player-links/:linkId/approve', requireRole('admin'), approveLink);
+
+// PATCH /api/v1/clubs/:clubId/players/links/:linkId/reject — admin only
+router.patch('/links/:linkId/reject', requireRole('admin'), rejectLink);
+// Also accept legacy/client variant: /player-links/:linkId/reject
+router.patch('/player-links/:linkId/reject', requireRole('admin'), rejectLink);
+
+// ── Parameterized /:playerId Routes ──────────────────────────────────────────
 
 // GET /api/v1/clubs/:clubId/players/:playerId
 router.get('/:playerId', getPlayer);
@@ -43,22 +63,13 @@ router.patch('/:playerId', requireSelfOrAdmin, validate(updatePlayerSchema), upd
 // DELETE /api/v1/clubs/:clubId/players/:playerId
 router.delete('/:playerId', requireRole('admin'), deletePlayer);
 
-// ── Player link management ────────────────────────────────────────────────────
+// ── Player link actions on specific player ───────────────────────────────────
 
 // POST /api/v1/clubs/:clubId/players/:playerId/claim
 // Any authenticated club member can request to claim an unlinked player
 router.post('/:playerId/claim', claimPlayer);
 
-// GET /api/v1/clubs/:clubId/links/pending
-router.get('/links/pending', requireRole('admin'), getPendingLinks);
-
-// PATCH /api/v1/clubs/:clubId/links/:linkId/approve
-router.patch('/links/:linkId/approve', requireRole('admin'), approveLink);
-
-// PATCH /api/v1/clubs/:clubId/links/:linkId/reject
-router.patch('/links/:linkId/reject', requireRole('admin'), rejectLink);
-
-// DELETE /api/v1/clubs/:clubId/players/:playerId/unlink
-router.delete('/:playerId/unlink', requireRole('admin'), validate(unlinkPlayerSchema), unlinkPlayer);
+// DELETE /api/v1/clubs/:clubId/players/:playerId/unlink — admin only
+router.delete('/:playerId/unlink', requireRole('admin'), unlinkPlayer);
 
 export default router;

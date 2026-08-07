@@ -8,6 +8,7 @@ const navItems = [
     { to: '/leaderboard', label: 'Leaderboard' },
     { to: '/players', label: 'Players' },
     { to: '/matches', label: 'Matches' },
+    { to: '/clubs', label: 'Clubs' },
     { to: '/tournaments', label: 'Tournaments' },
 ];
 

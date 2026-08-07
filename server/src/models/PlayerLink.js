@@ -47,6 +47,25 @@ export const PlayerLinkModel = {
         ).then(r => r.first);
     },
 
+    findById: async (linkId) => {
+        return db.query(
+            `SELECT pl.*, p.club_id
+             FROM player_links pl
+             JOIN players p ON p.id = pl.player_id
+             WHERE pl.id = $1`,
+            [linkId]
+        ).then(r => r.first);
+    },
+
+    countApprovedByUser: async (userId) => {
+        return db.query(
+            `SELECT COUNT(*)::int AS count
+             FROM player_links
+             WHERE user_id = $1 AND status = 'approved'`,
+            [userId]
+        ).then(r => r.first?.count || 0);
+    },
+
     // All pending requests for a club — shown in the admin approval queue.
     findPendingByClub: async (clubId) => {
         return db.query(

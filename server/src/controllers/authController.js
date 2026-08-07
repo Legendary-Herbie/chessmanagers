@@ -84,6 +84,7 @@ export async function login(req, res, next) {
             user: {
                 id:         user.id,
                 email:      user.email,
+                name:       user.name,
                 role:       user.role,
                 playerId:   user.player_id   ?? null,
                 linkStatus: user.link_status ?? null,
@@ -110,6 +111,7 @@ export async function getMe(req, res, next) {
             user: {
                 id:         user.id,
                 email:      user.email,
+                name:       user.name,
                 role:       user.role,
                 playerId:   user.player_id   ?? null,
                 linkStatus: user.link_status ?? null,

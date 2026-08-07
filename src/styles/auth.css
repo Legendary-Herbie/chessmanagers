@@ -1,77 +1,172 @@
 @import './variables.css';
 
-/* ── Root layout ──────────────────────────────────────────────────────────── */
+/* â”€â”€ Root layout â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .auth-root {
     min-height: 100dvh;
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: var(--bg-page);
-    padding: var(--gap-md);
+    background: radial-gradient(circle at top left, #2c2f33 0%, transparent 36%),
+                linear-gradient(180deg, #111315 0%, #101214 45%, #0b0c0f 100%);
+    color: #ffffff;
+    padding: 2rem;
     position: relative;
     overflow: hidden;
 }
 
-/* ── Background decoration ────────────────────────────────────────────────── */
+.auth-layout {
+    width: min(1200px, 100%);
+    display: grid;
+    grid-template-columns: minmax(320px, 1.2fr) minmax(320px, 0.8fr);
+    gap: 2.5rem;
+    align-items: stretch;
+    z-index: 1;
+}
 
-.auth-bg {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
+.auth-left,
+.auth-right {
+    border-radius: 2rem;
     overflow: hidden;
+    position: relative;
 }
 
-.auth-bg-piece {
-    position: absolute;
-    border-radius: 50%;
-    filter: blur(80px);
-    opacity: 0.12;
-}
-
-.auth-bg-piece--1 {
-    width: 480px;
-    height: 480px;
-    background: var(--primary);
-    top: -120px;
-    right: -100px;
-}
-
-.auth-bg-piece--2 {
-    width: 320px;
-    height: 320px;
-    background: var(--accent);
-    bottom: -80px;
-    left: -60px;
-}
-
-.auth-bg-piece--3 {
-    width: 200px;
-    height: 200px;
-    background: var(--primary-600);
-    top: 40%;
-    left: 30%;
-    opacity: 0.07;
-}
-
-[data-theme='dark'] .auth-bg-piece {
-    opacity: 0.18;
-}
-
-/* ── Container ────────────────────────────────────────────────────────────── */
-
-.auth-container {
-    width: 100%;
-    max-width: 420px;
+.auth-left {
     display: flex;
     flex-direction: column;
+    justify-content: center;
+    gap: 2rem;
+    padding: clamp(2rem, 5vw, 4rem);
+    background: linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02));
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 40px 120px rgba(0, 0, 0, 0.35);
+}
+
+.auth-left::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at top right, rgba(255, 255, 255, 0.08), transparent 35%);
+    pointer-events: none;
+}
+
+.auth-right {
+    display: flex;
     align-items: center;
-    gap: var(--gap-md);
+    justify-content: center;
+    padding: clamp(1.5rem, 3vw, 2.5rem);
+}
+
+.auth-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.9rem;
+    color: #ffffff;
     position: relative;
     z-index: 1;
 }
 
-/* ── Brand ────────────────────────────────────────────────────────────────── */
+.auth-brand-icon {
+    width: 40px;
+    height: 40px;
+    color: #ffffff;
+    flex-shrink: 0;
+}
+
+.auth-brand-icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+.auth-brand-name {
+    font-size: 1.1rem;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+}
+
+.auth-hero {
+    position: relative;
+    z-index: 1;
+    max-width: 44rem;
+}
+
+.auth-hero-eyebrow {
+    margin: 0 0 1rem;
+    font-size: 0.95rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.65);
+}
+
+.auth-hero-title {
+    margin: 0;
+    font-size: clamp(2.6rem, 4vw, 4.4rem);
+    line-height: 0.95;
+    font-weight: 900;
+    letter-spacing: -0.05em;
+    color: #ffffff;
+}
+
+.auth-hero-copy {
+    margin: 1.5rem 0 0;
+    max-width: 32rem;
+    font-size: 1rem;
+    line-height: 1.8;
+    color: rgba(255, 255, 255, 0.78);
+}
+
+.auth-panel {
+    width: 100%;
+    max-width: 480px;
+    background: #ffffff;
+    border-radius: 2rem;
+    padding: clamp(2rem, 3vw, 3rem);
+    box-shadow: 0 32px 90px rgba(0, 0, 0, 0.18);
+    border: 1px solid rgba(15, 20, 30, 0.08);
+}
+
+.auth-form-title,
+.auth-form-subtitle,
+.auth-label,
+.auth-input,
+.auth-submit,
+.auth-switch,
+.auth-link,
+.auth-error {
+    color: inherit;
+}
+
+@media (max-width: 900px) {
+    .auth-layout {
+        grid-template-columns: 1fr;
+    }
+
+    .auth-left,
+    .auth-right {
+        border-radius: 1.75rem;
+    }
+}
+
+@media (max-width: 640px) {
+    .auth-root {
+        padding: 1.25rem;
+    }
+
+    .auth-left {
+        padding: 1.75rem;
+    }
+
+    .auth-right {
+        padding: 1rem;
+    }
+
+    .auth-panel {
+        padding: 1.75rem;
+    }
+}
+
+/* â”€â”€ Brand â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .auth-brand {
     display: flex;
@@ -100,7 +195,7 @@
     color: var(--text-strong);
 }
 
-/* ── Panel ────────────────────────────────────────────────────────────────── */
+/* â”€â”€ Panel â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .auth-panel {
     width: 100%;
@@ -118,7 +213,7 @@
     }
 }
 
-/* ── Form wrapper ─────────────────────────────────────────────────────────── */
+/* â”€â”€ Form wrapper â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .auth-form-header {
     margin-bottom: var(--gap-md);
@@ -138,7 +233,7 @@
     margin: 0;
 }
 
-/* ── Error banner ─────────────────────────────────────────────────────────── */
+/* â”€â”€ Error banner â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .auth-error {
     display: flex;
@@ -158,7 +253,7 @@
     flex-shrink: 0;
 }
 
-/* ── Form ─────────────────────────────────────────────────────────────────── */
+/* â”€â”€ Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .auth-form {
     display: flex;
@@ -231,7 +326,7 @@
     border-radius: var(--radius-md);
 }
 
-/* ── Switch link ──────────────────────────────────────────────────────────── */
+/* â”€â”€ Switch link â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
 
 .auth-switch {
     text-align: center;
@@ -249,8 +344,6 @@
 .auth-link:hover {
     text-decoration: underline;
 }
-
-/* ── Footer tagline ───────────────────────────────────────────────────────── */
 
 .auth-footer {
     font-size: var(--font-size-xs);

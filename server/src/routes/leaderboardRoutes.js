@@ -17,7 +17,9 @@ router.use(requireAuth, requireClubMember);
 router.get('/', getLeaderboard);
 
 // GET /api/v1/clubs/:clubId/leaderboard/stats
-router.get('/stats', requireRole('admin'), getClubStats);
+// Allow club admins (owner/admin) to view club stats as well as system admins
+import { requireClubAdmin } from '../middleware/requireRole.js';
+router.get('/stats', requireClubAdmin, getClubStats);
 
 // GET /api/v1/clubs/:clubId/players/:playerId/rating-history
 router.get('/players/:playerId/rating-history', getRatingHistory);

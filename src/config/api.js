@@ -1,7 +1,7 @@
-export const API_BASE = import.meta.env.VITE_API_URL;
+export const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
-if (!API_BASE) {
-    console.error('[api] VITE_API_URL is not set. Add it to your .env file.');
+if (!import.meta.env.VITE_API_URL) {
+    console.warn('[api] VITE_API_URL is not set; using fallback to /api/v1 for local proxying.');
 }
 
 // ─── Token helpers ─────────────────────────────────────────────────────────────
@@ -142,8 +142,15 @@ api.post = (endpoint, body, options = {}) =>
 api.patch = (endpoint, body, options = {}) =>
     api(endpoint, { ...options, method: 'PATCH', body: JSON.stringify(body) });
 
-api.delete = (endpoint, options = {}) =>
-    api(endpoint, { ...options, method: 'DELETE' });
+api.delete = (endpoint, payloadOrOptions = {}, options = {}) => {
+    let opts = options;
+    if (payloadOrOptions && (payloadOrOptions.body || payloadOrOptions.headers || payloadOrOptions.signal)) {
+        opts = { ...payloadOrOptions, ...options };
+    } else if (payloadOrOptions && Object.keys(payloadOrOptions).length > 0) {
+        opts = { body: JSON.stringify(payloadOrOptions), ...options };
+    }
+    return api(endpoint, { ...opts, method: 'DELETE' });
+};
 
 // ─── Error helpers ─────────────────────────────────────────────────────────────
 
@@ -183,12 +190,14 @@ export const endpoints = {
     },
     clubs: {
         mine:    ()                  => '/clubs/mine',
+        create:  ()                  => '/clubs',
         byId:    (clubId)            => `/clubs/${clubId}`,
         members: (clubId)            => `/clubs/${clubId}/members`,
         member:  (clubId, userId)    => `/clubs/${clubId}/members/${userId}`,
     },
     players: {
         list:          (clubId)            => `/clubs/${clubId}/players`,
+        bulk:          (clubId)            => `/clubs/${clubId}/players/bulk`,
         byId:          (clubId, playerId)  => `/clubs/${clubId}/players/${playerId}`,
         claim:         (clubId, playerId)  => `/clubs/${clubId}/players/${playerId}/claim`,
         unlink:        (clubId, playerId)  => `/clubs/${clubId}/players/${playerId}/unlink`,
@@ -197,9 +206,9 @@ export const endpoints = {
         ratingHistory: (clubId, playerId)  => `/clubs/${clubId}/leaderboard/players/${playerId}/rating-history`,
     },
     links: {
-        pending: (clubId)            => `/clubs/${clubId}/players/links/pending`,
-        approve: (clubId, linkId)    => `/clubs/${clubId}/players/links/${linkId}/approve`,
-        reject:  (clubId, linkId)    => `/clubs/${clubId}/players/links/${linkId}/reject`,
+        pending: (clubId)         => `/clubs/${clubId}/player-links/pending`,
+        approve: (clubId, linkId) => `/clubs/${clubId}/player-links/${linkId}/approve`,
+        reject:  (clubId, linkId) => `/clubs/${clubId}/player-links/${linkId}/reject`,
     },
     matches: {
         list: (clubId)           => `/clubs/${clubId}/matches`,

@@ -129,6 +129,7 @@ SELECT create_updated_at_trigger('users');
 CREATE TABLE IF NOT EXISTS clubs (
     id                 TEXT        PRIMARY KEY DEFAULT ('club_' || md5(random()::text || clock_timestamp()::text)),
     name               TEXT        NOT NULL,
+    federation         TEXT,
     description        TEXT,
     logo               TEXT,
     contact_info       TEXT,
@@ -146,6 +147,7 @@ CREATE TABLE IF NOT EXISTS user_clubs (
     user_id   TEXT        NOT NULL REFERENCES users(id)  ON DELETE CASCADE,
     club_id   TEXT        NOT NULL REFERENCES clubs(id)  ON DELETE CASCADE,
     joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    role      TEXT        NOT NULL DEFAULT 'member' CHECK (role IN ('owner','admin','member')),
     PRIMARY KEY (user_id, club_id)
 );
 
@@ -282,7 +284,8 @@ CREATE TABLE IF NOT EXISTS password_resets (
 -- ─── Views ────────────────────────────────────────────────────────────────────
 
 -- Club leaderboard — models now query this instead of repeating CASE blocks.
-CREATE OR REPLACE VIEW v_club_leaderboard AS
+DROP VIEW IF EXISTS v_club_leaderboard CASCADE;
+CREATE VIEW v_club_leaderboard AS
 SELECT
     p.id,
     p.club_id,
@@ -299,7 +302,8 @@ FROM players p
 LEFT JOIN player_links pl ON pl.player_id = p.id AND pl.status = 'approved';
 
 -- Tournament standings — models now query this instead of repeating CASE blocks.
-CREATE OR REPLACE VIEW v_tournament_standings AS
+DROP VIEW IF EXISTS v_tournament_standings CASCADE;
+CREATE VIEW v_tournament_standings AS
 SELECT
     tp.tournament_id,
     p.id                                                            AS player_id,
@@ -335,6 +339,7 @@ CREATE INDEX IF NOT EXISTS idx_clubs_owner               ON clubs(owner_id);
 CREATE INDEX IF NOT EXISTS idx_clubs_share_token         ON clubs(share_token);
 CREATE INDEX IF NOT EXISTS idx_user_clubs_user           ON user_clubs(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_clubs_club           ON user_clubs(club_id);
+CREATE INDEX IF NOT EXISTS idx_user_clubs_role           ON user_clubs(role);
 
 CREATE INDEX IF NOT EXISTS idx_players_club              ON players(club_id);
 CREATE INDEX IF NOT EXISTS idx_players_rating_sort       ON players(club_id, rating DESC);
@@ -362,3 +367,32 @@ CREATE INDEX IF NOT EXISTS idx_refresh_token_user        ON refresh_tokens(user_
 CREATE INDEX IF NOT EXISTS idx_refresh_token_hash        ON refresh_tokens(token_hash);
 CREATE INDEX IF NOT EXISTS idx_password_resets_token     ON password_resets(token_hash);
 CREATE INDEX IF NOT EXISTS idx_password_resets_user      ON password_resets(user_id);
+
+-- ─── Club join requests (users ask to join a club; admins can approve/reject) ───
+CREATE TABLE IF NOT EXISTS club_join_requests (
+    id         TEXT        PRIMARY KEY DEFAULT ('cjr_' || md5(random()::text || clock_timestamp()::text)),
+    club_id    TEXT        NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+    user_id    TEXT        NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    message    TEXT,
+    status     TEXT        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+    processed_at TIMESTAMPTZ
+);
+
+CREATE INDEX IF NOT EXISTS idx_club_join_requests_club ON club_join_requests(club_id);
+CREATE INDEX IF NOT EXISTS idx_club_join_requests_user ON club_join_requests(user_id);
+CREATE INDEX IF NOT EXISTS idx_club_join_requests_status ON club_join_requests(status);
+
+-- ─── Club invites (token-based invite links, revocable) ─────────────────────────
+CREATE TABLE IF NOT EXISTS club_invites (
+    id          TEXT        PRIMARY KEY DEFAULT ('inv_' || md5(random()::text || clock_timestamp()::text)),
+    club_id     TEXT        NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
+    token       TEXT        NOT NULL UNIQUE,
+    created_by  TEXT        NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+    expires_at  TIMESTAMPTZ,
+    revoked     BOOLEAN     NOT NULL DEFAULT FALSE,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_club_invites_club ON club_invites(club_id);
+CREATE INDEX IF NOT EXISTS idx_club_invites_token ON club_invites(token);

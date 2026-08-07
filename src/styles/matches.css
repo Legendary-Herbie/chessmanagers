@@ -1,0 +1,114 @@
+.matches-page {
+    padding: 24px;
+}
+.matches-page .page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+}
+.matches-controls {
+    margin-bottom: 1rem;
+    display: flex;
+    justify-content: flex-start;
+}
+.matches-table,
+.members-table,
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+.matches-table th,
+.matches-table td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: middle;
+}
+.matches-table th {
+    font-weight: 700;
+    color: var(--text-muted);
+}
+.matches-table td {
+    white-space: nowrap;
+}
+.matches-table tr:hover {
+    background: var(--bg-muted);
+}
+.badge.time-control {
+    display: inline-flex;
+    padding: 0.2rem 0.5rem;
+    border-radius: 999px;
+    background: rgba(59, 130, 246, 0.12);
+    color: #1d4ed8;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.65);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 1rem;
+    z-index: 1000;
+}
+.modal-content.small {
+    width: min(540px, 100%);
+    background: var(--bg);
+    border-radius: 1rem;
+    padding: 1.5rem;
+    box-shadow: 0 24px 56px rgba(15, 23, 42, 0.2);
+}
+.modal-header,
+.modal-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+}
+.modal-header h3 {
+    margin: 0;
+}
+.modal-body {
+    margin-top: 1rem;
+    display: grid;
+    gap: 1rem;
+}
+.form-row {
+    display: grid;
+    gap: 0.5rem;
+}
+.form-row .label {
+    font-weight: 700;
+    color: var(--text-strong);
+}
+.input {
+    width: 100%;
+    min-height: 44px;
+    padding: 0.75rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--bg-secondary);
+    color: var(--text);
+}
+.input:focus {
+    outline: 2px solid rgba(59, 130, 246, 0.4);
+    outline-offset: 2px;
+}
+textarea.input {
+    min-height: 100px;
+    resize: vertical;
+}
+.error {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.35);
+    color: #b91c1c;
+    padding: 0.8rem 1rem;
+    border-radius: 0.75rem;
+}
+.muted {
+    color: var(--text-muted);
+}

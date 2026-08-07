@@ -4,31 +4,32 @@ import react from '@vitejs/plugin-react'
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
-  const API_TARGET = env.VITE_API_URL
+  const API_TARGET = env.VITE_API_URL || 'http://localhost:5000'
 
   return {
     plugins: [react()],
 
-    // ── Dev server ──────────────────────────────────────────────
+    // ── Dev server ────────────────────────────────────────────────────────────
     server: {
       port: 3000,
       proxy: {
-        '/api': {
+        '/api/v1': {
           target: API_TARGET,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api\/v1/, ''),
+          followRedirects: true,
+          ws: false,
         },
       },
     },
 
-    // ── Build ───────────────────────────────────────────────────
+    // ── Build ─────────────────────────────────────────────────────────────────
     build: {
       outDir: 'dist',
       sourcemap: mode !== 'production',
       minify: mode === 'production' ? 'esbuild' : false,
     },
 
-    // ── Env exposure ────────────────────────────────────────────
+    // ── Env exposure ───────────────────────────────────────────────────────────
     define: {
       __APP_ENV__: JSON.stringify(mode),
     },

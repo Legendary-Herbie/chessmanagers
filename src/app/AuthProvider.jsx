@@ -37,11 +37,18 @@ export function AuthProvider({ children }) {
         setUser(null);
     }, []);
 
+    // Call this after any server action that returns a new token + user object
+    // (e.g. creating a club promotes the user to admin).
+    const updateSession = useCallback((token, freshUser) => {
+        setToken(token);
+        setUser(freshUser);
+    }, []);
+
     const isAdmin  = user?.role === 'admin';
     const isLinked = user?.linkStatus === 'approved';
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, isLinked }}>
+        <AuthContext.Provider value={{ user, loading, login, register, logout, updateSession, isAdmin, isLinked }}>
             {children}
         </AuthContext.Provider>
     );

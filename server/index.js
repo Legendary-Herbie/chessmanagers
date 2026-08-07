@@ -6,6 +6,7 @@ import rateLimit from 'express-rate-limit';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import http from 'http';
 
 import env from './src/config/env.js';
 import db from './src/database/database.js';
@@ -62,7 +63,9 @@ const isOriginAllowed = createOriginMatcher(CORS_ORIGIN);
 
 app.set('trust proxy', 1);
 
-app.use(helmet());
+app.use(helmet({
+    contentSecurityPolicy: false,
+}));
 
 app.use(cors({
     origin: (requestOrigin, callback) => {
@@ -81,6 +84,7 @@ app.use(cors({
 
 app.use(cookieParser());
 app.use(express.json({ limit: '100kb' }));
+app.use(express.urlencoded({ limit: '100kb', extended: true }));
 
 // ─── Rate Limiting ─────────────────────────────────────────────────────────────
 
@@ -103,10 +107,11 @@ app.use('/api/v1/auth',   authRoutes);
 app.use('/api/v1/public', publicRoutes);
 app.use('/api/v1/clubs',  clubRoutes);
 
-app.use('/api/v1/clubs/:clubId/players',     playerRoutes);
-app.use('/api/v1/clubs/:clubId/matches',     matchRoutes);
-app.use('/api/v1/clubs/:clubId/tournaments', tournamentRoutes);
-app.use('/api/v1/clubs/:clubId/leaderboard', leaderboardRoutes);
+app.use('/api/v1/clubs/:clubId/players',      playerRoutes);
+app.use('/api/v1/clubs/:clubId/player-links', playerRoutes);
+app.use('/api/v1/clubs/:clubId/matches',      matchRoutes);
+app.use('/api/v1/clubs/:clubId/tournaments',  tournamentRoutes);
+app.use('/api/v1/clubs/:clubId/leaderboard',  leaderboardRoutes);
 
 // ─── Static Frontend (Production) ─────────────────────────────────────────────
 
@@ -154,7 +159,8 @@ if (NODE_ENV !== 'test') {
     db.init()
         .then(() => {
             console.log(`[INFO] Allowed CORS origins: ${CORS_ORIGIN.join(', ')}`);
-            const server = app.listen(PORT, () => {
+            const server = http.createServer({ maxHeaderSize: 64 * 1024 }, app);
+            server.listen(PORT, () => {
                 console.log(`[INFO] Server running on port ${PORT}`);
             });
 

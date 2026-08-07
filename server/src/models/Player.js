@@ -10,11 +10,29 @@ export const PlayerModel = {
 
     create: async ({ clubId, name, rating = 1200, bio = null }) => {
         return db.query(
-            `INSERT INTO players (club_id, name, rating, bio)
-             VALUES ($1, $2, $3, $4)
+            `INSERT INTO players (club_id, name, rating, start_rating, bio)
+             VALUES ($1, $2, $3, $3, $4)
              RETURNING *`,
             [clubId, name, rating, bio]
         ).then(r => r.first);
+    },
+
+    createBulk: async ({ clubId, players }) => {
+        if (!players || players.length === 0) return [];
+        return db.transaction(async (trx) => {
+            const created = [];
+            for (const p of players) {
+                const rating = parseInt(p.rating, 10) || 1200;
+                const row = await trx.query(
+                    `INSERT INTO players (club_id, name, rating, start_rating, bio)
+                     VALUES ($1, $2, $3, $3, $4)
+                     RETURNING *`,
+                    [clubId, p.name, rating, p.bio || null]
+                ).then(r => r.first);
+                created.push(row);
+            }
+            return created;
+        });
     },
 
     // ── Read ──────────────────────────────────────────────────────────────────
@@ -25,7 +43,7 @@ export const PlayerModel = {
                     pl.user_id  AS linked_user_id,
                     pl.status   AS link_status
              FROM players p
-             LEFT JOIN player_links pl ON pl.player_id = p.id AND pl.status = 'approved'
+             LEFT JOIN player_links pl ON pl.player_id = p.id AND pl.status IN ('approved', 'pending')
              WHERE p.id = $1`,
             [id]
         ).then(r => r.first);
@@ -37,8 +55,7 @@ export const PlayerModel = {
                     pl.user_id  AS linked_user_id,
                     pl.status   AS link_status
              FROM players p
-             LEFT JOIN player_links pl ON pl.player_id = p.id
-                 AND pl.status IN ('approved', 'pending')
+             LEFT JOIN player_links pl ON pl.player_id = p.id AND pl.status IN ('approved', 'pending')
              WHERE p.club_id = $1
              ORDER BY p.rating DESC`,
             [clubId]

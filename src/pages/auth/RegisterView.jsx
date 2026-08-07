@@ -7,7 +7,7 @@ export default function RegisterView() {
     const { register } = useAuth();
     const navigate     = useNavigate();
 
-    const [fields, setFields] = useState({ name: '', email: '', password: '' });
+    const [fields, setFields] = useState({ name: '', email: '', password: '', confirmPassword: '' });
     const [error,  setError]  = useState('');
     const [busy,   setBusy]   = useState(false);
 
@@ -18,7 +18,7 @@ export default function RegisterView() {
         e.preventDefault();
         setError('');
 
-        if (!fields.name || !fields.email || !fields.password) {
+        if (!fields.name || !fields.email || !fields.password || !fields.confirmPassword) {
             setError('Please fill in all fields.');
             return;
         }
@@ -26,10 +26,14 @@ export default function RegisterView() {
             setError('Password must be at least 8 characters.');
             return;
         }
+        if (fields.password !== fields.confirmPassword) {
+            setError('Passwords do not match.');
+            return;
+        }
 
         setBusy(true);
         try {
-            await register(fields);
+            await register({ name: fields.name, email: fields.email, password: fields.password });
             navigate('/dashboard');
         } catch (err) {
             setError(err.message || 'Registration failed. Please try again.');
@@ -103,6 +107,22 @@ export default function RegisterView() {
                         className="auth-input"
                         placeholder="••••••••"
                         value={fields.password}
+                        onChange={handleChange}
+                        disabled={busy}
+                    />
+                </div>
+
+                <div className="auth-field">
+                    <label htmlFor="confirmPassword" className="auth-label">Confirm password</label>
+                    <input
+                        id="confirmPassword"
+                        name="confirmPassword"
+                        type="password"
+                        autoComplete="new-password"
+                        required
+                        className="auth-input"
+                        placeholder="••••••••"
+                        value={fields.confirmPassword}
                         onChange={handleChange}
                         disabled={busy}
                     />

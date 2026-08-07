@@ -23,6 +23,9 @@ import TournamentsPage from '../pages/tournaments/TournamentsPage.jsx';
 import TournamentPage  from '../pages/tournaments/TournamentPage.jsx';
 import LeaderboardPage from '../pages/leaderboard/LeaderboardPage.jsx';
 import ClubPage        from '../pages/club/ClubPage.jsx';
+import FindClubsPage   from '../pages/club/FindClubsPage.jsx';
+import ClubInviteHandler from '../pages/club/ClubInviteHandler.jsx';
+import PublicClubPage  from '../pages/club/PublicClubPage.jsx';
 
 // ─── Route guards ──────────────────────────────────────────────────────────────
 
@@ -67,6 +70,11 @@ export default function AppRoutes() {
             {/* ── Public ───────────────────────────────────────────────── */}
             <Route path="/" element={<Landing />} />
 
+            {/* Find clubs (public) */}
+            <Route path="/clubs" element={<FindClubsPage />} />
+            <Route path="/clubs/join" element={<ClubInviteHandler />} />
+            <Route path="/clubs/:clubId" element={<PublicClubPage />} />
+
             {/* ── Auth ─────────────────────────────────────────────────── */}
             <Route
                 path="/auth"
@@ -109,15 +117,8 @@ export default function AppRoutes() {
                 <Route path="/tournaments"                element={<TournamentsPage />} />
                 <Route path="/tournaments/:tournamentId"  element={<TournamentPage />} />
 
-                {/* Club settings — admin only */}
-                <Route
-                    path="/club"
-                    element={
-                        <RequireAdmin>
-                            <ClubPage />
-                        </RequireAdmin>
-                    }
-                />
+                {/* Club dashboard — authenticated users (admin controls shown only to club admins) */}
+                <Route path="/club" element={<ClubPage />} />
             </Route>
 
             {/* ── 404 ──────────────────────────────────────────────────── */}

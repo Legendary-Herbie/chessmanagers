@@ -1,4 +1,42 @@
 import { ClubModel } from '../models/Club.js';
+import db from '../database/database.js';
+
+// Checks whether the authenticated user is the owner/admin of the club (club-scoped admin).
+// Note: Per-club admin roles are not yet implemented in the schema; for now the club owner
+// is treated as the club admin. This prevents system-level 'admin' users from managing
+// arbitrary clubs unless explicitly intended.
+export async function requireClubAdmin(req, res, next) {
+    try {
+        const { clubId } = req.params;
+        if (!clubId) return res.status(400).json({ error: 'Club ID is required.' });
+
+        let club = req.club;
+        if (!club) {
+            club = await ClubModel.findById(clubId);
+            if (!club) return res.status(404).json({ error: 'Club not found.' });
+        }
+
+        // Allow club owner or club-specific admin (user_clubs.role = 'admin')
+            if (club.owner_id === req.user.id) {
+                req.club = club;
+                return next();
+            }
+
+            const isClubAdmin = await db.query(`SELECT role FROM user_clubs WHERE club_id = $1 AND user_id = $2 LIMIT 1`, [clubId, req.user.id]).then(r => r.first);
+            if (isClubAdmin && isClubAdmin.role === 'admin') {
+                req.club = club;
+                return next();
+            }
+
+            return res.status(403).json({ error: 'Only the club owner or a club admin may perform this action.' });
+
+            // ensure req.club is set for downstream handlers
+
+    } catch (err) {
+        next(err);
+    }
+}
+
 
 // Role hierarchy from the spec:
 //   admin            — full control over club data
@@ -36,12 +74,20 @@ export async function requireClubMember(req, res, next) {
             return res.status(400).json({ error: 'Club ID is required.' });
         }
 
-        // Admins bypass the membership check — they may manage any club
-        if (req.user.role === 'admin') return next();
+        // Check membership in the explicit club_id — do not allow global system admins to bypass
+        const club = await ClubModel.findById(clubId);
 
-        const club = await ClubModel.findByUserId(req.user.id);
+        if (!club) {
+            return res.status(404).json({ error: 'Club not found.' });
+        }
 
-        if (!club || club.id !== clubId) {
+        // Verify user is a member of this club
+        const member = await db.query(
+            `SELECT 1 FROM user_clubs WHERE club_id = $1 AND user_id = $2 LIMIT 1`,
+            [clubId, req.user.id]
+        ).then(r => r.rowCount > 0);
+
+        if (!member) {
             return res.status(403).json({ error: 'You are not a member of this club.' });
         }
 
