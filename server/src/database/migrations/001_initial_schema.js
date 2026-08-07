@@ -352,7 +352,8 @@ export const up = pgm => {
     // ─── Views ───────────────────────────────────────────────────────────────
 
     pgm.sql(`
-        CREATE OR REPLACE VIEW v_club_leaderboard AS
+        DROP VIEW IF EXISTS v_club_leaderboard;
+        CREATE VIEW v_club_leaderboard AS
         SELECT
             p.id,
             p.club_id,
@@ -370,7 +371,8 @@ export const up = pgm => {
     `);
 
     pgm.sql(`
-        CREATE OR REPLACE VIEW v_tournament_standings AS
+        DROP VIEW IF EXISTS v_tournament_standings;
+        CREATE VIEW v_tournament_standings AS
         SELECT
             tp.tournament_id,
             p.id                                                            AS player_id,

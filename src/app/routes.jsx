@@ -23,6 +23,9 @@ import TournamentsPage from '../pages/tournaments/TournamentsPage.jsx';
 import TournamentPage  from '../pages/tournaments/TournamentPage.jsx';
 import LeaderboardPage from '../pages/leaderboard/LeaderboardPage.jsx';
 import ClubPage        from '../pages/club/ClubPage.jsx';
+import FindClubsPage   from '../pages/club/FindClubsPage.jsx';
+import ClubInviteHandler from '../pages/club/ClubInviteHandler.jsx';
+import PublicClubPage   from '../pages/club/PublicClubPage.jsx';
 
 // ─── Route guards ──────────────────────────────────────────────────────────────
 
@@ -81,6 +84,12 @@ export default function AppRoutes() {
                 <Route path="register" element={<RegisterView />} />
             </Route>
 
+            {/* Club invite handler (public) */}
+            <Route path="/clubs/join" element={<ClubInviteHandler />} />
+            <Route path="/clubs/:clubId/join" element={<ClubInviteHandler />} />
+            {/* Public club detail */}
+            <Route path="/clubs/:clubId" element={<PublicClubPage />} />
+
             {/* ── Protected app ─────────────────────────────────────────── */}
             <Route
                 element={
@@ -109,15 +118,11 @@ export default function AppRoutes() {
                 <Route path="/tournaments"                element={<TournamentsPage />} />
                 <Route path="/tournaments/:tournamentId"  element={<TournamentPage />} />
 
-                {/* Club settings — admin only */}
-                <Route
-                    path="/club"
-                    element={
-                        <RequireAdmin>
-                            <ClubPage />
-                        </RequireAdmin>
-                    }
-                />
+                {/* Clubs: find list and club page */}
+                <Route path="/clubs" element={<FindClubsPage />} />
+
+                {/* Club settings / view — members and admins see appropriate UI */}
+                <Route path="/club" element={<ClubPage />} />
             </Route>
 
             {/* ── 404 ──────────────────────────────────────────────────── */}

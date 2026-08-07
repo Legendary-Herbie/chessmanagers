@@ -29,6 +29,20 @@ const runner = pgMigratePkg.default || pgMigratePkg.runner || pgMigratePkg;
 const db = {
     init: async () => {
         await pgDb.initPg();
+
+        // If core tables already exist (e.g. users), skip running migrations — this
+        // makes startup tolerant of environments that already have schema applied.
+        const client = await pgDb.pool.connect();
+        try {
+            const res = await client.query("SELECT to_regclass('public.users') as users_table");
+            if (res.rows && res.rows[0] && res.rows[0].users_table) {
+                console.log('[DB] Schema already present; skipping migrations.');
+                return;
+            }
+        } finally {
+            client.release();
+        }
+
         console.log('[DB] Running migrations...');
         await runner({
             dbClient: pgDb.pool,

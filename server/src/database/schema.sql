@@ -282,46 +282,48 @@ CREATE TABLE IF NOT EXISTS password_resets (
 -- ─── Views ────────────────────────────────────────────────────────────────────
 
 -- Club leaderboard — models now query this instead of repeating CASE blocks.
+DROP VIEW IF EXISTS v_club_leaderboard;
 CREATE OR REPLACE VIEW v_club_leaderboard AS
 SELECT
     p.id,
     p.club_id,
     p.name,
     p.rating,
-    p.games                     AS played,
+    p.games        AS played,
     p.wins,
     p.draws,
     p.losses,
-    p.last_played               AS last_active,
-    pl.status                   AS link_status,
-    (p.wins + p.draws * 0.5)    AS points
+    p.last_played  AS last_active,
+    pl.status      AS link_status,
+    (p.wins + p.draws * 0.5) AS points
 FROM players p
 LEFT JOIN player_links pl ON pl.player_id = p.id AND pl.status = 'approved';
 
 -- Tournament standings — models now query this instead of repeating CASE blocks.
+DROP VIEW IF EXISTS v_tournament_standings;
 CREATE OR REPLACE VIEW v_tournament_standings AS
 SELECT
     tp.tournament_id,
-    p.id                                                            AS player_id,
+    p.id                                                   AS player_id,
     p.name,
-    COUNT(m.id)                                                     AS played,
+    COUNT(m.id)                                            AS played,
     SUM(CASE
         WHEN m.white_player_id = p.id AND m.result = 'white' THEN 1
         WHEN m.black_player_id = p.id AND m.result = 'black' THEN 1
         ELSE 0
-    END)                                                            AS wins,
-    SUM(CASE WHEN m.result = 'draw' THEN 1 ELSE 0 END)             AS draws,
+    END)                                                    AS wins,
+    SUM(CASE WHEN m.result = 'draw' THEN 1 ELSE 0 END)      AS draws,
     SUM(CASE
         WHEN m.white_player_id = p.id AND m.result = 'black' THEN 1
         WHEN m.black_player_id = p.id AND m.result = 'white' THEN 1
         ELSE 0
-    END)                                                            AS losses,
+    END)                                                    AS losses,
     SUM(CASE
         WHEN m.white_player_id = p.id AND m.result = 'white' THEN 1.0
         WHEN m.black_player_id = p.id AND m.result = 'black' THEN 1.0
-        WHEN m.result = 'draw'                                THEN 0.5
+        WHEN m.result = 'draw'                             THEN 0.5
         ELSE 0.0
-    END)                                                            AS score
+    END)                                                    AS score
 FROM tournament_players tp
 JOIN  players p ON p.id = tp.player_id
 LEFT JOIN matches m

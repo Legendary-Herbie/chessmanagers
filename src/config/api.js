@@ -182,11 +182,27 @@ export const endpoints = {
         password: ()      => '/auth/password',
     },
     clubs: {
+        // Public listing of clubs
+        list:    ()                  => '/clubs',
+        // Current user's club
         mine:    ()                  => '/clubs/mine',
         byId:    (clubId)            => `/clubs/${clubId}`,
         members: (clubId)            => `/clubs/${clubId}/members`,
         member:  (clubId, userId)    => `/clubs/${clubId}/members/${userId}`,
+        // Join / invite endpoint
+        join:    (clubId)            => `/clubs/${clubId}/join`,
+        // Join requests (admin)
+        joinRequests: (clubId)       => `/clubs/${clubId}/join-requests`,
+        approveJoin:  (clubId, reqId) => `/clubs/${clubId}/join-requests/${reqId}/approve`,
+        rejectJoin:   (clubId, reqId) => `/clubs/${clubId}/join-requests/${reqId}/reject`,
+        // Invites
+        createInvite: (clubId)       => `/clubs/${clubId}/invites`,
+        listInvites:   (clubId)      => `/clubs/${clubId}/invites`,
+        revokeInvite:  (clubId, id)  => `/clubs/${clubId}/invites/${id}`,
+        // Public token join
+        joinByToken:   ()            => `/clubs/join-by-token`,
     },
+
     players: {
         list:          (clubId)            => `/clubs/${clubId}/players`,
         byId:          (clubId, playerId)  => `/clubs/${clubId}/players/${playerId}`,

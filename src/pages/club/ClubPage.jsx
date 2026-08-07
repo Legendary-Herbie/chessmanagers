@@ -4,6 +4,9 @@ import { api, endpoints } from '../../config/api.js';
 import { useClub } from '../../app/ClubProvider.jsx';
 import { useAuth } from '../../app/AuthProvider.jsx';
 import Button from '../../shared/common/Button.jsx';
+import InviteModal from './InviteModal.jsx';
+import { useNotifications } from '../../app/providers.jsx';
+import { useConfirm } from '../../app/ConfirmProvider.jsx';
 
 export default function ClubPage() {
     const { club, refreshClub } = useClub();
@@ -11,14 +14,21 @@ export default function ClubPage() {
 
     const [profile, setProfile] = useState(null);
     const [members, setMembers] = useState([]);
+    const [joinRequests, setJoinRequests] = useState([]);
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
+    const [loadingRequests, setLoadingRequests] = useState(false);
+    const [showInviteModal, setShowInviteModal] = useState(false);
+
+    const { notify } = useNotifications();
+    const confirm = useConfirm();
 
     useEffect(() => {
         if (!club) return;
         setProfile(club);
         loadMembers();
-    }, [club]);
+        if (isAdmin) loadJoinRequests();
+    }, [club, isAdmin]);
 
     async function loadMembers() {
         setLoading(true);
@@ -32,13 +42,25 @@ export default function ClubPage() {
         }
     }
 
+    async function loadJoinRequests() {
+        setLoadingRequests(true);
+        try {
+            const res = await api.get(endpoints.clubs.joinRequests(club.id));
+            setJoinRequests(Array.isArray(res.requests) ? res.requests : (res.requests ?? []));
+        } catch (err) {
+            console.error('Failed to load join requests', err);
+        } finally {
+            setLoadingRequests(false);
+        }
+    }
+
     async function saveProfile() {
         try {
             await api.patch(endpoints.clubs.byId(club.id), profile);
             await refreshClub();
-            alert('Club updated');
+            notify('Club updated', 'success');
         } catch (err) {
-            alert(err.message || 'Failed to update club');
+            notify(err.message || 'Failed to update club', 'error');
         }
     }
 
@@ -47,14 +69,41 @@ export default function ClubPage() {
     }
 
     async function removeMember(member) {
-        if (!confirm(`Remove ${member.email} from the club?`)) return;
-        if (member.role === 'owner') { alert('Cannot remove owner'); return; }
-        if (member.userId === user?.id) { alert('Cannot remove yourself'); return; }
+        const ok = await confirm({ title: 'Remove member', message: `Remove ${member.email} from the club?` });
+        if (!ok) return;
+        if (member.role === 'owner') { notify('Cannot remove owner', 'error'); return; }
+        if (member.userId === user?.id) { notify('Cannot remove yourself', 'error'); return; }
         try {
             await api.delete(endpoints.clubs.member(club.id, member.userId));
             await loadMembers();
+            notify('Member removed', 'success');
         } catch (err) {
-            alert(err.message || 'Failed to remove member');
+            notify(err.message || 'Failed to remove member', 'error');
+        }
+    }
+
+    async function approveRequest(reqRow) {
+        const ok = await confirm({ title: 'Approve request', message: `Approve join request from ${reqRow.email}?` });
+        if (!ok) return;
+        try {
+            await api.patch(endpoints.clubs.approveJoin(club.id, reqRow.id));
+            await loadJoinRequests();
+            await loadMembers();
+            notify('Approved', 'success');
+        } catch (err) {
+            notify(err.message || 'Failed to approve request', 'error');
+        }
+    }
+
+    async function rejectRequest(reqRow) {
+        const ok = await confirm({ title: 'Reject request', message: `Reject join request from ${reqRow.email}?` });
+        if (!ok) return;
+        try {
+            await api.patch(endpoints.clubs.rejectJoin(club.id, reqRow.id));
+            await loadJoinRequests();
+            notify('Rejected', 'success');
+        } catch (err) {
+            notify(err.message || 'Failed to reject request', 'error');
         }
     }
 
@@ -69,6 +118,7 @@ export default function ClubPage() {
             <div className="tabs">
                 <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => setActiveTab('profile')}>Profile</button>
                 <button className={activeTab === 'members' ? 'active' : ''} onClick={() => setActiveTab('members')}>Members</button>
+                {isAdmin && <button className={activeTab === 'requests' ? 'active' : ''} onClick={() => setActiveTab('requests')}>Join Requests</button>}
             </div>
 
             {activeTab === 'profile' && (
@@ -109,11 +159,13 @@ export default function ClubPage() {
                     <div className="invite-section">
                         {isAdmin ? (
                             <>
-                                <div className="invite-label">Invite link</div>
+                                <div className="invite-label">Invite links</div>
                                 <div className="invite-row">
-                                    <input className="input mono" readOnly value={inviteLink()} />
-                                    <Button onClick={() => navigator.clipboard.writeText(inviteLink())}>Copy</Button>
+                                    <Button onClick={() => setShowInviteModal(true)}>Manage Invites</Button>
                                 </div>
+                                {showInviteModal && (
+                                    <InviteModal clubId={club.id} onClose={() => setShowInviteModal(false)} />
+                                )}
                             </>
                         ) : null}
                     </div>
@@ -141,6 +193,32 @@ export default function ClubPage() {
                                     </tr>
                                 ))}
                                 {members.length === 0 && <tr><td colSpan={isAdmin ? 4 : 3} className="muted">No members</td></tr>}
+                            </tbody>
+                        </table>
+                    )}
+                </div>
+            )}
+
+            {isAdmin && activeTab === 'requests' && (
+                <div className="tab-panel requests-panel">
+                    {loadingRequests ? <div className="muted">Loading…</div> : (
+                        <table className="members-table">
+                            <thead>
+                                <tr><th>Email</th><th>Message</th><th>Requested At</th><th>Actions</th></tr>
+                            </thead>
+                            <tbody>
+                                {joinRequests.map(r => (
+                                    <tr key={r.id}>
+                                        <td>{r.email}</td>
+                                        <td>{r.message || '—'}</td>
+                                        <td>{r.created_at ? new Date(r.created_at).toLocaleString() : '—'}</td>
+                                        <td>
+                                            <Button onClick={() => approveRequest(r)} className="mr-2">Approve</Button>
+                                            <Button variant="secondary" onClick={() => rejectRequest(r)}>Reject</Button>
+                                        </td>
+                                    </tr>
+                                ))}
+                                {joinRequests.length === 0 && <tr><td colSpan={4} className="muted">No pending requests</td></tr>}
                             </tbody>
                         </table>
                     )}

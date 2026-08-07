@@ -5,6 +5,8 @@ import Button from '../../shared/common/Button.jsx';
 import { api, endpoints } from '../../config/api.js';
 import { useClub } from '../../app/ClubProvider.jsx';
 import { useAuth } from '../../app/AuthProvider.jsx';
+import { useNotifications } from '../../app/providers.jsx';
+import { useConfirm } from '../../app/ConfirmProvider.jsx';
 
 export default function MatchesPage() {
     const { club } = useClub();
@@ -19,6 +21,9 @@ export default function MatchesPage() {
     const [editingMatch, setEditingMatch] = useState(null);
     const [form, setForm] = useState({ whiteId: '', blackId: '', outcome: 'white', timeControl: 'blitz', notes: '' });
     const [error, setError] = useState(null);
+
+    const { notify } = useNotifications();
+    const confirm = useConfirm();
 
     useEffect(() => {
         if (!club) return;
@@ -83,13 +88,15 @@ export default function MatchesPage() {
     }
 
     async function deleteMatch(id) {
-        if (!confirm('Delete this match? This action cannot be undone. Ratings will be recomputed on the server.')) return;
+        const ok = await confirm({ title: 'Delete match', message: 'Delete this match? This action cannot be undone. Ratings will be recomputed on the server.' });
+        if (!ok) return;
         try {
             await api.delete(endpoints.matches.byId(club.id, id));
             // Server-side recompute is expected. Refresh.
             await refreshAll();
+            notify('Match deleted and ratings recomputed', 'success');
         } catch (err) {
-            alert(err.message || 'Failed to delete match');
+            notify(err.message || 'Failed to delete match', 'error');
         }
     }
 

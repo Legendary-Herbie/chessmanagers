@@ -6,31 +6,42 @@ import {
     updateClub,
     getMembers,
     removeMember,
+    createInvite,
+    listInvites,
+    revokeInvite,
+    joinByToken,
 } from '../controllers/clubController.js';
 import { requireAuth } from '../middleware/auth.js';
-import { requireRole, requireClubMember } from '../middleware/requireRole.js';
+import { requireRole, requireClubMember, requireClubAdmin } from '../middleware/requireRole.js';
 import { validate, updateClubSchema } from '../middleware/validate.js';
 
 const router = Router();
-router.use(requireAuth);
 
-// GET /api/v1/clubs/mine
-// Must be declared before /:clubId to avoid 'mine' being treated as an ID
-router.get('/mine', getMyClub);
+// GET /api/v1/clubs/mine — authenticated
+router.get('/mine', requireAuth, getMyClub);
 
-// POST /api/v1/clubs
-router.post('/', requireRole('admin'), createClub);
+// POST /api/v1/clubs — system admin only
+router.post('/', requireAuth, requireRole('admin'), createClub);
 
-// GET /api/v1/clubs/:clubId
-router.get('/:clubId', requireClubMember, getClub);
+// Public: GET /api/v1/clubs/:clubId
+// Returns public club info; includes membership info when authenticated
+router.get('/:clubId', getClub);
 
-// PATCH /api/v1/clubs/:clubId
-router.patch('/:clubId', requireClubMember, requireRole('admin'), validate(updateClubSchema), updateClub);
+// PATCH /api/v1/clubs/:clubId — club admin only
+router.patch('/:clubId', requireAuth, requireClubAdmin, validate(updateClubSchema), updateClub);
 
-// GET /api/v1/clubs/:clubId/members
-router.get('/:clubId/members', requireClubMember, requireRole('admin'), getMembers);
+// GET /api/v1/clubs/:clubId/members — club admin only
+router.get('/:clubId/members', requireAuth, requireClubAdmin, getMembers);
 
-// DELETE /api/v1/clubs/:clubId/members/:userId
-router.delete('/:clubId/members/:userId', requireClubMember, requireRole('admin'), removeMember);
+// DELETE /api/v1/clubs/:clubId/members/:userId — club admin only
+router.delete('/:clubId/members/:userId', requireAuth, requireClubAdmin, removeMember);
+
+// Invite management (club admins)
+router.post('/:clubId/invites', requireAuth, requireClubAdmin, createInvite);
+router.get('/:clubId/invites', requireAuth, requireClubAdmin, listInvites);
+router.delete('/:clubId/invites/:inviteId', requireAuth, requireClubAdmin, revokeInvite);
+
+// Join by token (authenticated user)
+router.post('/join-by-token', requireAuth, joinByToken);
 
 export default router;

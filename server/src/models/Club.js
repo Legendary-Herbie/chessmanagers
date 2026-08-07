@@ -57,7 +57,7 @@ export const ClubModel = {
 
     getMembers: async (clubId) => {
         return db.query(
-            `SELECT u.id, u.email, u.role, uc.joined_at
+            `SELECT u.id AS user_id, u.email, uc.role AS role, uc.joined_at
              FROM users u
              JOIN user_clubs uc ON uc.user_id = u.id
              WHERE uc.club_id = $1
@@ -66,13 +66,24 @@ export const ClubModel = {
         ).then(r => r.rows);
     },
 
-    addMember: async (clubId, userId) => {
+    // Returns the membership record for a specific user in a club (or null)
+    getMembership: async (clubId, userId) => {
         return db.query(
-            `INSERT INTO user_clubs (club_id, user_id)
-             VALUES ($1, $2)
-             ON CONFLICT DO NOTHING
-             RETURNING *`,
+            `SELECT uc.user_id, uc.role, uc.joined_at
+             FROM user_clubs uc
+             WHERE uc.club_id = $1 AND uc.user_id = $2
+             LIMIT 1`,
             [clubId, userId]
+        ).then(r => r.first);
+    },
+
+    addMember: async (clubId, userId, role = 'member') => {
+        return db.query(
+            `INSERT INTO user_clubs (club_id, user_id, role)
+             VALUES ($1, $2, $3)
+             ON CONFLICT (club_id, user_id) DO UPDATE SET role = LEAST(user_clubs.role, EXCLUDED.role)
+             RETURNING *`,
+            [clubId, userId, role]
         ).then(r => r.first);
     },
 

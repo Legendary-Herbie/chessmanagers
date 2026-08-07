@@ -9,6 +9,7 @@ const navItems = [
     { to: '/players', label: 'Players' },
     { to: '/matches', label: 'Matches' },
     { to: '/tournaments', label: 'Tournaments' },
+    { to: '/clubs', label: 'Clubs' },
 ];
 
 function navLinkClass({ isActive }) {

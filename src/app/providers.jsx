@@ -4,6 +4,7 @@
 
 import { ThemeProvider }         from './ThemeProvider.jsx';
 import { NotificationsProvider } from './NotificationsProvider.jsx';
+import { ConfirmProvider }       from './ConfirmProvider.jsx';
 import { AuthProvider }          from './AuthProvider.jsx';
 import { ClubProvider }          from './ClubProvider.jsx';
 
@@ -17,11 +18,13 @@ export default function Providers({ children }) {
     return (
         <ThemeProvider>
             <NotificationsProvider>
-                <AuthProvider>
-                    <ClubProvider>
-                        {children}
-                    </ClubProvider>
-                </AuthProvider>
+                <ConfirmProvider>
+                    <AuthProvider>
+                        <ClubProvider>
+                            {children}
+                        </ClubProvider>
+                    </AuthProvider>
+                </ConfirmProvider>
             </NotificationsProvider>
         </ThemeProvider>
     );

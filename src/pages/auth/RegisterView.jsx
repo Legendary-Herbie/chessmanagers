@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../../app/AuthProvider.jsx';
+import { api, endpoints } from '../../config/api.js';
 import Button from '../../shared/common/Button.jsx';
 
 export default function RegisterView() {
     const { register } = useAuth();
     const navigate     = useNavigate();
+    const location     = useLocation();
 
     const [fields, setFields] = useState({ name: '', email: '', password: '' });
     const [error,  setError]  = useState('');
@@ -30,6 +32,32 @@ export default function RegisterView() {
         setBusy(true);
         try {
             await register(fields);
+
+            // If the user arrived with an invite query, join the club automatically
+            const params = new URLSearchParams(location.search);
+            const inviteClub = params.get('inviteClub');
+            const inviteToken = params.get('inviteToken');
+
+            if (inviteToken) {
+                try {
+                    await api.post(endpoints.clubs.joinByToken(), { token: inviteToken });
+                    navigate('/club');
+                    return;
+                } catch (err) {
+                    console.warn('Auto-join by token failed after registration', err);
+                }
+            }
+
+            if (inviteClub) {
+                try {
+                    await api.post(endpoints.clubs.join(inviteClub) + '?invite=1');
+                    navigate('/club');
+                    return;
+                } catch (err) {
+                    console.warn('Auto-join failed after registration', err);
+                }
+            }
+
             navigate('/dashboard');
         } catch (err) {
             setError(err.message || 'Registration failed. Please try again.');
