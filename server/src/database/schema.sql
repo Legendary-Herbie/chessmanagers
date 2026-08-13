@@ -158,6 +158,9 @@ CREATE TABLE IF NOT EXISTS players (
     bio          TEXT,
     rating       INTEGER     NOT NULL DEFAULT 1200,
     start_rating INTEGER     NOT NULL DEFAULT 1200,
+    blitz_rating INTEGER     NOT NULL DEFAULT 1200,
+    rapid_rating INTEGER     NOT NULL DEFAULT 1200,
+    classical_rating INTEGER NOT NULL DEFAULT 1200,
     games        INTEGER     NOT NULL DEFAULT 0  CHECK (games  >= 0),
     wins         INTEGER     NOT NULL DEFAULT 0  CHECK (wins   >= 0),
     draws        INTEGER     NOT NULL DEFAULT 0  CHECK (draws  >= 0),
@@ -202,6 +205,8 @@ CREATE TABLE IF NOT EXISTS matches (
     result          TEXT        NOT NULL CHECK (result IN ('white', 'black', 'draw')),
     type            TEXT        NOT NULL DEFAULT 'casual'
                                 CHECK (type IN ('casual', 'rated', 'tournament')),
+    time_control    TEXT        NOT NULL DEFAULT 'blitz'
+                                CHECK (time_control IN ('blitz', 'rapid', 'classical')),
     tournament_id   TEXT        REFERENCES tournaments(id) ON DELETE SET NULL,
     notes           TEXT,
     played_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -376,7 +381,8 @@ CREATE TABLE IF NOT EXISTS club_join_requests (
     message    TEXT,
     status     TEXT        NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    processed_at TIMESTAMPTZ
+    processed_at TIMESTAMPTZ,
+    UNIQUE (club_id, user_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_club_join_requests_club ON club_join_requests(club_id);
@@ -388,7 +394,7 @@ CREATE TABLE IF NOT EXISTS club_invites (
     id          TEXT        PRIMARY KEY DEFAULT ('inv_' || md5(random()::text || clock_timestamp()::text)),
     club_id     TEXT        NOT NULL REFERENCES clubs(id) ON DELETE CASCADE,
     token       TEXT        NOT NULL UNIQUE,
-    created_by  TEXT        NOT NULL REFERENCES users(id) ON DELETE SET NULL,
+    created_by  TEXT        REFERENCES users(id) ON DELETE SET NULL,
     expires_at  TIMESTAMPTZ,
     revoked     BOOLEAN     NOT NULL DEFAULT FALSE,
     created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()

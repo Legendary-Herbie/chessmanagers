@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { useAuth, useClub, useTheme } from '../../app/providers.jsx';
+import { useAuth, useClub, useTheme } from '../../app/contextHooks.js';
 import '../../styles/layout.css';
 
 const navItems = [

@@ -27,16 +27,15 @@ router.get('/clubs/:clubId/leaderboard', async (req, res, next) => {
 // Shareable public tournament view
 router.get('/clubs/:clubId/tournaments/:tournamentId', async (req, res, next) => {
     try {
-        const { tournamentId } = req.params;
-        const [tournament, players, standings] = await Promise.all([
-            TournamentModel.findById(tournamentId),
-            TournamentModel.getPlayers(tournamentId),
-            TournamentModel.getStandings(tournamentId),
-        ]);
-
+        const { clubId, tournamentId } = req.params;
+        const tournament = await TournamentModel.findById(tournamentId, clubId);
         if (!tournament) {
             return res.status(404).json({ error: 'Tournament not found.' });
         }
+        const [players, standings] = await Promise.all([
+            TournamentModel.getPlayers(tournamentId, clubId),
+            TournamentModel.getStandings(tournamentId),
+        ]);
 
         res.json({ tournament, players, standings });
     } catch (err) {
@@ -50,7 +49,7 @@ router.get('/clubs/:clubId/players/:playerId', async (req, res, next) => {
     try {
         const player = await PlayerModel.findById(req.params.playerId);
 
-        if (!player) {
+        if (!player || player.club_id !== req.params.clubId) {
             return res.status(404).json({ error: 'Player not found.' });
         }
 

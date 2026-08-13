@@ -61,27 +61,15 @@ export function applyMatch(pmap, match, settings = DEFAULT_SETTINGS) {
 
     const aBefore = A.rating;
     const bBefore = B.rating;
-
+    const { newWhiteRating: aAfter, newBlackRating: bAfter } = calculateNewRatings(
+        aBefore, bBefore, match.result, A, B, settings,
+    );
     const EA = expectedScore(aBefore, bBefore);
     const EB = 1 - EA;
-
-    const SA = resultToScore(match.result); // white's score
-    const SB = 1 - SA;                      // black's score
-
+    const SA = resultToScore(match.result);
+    const SB = 1 - SA;
     const KA = kFactor(A, settings);
     const KB = kFactor(B, settings);
-
-    let aAfter = aBefore + KA * (SA - EA);
-    let bAfter = bBefore + KB * (SB - EB);
-
-    if (settings.roundRatings) {
-        aAfter = Math.round(aAfter);
-        bAfter = Math.round(bAfter);
-    }
-
-    // Enforce floor and ceiling
-    aAfter = Math.min(settings.maxRating, Math.max(settings.minRating, aAfter));
-    bAfter = Math.min(settings.maxRating, Math.max(settings.minRating, bAfter));
 
     // Immutable update — never mutate the objects already in the map
     pmap.set(A.id, {

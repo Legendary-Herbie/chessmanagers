@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, endpoints, getFieldErrors, isValidationError } from '../config/api.js';
-import { useAuth } from '../app/AuthProvider.jsx';
+import { useAuth } from '../app/contextHooks.js';
 import '../styles/create-club.css';
 
 export default function CreateClub() {

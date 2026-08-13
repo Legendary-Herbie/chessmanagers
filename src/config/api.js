@@ -194,6 +194,10 @@ export const endpoints = {
         byId:    (clubId)            => `/clubs/${clubId}`,
         members: (clubId)            => `/clubs/${clubId}/members`,
         member:  (clubId, userId)    => `/clubs/${clubId}/members/${userId}`,
+        join:    (clubId)            => `/clubs/${clubId}/join`,
+        invites: (clubId)            => `/clubs/${clubId}/invites`,
+        invite:  (clubId, inviteId)  => `/clubs/${clubId}/invites/${inviteId}`,
+        joinByToken: ()              => '/clubs/join-by-token',
     },
     players: {
         list:          (clubId)            => `/clubs/${clubId}/players`,

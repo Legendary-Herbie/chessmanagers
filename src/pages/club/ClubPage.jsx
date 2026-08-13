@@ -1,18 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import '../../styles/club.css';
 import Button from '../../shared/common/Button.jsx';
+import ClubDashboard from './ClubDashboard.jsx';
 import { api, endpoints } from '../../config/api.js';
-import { useClub, useAuth } from '../../app/providers.jsx';
+import { useClub, useAuth } from '../../app/contextHooks.js';
 
 export default function ClubPage() {
     const { club, refreshClub } = useClub();
-    const { user, isAdmin } = useAuth();
+    const { user } = useAuth();
     const [profile, setProfile] = useState(null);
     const [members, setMembers] = useState([]);
     const [activeTab, setActiveTab] = useState('profile');
     const [loading, setLoading] = useState(false);
     const [creatingInvite, setCreatingInvite] = useState(false);
     const [invites, setInvites] = useState([]);
+    const [joinRequests, setJoinRequests] = useState([]);
 
     const loadMembers = useCallback(async () => {
         if (!club) return;
@@ -38,16 +40,16 @@ export default function ClubPage() {
         // load existing invites (if admin)
         async function loadAdminData() {
             try {
-                const res = await api.get(`/clubs/${club.id}/invites`);
+                const res = await api.get(endpoints.clubs.invites(club.id));
                 setInvites(res?.invites || []);
-            } catch (err) {
+            } catch {
                 // ignore — non-admins won't be able to fetch
             }
 
             try {
                 const s = await api.get(endpoints.leaderboard.stats(club.id));
                 setStats(s?.stats || null);
-            } catch (err) {
+            } catch {
                 // ignore
             }
         }
@@ -69,7 +71,7 @@ export default function ClubPage() {
         if (!club) return;
         setCreatingInvite(true);
         try {
-            const res = await api.post(`/clubs/${club.id}/invites`, {});
+            const res = await api.post(endpoints.clubs.invites(club.id), {});
             const inv = res?.invite;
             if (inv?.token) {
                 setInvites(prev => [inv, ...prev]);
@@ -83,6 +85,27 @@ export default function ClubPage() {
             alert(err?.message || 'Failed to create invite');
         } finally {
             setCreatingInvite(false);
+        }
+    }
+
+    async function loadJoinRequests() {
+        if (!club) return;
+        try {
+            const result = await api.get(`/clubs/${club.id}/join-requests`);
+            setJoinRequests(result.requests || []);
+        } catch {
+            setJoinRequests([]);
+        }
+    }
+
+    async function reviewJoinRequest(requestId, action) {
+        if (!club) return;
+        try {
+            await api.patch(`/clubs/${club.id}/join-requests/${requestId}/${action}`);
+            setJoinRequests(current => current.filter(request => request.id !== requestId));
+            if (action === 'approve') await loadMembers();
+        } catch (err) {
+            alert(err?.message || `Failed to ${action} join request`);
         }
     }
 
@@ -103,6 +126,10 @@ export default function ClubPage() {
     // determine club-level admin (owner/admin) for the current user
     const currentMember = members.find(m => m.userId === user?.id);
     const isClubAdmin = currentMember && (currentMember.role === 'owner' || currentMember.role === 'admin');
+
+    useEffect(() => {
+        if (isClubAdmin) loadJoinRequests();
+    }, [isClubAdmin, club]);
 
     return (
         <div className="club-page">
@@ -177,12 +204,29 @@ export default function ClubPage() {
                                                 <Button variant="danger" style={{ marginLeft: 8 }} onClick={async () => {
                                                     if (!confirm('Revoke this invite?')) return;
                                                     try {
-                                                        await api.delete(`/clubs/${club.id}/invites/${i.id}`);
+                                                        await api.delete(endpoints.clubs.invite(club.id, i.id));
                                                         setInvites(prev => prev.filter(x => x.id !== i.id));
                                                     } catch (err) {
                                                         alert(err?.message || 'Failed to revoke invite');
                                                     }
                                                 }}>Revoke</Button>
+                                            </div>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+
+                            <div className="invite-label" style={{ marginTop: 20 }}>Join requests</div>
+                            {joinRequests.length === 0 ? (
+                                <div className="muted">No pending join requests</div>
+                            ) : (
+                                <ul className="invite-list">
+                                    {joinRequests.map(request => (
+                                        <li key={request.id} className="invite-item">
+                                            <div><strong>{request.name || request.email}</strong>{request.message ? <div className="muted">{request.message}</div> : null}</div>
+                                            <div style={{ marginLeft: 'auto' }}>
+                                                <Button onClick={() => reviewJoinRequest(request.id, 'approve')}>Approve</Button>
+                                                <Button variant="danger" style={{ marginLeft: 8 }} onClick={() => reviewJoinRequest(request.id, 'reject')}>Reject</Button>
                                             </div>
                                         </li>
                                     ))}
@@ -219,6 +263,8 @@ export default function ClubPage() {
                     )}
                 </div>
             )}
+
+            {activeTab === 'dashboard' && <ClubDashboard stats={stats} />}
         </div>
     );
 }

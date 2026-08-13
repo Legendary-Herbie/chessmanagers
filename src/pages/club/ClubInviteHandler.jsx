@@ -1,8 +1,7 @@
 import { useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { api } from '../../config/api.js';
-import { useAuth } from '../../app/providers.jsx';
-import { useNotifications } from '../../app/NotificationsProvider.jsx';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { api, endpoints } from '../../config/api.js';
+import { useAuth, useNotifications } from '../../app/contextHooks.js';
 
 export default function ClubInviteHandler() {
     const [searchParams] = useSearchParams();
@@ -12,33 +11,24 @@ export default function ClubInviteHandler() {
     const { notify } = useNotifications();
 
     useEffect(() => {
+        if (!token || !user) return;
         async function acceptToken() {
-            if (!token) {
-                notify('Invite token missing', 'error');
-                navigate('/clubs');
-                return;
-            }
-
-            if (!user) {
-                // Not authenticated — redirect to register/login carrying the token
-                navigate(`/auth/register?inviteToken=${encodeURIComponent(token)}`);
-                return;
-            }
-
             try {
-                const res = await api.post('/clubs/join-by-token', { token });
+                const result = await api.post(endpoints.clubs.joinByToken(), { token });
                 notify('You have joined the club.', 'success');
-                // If server returns clubId, navigate to its public page
-                const clubId = res?.clubId || null;
-                navigate(clubId ? `/clubs/${clubId}` : '/club');
+                navigate(`/clubs/${result.clubId}`, { replace: true });
             } catch (err) {
                 notify(err?.message || 'Failed to accept invite', 'error');
-                navigate('/clubs');
+                navigate('/clubs', { replace: true });
             }
         }
-
         acceptToken();
     }, [token, user, navigate, notify]);
 
-    return <div>Processing invite…</div>;
+    if (!token) return <p>Invite token missing.</p>;
+    if (!user) {
+        const encoded = encodeURIComponent(token);
+        return <div><h1>You’ve been invited to join a club</h1><p>Create an account or sign in to accept this invite.</p><Link to={`/auth/register?inviteToken=${encoded}`}>Create an account</Link>{' · '}<Link to={`/auth/login?inviteToken=${encoded}`}>Sign in</Link></div>;
+    }
+    return <p>Processing invite…</p>;
 }

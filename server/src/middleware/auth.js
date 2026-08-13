@@ -1,11 +1,12 @@
 import jwt from 'jsonwebtoken';
 import env from '../config/env.js';
+import { UserModel } from '../models/User.js';
 
 const { JWT_SECRET } = env;
 
 // Verifies the JWT from the Authorization header and attaches the decoded
 // Expected header: Authorization: Bearer <token>
-export function requireAuth(req, res, next) {
+export async function requireAuth(req, res, next) {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -16,9 +17,15 @@ export function requireAuth(req, res, next) {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
-        // Attach the decoded payload as req.user so controllers and downstream
-        // middleware can access id, email, and role without re-querying the DB.
-        req.user = decoded;
+        const user = await UserModel.findById(decoded.id);
+        if (!user) return res.status(401).json({ error: 'User not found.' });
+        req.user = {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            playerId: user.player_id ?? null,
+            linkStatus: user.link_status ?? null,
+        };
         next();
     } catch (err) {
         if (err.name === 'TokenExpiredError') {
@@ -30,7 +37,7 @@ export function requireAuth(req, res, next) {
 
 // Optional auth — attaches req.user if a valid token is present, but does not block the request if absent.
 // Used for public endpoints that show extra data to authenticated users.
-export function optionalAuth(req, res, next) {
+export async function optionalAuth(req, res, next) {
     const authHeader = req.headers.authorization;
 
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -41,7 +48,15 @@ export function optionalAuth(req, res, next) {
     const token = authHeader.slice(7);
 
     try {
-        req.user = jwt.verify(token, JWT_SECRET);
+        const decoded = jwt.verify(token, JWT_SECRET);
+        const user = await UserModel.findById(decoded.id);
+        req.user = user ? {
+            id: user.id,
+            email: user.email,
+            role: user.role,
+            playerId: user.player_id ?? null,
+            linkStatus: user.link_status ?? null,
+        } : null;
     } catch {
         req.user = null;
     }

@@ -18,15 +18,15 @@ export async function getTournaments(req, res, next) {
 // GET /api/v1/clubs/:clubId/tournaments/:tournamentId
 export async function getTournament(req, res, next) {
     try {
-        const [tournament, players, standings] = await Promise.all([
-            TournamentModel.findById(req.params.tournamentId),
-            TournamentModel.getPlayers(req.params.tournamentId),
-            TournamentModel.getStandings(req.params.tournamentId),
-        ]);
-
+        const { clubId, tournamentId } = req.params;
+        const tournament = await TournamentModel.findById(tournamentId, clubId);
         if (!tournament) {
             return res.status(404).json({ error: 'Tournament not found.' });
         }
+        const [players, standings] = await Promise.all([
+            TournamentModel.getPlayers(tournamentId, clubId),
+            TournamentModel.getStandings(req.params.tournamentId),
+        ]);
 
         res.json({ tournament, players, standings });
     } catch (err) {
@@ -67,7 +67,7 @@ export async function createTournament(req, res, next) {
 export async function updateTournament(req, res, next) {
     try {
         const { name, startDate, endDate } = req.body;
-        const tournament = await TournamentModel.update(req.params.tournamentId, {
+        const tournament = await TournamentModel.update(req.params.tournamentId, req.params.clubId, {
             name, startDate, endDate,
         });
 
@@ -90,7 +90,7 @@ export async function setTournamentStatus(req, res, next) {
             return res.status(400).json({ error: `Status must be one of: ${VALID_STATUSES.join(', ')}.` });
         }
 
-        const tournament = await TournamentModel.setStatus(req.params.tournamentId, status);
+        const tournament = await TournamentModel.setStatus(req.params.tournamentId, req.params.clubId, status);
 
         if (!tournament) {
             return res.status(404).json({ error: 'Tournament not found.' });
@@ -105,7 +105,7 @@ export async function setTournamentStatus(req, res, next) {
 // DELETE /api/v1/clubs/:clubId/tournaments/:tournamentId — admin only
 export async function deleteTournament(req, res, next) {
     try {
-        const deleted = await TournamentModel.delete(req.params.tournamentId);
+        const deleted = await TournamentModel.delete(req.params.tournamentId, req.params.clubId);
 
         if (!deleted) {
             return res.status(404).json({ error: 'Tournament not found.' });
@@ -122,7 +122,9 @@ export async function deleteTournament(req, res, next) {
 // GET /api/v1/clubs/:clubId/tournaments/:tournamentId/players
 export async function getTournamentPlayers(req, res, next) {
     try {
-        const players = await TournamentModel.getPlayers(req.params.tournamentId);
+        const tournament = await TournamentModel.findById(req.params.tournamentId, req.params.clubId);
+        if (!tournament) return res.status(404).json({ error: 'Tournament not found.' });
+        const players = await TournamentModel.getPlayers(req.params.tournamentId, req.params.clubId);
         res.json({ players });
     } catch (err) {
         next(err);
@@ -133,7 +135,7 @@ export async function getTournamentPlayers(req, res, next) {
 export async function addTournamentPlayer(req, res, next) {
     try {
         const { playerId } = req.body;
-        const { tournamentId } = req.params;
+        const { tournamentId, clubId } = req.params;
 
         if (!playerId) {
             return res.status(400).json({ error: 'playerId is required.' });
@@ -141,11 +143,12 @@ export async function addTournamentPlayer(req, res, next) {
 
         // Confirm the player exists before adding
         const player = await PlayerModel.findById(playerId);
-        if (!player) {
-            return res.status(404).json({ error: 'Player not found.' });
+        if (!player || player.club_id !== clubId) {
+            return res.status(404).json({ error: 'Player not found in this club.' });
         }
 
-        const entry = await TournamentModel.addPlayer(tournamentId, playerId);
+        const entry = await TournamentModel.addPlayer(tournamentId, playerId, clubId);
+        if (!entry) return res.status(404).json({ error: 'Tournament not found in this club.' });
         res.status(201).json({ entry });
     } catch (err) {
         next(err);
@@ -156,7 +159,7 @@ export async function addTournamentPlayer(req, res, next) {
 export async function removeTournamentPlayer(req, res, next) {
     try {
         const { tournamentId, playerId } = req.params;
-        const removed = await TournamentModel.removePlayer(tournamentId, playerId);
+        const removed = await TournamentModel.removePlayer(tournamentId, playerId, req.params.clubId);
 
         if (!removed) {
             return res.status(404).json({ error: 'Player not in this tournament.' });
@@ -171,6 +174,8 @@ export async function removeTournamentPlayer(req, res, next) {
 // GET /api/v1/clubs/:clubId/tournaments/:tournamentId/standings
 export async function getTournamentStandings(req, res, next) {
     try {
+        const tournament = await TournamentModel.findById(req.params.tournamentId, req.params.clubId);
+        if (!tournament) return res.status(404).json({ error: 'Tournament not found.' });
         const standings = await TournamentModel.getStandings(req.params.tournamentId);
         res.json({ standings });
     } catch (err) {

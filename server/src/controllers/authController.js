@@ -21,7 +21,7 @@ const signToken = (user) =>
 // POST /api/v1/auth/register
 export async function register(req, res, next) {
     try {
-        const { email,name, password } = req.body;
+        const { email, name, password } = req.validated;
 
         if (!email || !name || !password) {
             return res.status(400).json({ error: 'Email, name, and password are required.' });

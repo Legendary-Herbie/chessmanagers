@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import '../../styles/matches.css';
 import Button from '../../shared/common/Button.jsx';
 import { api, endpoints } from '../../config/api.js';
-import { useClub, useAuth } from '../../app/providers.jsx';
+import { useClub, useAuth } from '../../app/contextHooks.js';
 
 export default function MatchesPage() {
     const { club } = useClub();
@@ -52,7 +52,7 @@ export default function MatchesPage() {
             whiteId: match.whitePlayerId ?? match.white_player_id ?? '',
             blackId: match.blackPlayerId ?? match.black_player_id ?? '',
             outcome: match.result ?? match.outcome,
-            timeControl: match.timeControl || 'blitz',
+            timeControl: match.timeControl ?? match.time_control ?? 'blitz',
             notes: match.notes || '',
         });
         setModalOpen(true);
@@ -143,7 +143,7 @@ export default function MatchesPage() {
                                     <td>{players.find(p => p.id === (m.whitePlayerId ?? m.white_player_id))?.name ?? (m.whitePlayerId ?? m.white_player_id)}</td>
                                     <td>{players.find(p => p.id === (m.blackPlayerId ?? m.black_player_id))?.name ?? (m.blackPlayerId ?? m.black_player_id)}</td>
                                     <td>{(m.result ?? m.outcome) === 'white' ? '1-0' : (m.result ?? m.outcome) === 'black' ? '0-1' : '�-�'}</td>
-                                    <td className="badge time-control">{(m.timeControl || 'blitz').toUpperCase()}</td>
+                                    <td className="badge time-control">{(m.timeControl ?? m.time_control ?? 'blitz').toUpperCase()}</td>
                                     <td>{m.notes}</td>
                                     {isAdmin && (
                                         <td>

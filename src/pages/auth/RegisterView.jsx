@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../app/AuthProvider.jsx';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
+import { useAuth } from '../../app/contextHooks.js';
 import Button from '../../shared/common/Button.jsx';
 
 export default function RegisterView() {
     const { register } = useAuth();
     const navigate     = useNavigate();
+    const [searchParams] = useSearchParams();
+    const inviteToken = searchParams.get('inviteToken');
 
     const [fields, setFields] = useState({ name: '', email: '', password: '', confirmPassword: '' });
     const [error,  setError]  = useState('');
@@ -34,7 +36,7 @@ export default function RegisterView() {
         setBusy(true);
         try {
             await register({ name: fields.name, email: fields.email, password: fields.password });
-            navigate('/dashboard');
+            navigate(inviteToken ? `/clubs/join?token=${encodeURIComponent(inviteToken)}` : '/dashboard');
         } catch (err) {
             setError(err.message || 'Registration failed. Please try again.');
         } finally {
@@ -141,7 +143,7 @@ export default function RegisterView() {
 
             <p className="auth-switch">
                 Already have an account?{' '}
-                <Link to="/auth/login" className="auth-link">Sign in</Link>
+                <Link to={inviteToken ? `/auth/login?inviteToken=${encodeURIComponent(inviteToken)}` : '/auth/login'} className="auth-link">Sign in</Link>
             </p>
         </div>
     );

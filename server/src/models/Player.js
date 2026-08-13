@@ -10,8 +10,8 @@ export const PlayerModel = {
 
     create: async ({ clubId, name, rating = 1200, bio = null }) => {
         return db.query(
-            `INSERT INTO players (club_id, name, rating, start_rating, bio)
-             VALUES ($1, $2, $3, $3, $4)
+            `INSERT INTO players (club_id, name, rating, start_rating, blitz_rating, rapid_rating, classical_rating, bio)
+             VALUES ($1, $2, $3, $3, $3, $3, $3, $4)
              RETURNING *`,
             [clubId, name, rating, bio]
         ).then(r => r.first);
@@ -19,20 +19,19 @@ export const PlayerModel = {
 
     createBulk: async ({ clubId, players }) => {
         if (!players || players.length === 0) return [];
-        return db.transaction(async (trx) => {
-            const created = [];
-            for (const p of players) {
-                const rating = parseInt(p.rating, 10) || 1200;
-                const row = await trx.query(
-                    `INSERT INTO players (club_id, name, rating, start_rating, bio)
-                     VALUES ($1, $2, $3, $3, $4)
-                     RETURNING *`,
-                    [clubId, p.name, rating, p.bio || null]
-                ).then(r => r.first);
-                created.push(row);
-            }
-            return created;
+        const values = [];
+        const placeholders = players.map((player, index) => {
+            const rating = Number.parseInt(player.rating, 10) || 1200;
+            const start = index * 4;
+            values.push(clubId, player.name, rating, player.bio || null);
+            return `($${start + 1}, $${start + 2}, $${start + 3}, $${start + 3}, $${start + 3}, $${start + 3}, $${start + 3}, $${start + 4})`;
         });
+        return db.query(
+            `INSERT INTO players (club_id, name, rating, start_rating, blitz_rating, rapid_rating, classical_rating, bio)
+             VALUES ${placeholders.join(', ')}
+             RETURNING *`,
+            values,
+        ).then(result => result.rows);
     },
 
     // ── Read ──────────────────────────────────────────────────────────────────
@@ -68,6 +67,7 @@ export const PlayerModel = {
              FROM players p
              JOIN player_links pl ON pl.player_id = p.id
              WHERE pl.user_id = $1 AND pl.status = 'approved'
+             ORDER BY p.created_at ASC, p.id ASC
              LIMIT 1`,
             [userId]
         ).then(r => r.first);

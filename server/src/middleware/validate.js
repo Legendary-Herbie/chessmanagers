@@ -23,6 +23,7 @@ export function validate(schema) {
 
 export const registerSchema = z.object({
     email:    z.string().email('Invalid email address.'),
+    name:     z.string().trim().min(1, 'Name is required.').max(100),
     password: z.string().min(8, 'Password must be at least 8 characters.'),
 });
 
@@ -59,12 +60,15 @@ export const createMatchSchema = z.object({
     type:         z.enum(['casual', 'rated', 'tournament']).optional(),
     tournamentId: z.string().min(1).optional().nullable(),
     notes:        z.string().max(1000).optional(),
+    timeControl:  z.enum(['blitz', 'rapid', 'classical']).default('blitz'),
+    playedAt:     z.string().datetime().optional(),
 });
 
 export const updateMatchSchema = z.object({
     result: z.enum(['white', 'black', 'draw']).optional(),
     notes:  z.string().max(1000).optional(),
-}).refine(data => data.result || data.notes !== undefined, {
+    timeControl: z.enum(['blitz', 'rapid', 'classical']).optional(),
+}).refine(data => data.result || data.notes !== undefined || data.timeControl, {
     message: 'At least one field must be provided.',
 });
 
@@ -91,6 +95,7 @@ export const setTournamentStatusSchema = z.object({
 
 export const updateClubSchema = z.object({
     name:        z.string().min(1).max(150).optional(),
+    federation:  z.string().min(1).max(100).optional(),
     description: z.string().max(1000).optional(),
     logo:        z.string().url('Logo must be a valid URL.').optional().nullable(),
     contactInfo: z.string().max(500).optional().nullable(),

@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useAuth } from './providers.jsx';
+import { useAuth } from './contextHooks.js';
 
 // Layouts
 import AppLayout from '../shared/layouts/AppLayout.jsx';

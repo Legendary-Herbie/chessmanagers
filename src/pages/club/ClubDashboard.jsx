@@ -1,6 +1,6 @@
 import React from 'react';
 
-export default function ClubDashboard({ club, stats }) {
+export default function ClubDashboard({ stats }) {
     return (
         <div>
             <h2>Dashboard</h2>

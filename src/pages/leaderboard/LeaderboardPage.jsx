@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import '../../styles/leaderboard.css';
 import Button from '../../shared/common/Button.jsx';
 import { api, endpoints } from '../../config/api.js';
-import { useClub } from '../../app/providers.jsx';
+import { useClub } from '../../app/contextHooks.js';
 
 function Sparkline({ points = [] }) {
     if (!points || points.length === 0) return <div className="sparkline empty">No data</div>;

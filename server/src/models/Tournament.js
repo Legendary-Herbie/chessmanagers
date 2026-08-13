@@ -15,10 +15,10 @@ export const TournamentModel = {
 
     // ── Read ──────────────────────────────────────────────────────────────────
 
-    findById: async (id) => {
+    findById: async (id, clubId = null) => {
         return db.query(
-            `SELECT * FROM tournaments WHERE id = $1`,
-            [id]
+            `SELECT * FROM tournaments WHERE id = $1 AND ($2::TEXT IS NULL OR club_id = $2)`,
+            [id, clubId]
         ).then(r => r.first);
     },
 
@@ -59,67 +59,73 @@ export const TournamentModel = {
 
     // ── Players ───────────────────────────────────────────────────────────────
 
-    getPlayers: async (tournamentId) => {
+    getPlayers: async (tournamentId, clubId = null) => {
         return db.query(
             `SELECT p.*
              FROM players p
              JOIN tournament_players tp ON tp.player_id = p.id
-             WHERE tp.tournament_id = $1
+             JOIN tournaments t ON t.id = tp.tournament_id
+             WHERE tp.tournament_id = $1 AND ($2::TEXT IS NULL OR t.club_id = $2)
              ORDER BY p.name ASC`,
-            [tournamentId]
+            [tournamentId, clubId]
         ).then(r => r.rows);
     },
 
-    addPlayer: async (tournamentId, playerId) => {
+    addPlayer: async (tournamentId, playerId, clubId) => {
         return db.query(
             `INSERT INTO tournament_players (tournament_id, player_id)
-             VALUES ($1, $2)
+             SELECT $1, $2
+             FROM tournaments t
+             JOIN players p ON p.id = $2 AND p.club_id = t.club_id
+             WHERE t.id = $1 AND t.club_id = $3
              ON CONFLICT DO NOTHING
              RETURNING *`,
-            [tournamentId, playerId]
+            [tournamentId, playerId, clubId]
         ).then(r => r.first);
     },
 
-    removePlayer: async (tournamentId, playerId) => {
+    removePlayer: async (tournamentId, playerId, clubId) => {
         return db.query(
             `DELETE FROM tournament_players
-             WHERE tournament_id = $1 AND player_id = $2
+             USING tournaments t
+             WHERE tournament_players.tournament_id = $1 AND player_id = $2
+               AND t.id = tournament_players.tournament_id AND t.club_id = $3
              RETURNING player_id`,
-            [tournamentId, playerId]
+            [tournamentId, playerId, clubId]
         ).then(r => r.first);
     },
 
     // ── Update ────────────────────────────────────────────────────────────────
 
-    update: async (id, { name, startDate, endDate }) => {
+    update: async (id, clubId, { name, startDate, endDate }) => {
         return db.query(
             `UPDATE tournaments
              SET name       = COALESCE($1, name),
                  start_date = COALESCE($2, start_date),
                  end_date   = COALESCE($3, end_date),
                  updated_at = NOW()
-             WHERE id = $4
+             WHERE id = $4 AND club_id = $5
              RETURNING *`,
-            [name, startDate, endDate, id]
+            [name, startDate, endDate, id, clubId]
         ).then(r => r.first);
     },
 
-    setStatus: async (id, status) => {
+    setStatus: async (id, clubId, status) => {
         return db.query(
             `UPDATE tournaments
              SET status = $1, updated_at = NOW()
-             WHERE id = $2
+             WHERE id = $2 AND club_id = $3
              RETURNING *`,
-            [status, id]
+            [status, id, clubId]
         ).then(r => r.first);
     },
 
     // ── Delete ────────────────────────────────────────────────────────────────
 
-    delete: async (id) => {
+    delete: async (id, clubId) => {
         return db.query(
-            `DELETE FROM tournaments WHERE id = $1 RETURNING id`,
-            [id]
+            `DELETE FROM tournaments WHERE id = $1 AND club_id = $2 RETURNING id`,
+            [id, clubId]
         ).then(r => r.first);
     },
 };

@@ -16,8 +16,8 @@ import {
     revokeInvite,
     joinByToken,
 } from '../controllers/clubController.js';
-import { requireAuth } from '../middleware/auth.js';
-import { requireRole, requireClubMember, requireClubAdmin } from '../middleware/requireRole.js';
+import { requireAuth, optionalAuth } from '../middleware/auth.js';
+import { requireClubMember, requireClubAdmin } from '../middleware/requireRole.js';
 import { validate, updateClubSchema, createClubSchema } from '../middleware/validate.js';
 
 const router = Router();
@@ -25,15 +25,14 @@ const router = Router();
 // Public listing: GET /api/v1/clubs
 router.get('/', listClubs);
 
-// Public club detail (viewable without membership)
-// Placed before requireAuth so unauthenticated users can view basic club info
-router.get('/:clubId', getClub);
-
-router.use(requireAuth);
-
 // GET /api/v1/clubs/mine
 // Must be declared before /:clubId to avoid 'mine' being treated as an ID
-router.get('/mine', getMyClub);
+router.get('/mine', requireAuth, getMyClub);
+
+// Public club detail. optionalAuth lets the handler include membership context.
+router.get('/:clubId', optionalAuth, getClub);
+
+router.use(requireAuth);
 
 // POST /api/v1/clubs
 // Allow authenticated users to create a club for their account (first-time creation).
@@ -55,9 +54,6 @@ router.delete('/:clubId/invites/:inviteId', requireClubMember, requireClubAdmin,
 
 // Public join-by-token endpoint (no clubId required)
 router.post('/join-by-token', joinByToken);
-
-// GET /api/v1/clubs/:clubId
-router.get('/:clubId', requireClubMember, getClub);
 
 // PATCH /api/v1/clubs/:clubId
 router.patch('/:clubId', requireClubMember, requireClubAdmin, validate(updateClubSchema), updateClub);

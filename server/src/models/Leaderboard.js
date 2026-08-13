@@ -26,42 +26,44 @@ export const LeaderboardModel = {
     },
 
     // Rating history for a single player over time — used for sparklines and graphs.
-    getRatingHistory: async (playerId, { limit = 30 } = {}) => {
+    getRatingHistory: async (clubId, playerId, { limit = 30 } = {}) => {
         return db.query(
-            `SELECT
-                m.played_at,
-                rh.rating_after AS rating
-             FROM rating_history rh
-             JOIN matches m ON m.id = rh.match_id
-             WHERE rh.player_id = $1
-             ORDER BY m.played_at ASC
-             LIMIT $2`,
-            [playerId, limit]
+            `SELECT played_at, rating
+             FROM (
+                SELECT m.played_at, rh.rating_after AS rating
+                FROM rating_history rh
+                JOIN matches m ON m.id = rh.match_id
+                WHERE rh.player_id = $1 AND m.club_id = $2
+                ORDER BY m.played_at DESC, m.created_at DESC, m.id DESC
+                LIMIT $3
+             ) latest
+             ORDER BY played_at ASC`,
+            [playerId, clubId, limit]
         ).then(r => r.rows);
     },
 
     // Head-to-head summary between two players.
-    getHeadToHead: async (playerAId, playerBId) => {
+    getHeadToHead: async (clubId, playerAId, playerBId) => {
         return db.query(
             `SELECT
                 SUM(CASE
-                    WHEN white_player_id = $1 AND result = 'white' THEN 1
-                    WHEN black_player_id = $1 AND result = 'black' THEN 1
+                    WHEN white_player_id = $2 AND result = 'white' THEN 1
+                    WHEN black_player_id = $2 AND result = 'black' THEN 1
                     ELSE 0
                 END)                                    AS player_a_wins,
                 SUM(CASE
-                    WHEN white_player_id = $2 AND result = 'white' THEN 1
-                    WHEN black_player_id = $2 AND result = 'black' THEN 1
+                    WHEN white_player_id = $3 AND result = 'white' THEN 1
+                    WHEN black_player_id = $3 AND result = 'black' THEN 1
                     ELSE 0
                 END)                                    AS player_b_wins,
                 SUM(CASE WHEN result = 'draw' THEN 1 ELSE 0 END) AS draws,
                 COUNT(*)                                AS total
              FROM matches
-             WHERE
-                (white_player_id = $1 AND black_player_id = $2)
+             WHERE club_id = $1 AND (
+                (white_player_id = $2 AND black_player_id = $3)
                 OR
-                (white_player_id = $2 AND black_player_id = $1)`,
-            [playerAId, playerBId]
+                (white_player_id = $3 AND black_player_id = $2))`,
+            [clubId, playerAId, playerBId]
         ).then(r => r.first);
     },
 
@@ -69,16 +71,12 @@ export const LeaderboardModel = {
     getClubStats: async (clubId) => {
         return db.query(
             `SELECT
-                COUNT(DISTINCT p.id)            AS total_players,
-                COUNT(DISTINCT m.id)            AS total_matches,
-                COUNT(DISTINCT t.id)            AS total_tournaments,
-                ROUND(AVG(p.rating), 0)         AS average_rating,
-                MAX(p.rating)                   AS highest_rating,
-                MIN(p.rating)                   AS lowest_rating
-             FROM players p
-             LEFT JOIN matches     m ON m.club_id = p.club_id
-             LEFT JOIN tournaments t ON t.club_id = p.club_id
-             WHERE p.club_id = $1`,
+                (SELECT COUNT(*) FROM players WHERE club_id = $1) AS total_players,
+                (SELECT COUNT(*) FROM matches WHERE club_id = $1) AS total_matches,
+                (SELECT COUNT(*) FROM tournaments WHERE club_id = $1) AS total_tournaments,
+                (SELECT ROUND(AVG(rating), 0) FROM players WHERE club_id = $1) AS average_rating,
+                (SELECT MAX(rating) FROM players WHERE club_id = $1) AS highest_rating,
+                (SELECT MIN(rating) FROM players WHERE club_id = $1) AS lowest_rating`,
             [clubId]
         ).then(r => r.first);
     },

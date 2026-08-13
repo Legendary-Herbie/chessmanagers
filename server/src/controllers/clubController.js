@@ -58,7 +58,16 @@ export async function getClub(req, res, next) {
             return res.status(404).json({ error: 'Club not found.' });
         }
 
-        res.json({ club });
+        const membership = req.user
+            ? await ClubModel.getMembership(club.id, req.user.id)
+            : null;
+        res.json({
+            club: {
+                ...club,
+                is_member: Boolean(membership),
+                member_role: membership?.role ?? null,
+            },
+        });
     } catch (err) {
         next(err);
     }
@@ -145,17 +154,12 @@ export async function requestJoinClub(req, res, next) {
         const { clubId } = req.params;
         const userId = req.user.id;
         const { message } = req.body || {};
-        const invite = req.body?.invite === true || req.query?.invite === '1';
 
         const club = await ClubModel.findById(clubId);
         if (!club) return res.status(404).json({ error: 'Club not found.' });
 
-        if (invite) {
-            // Backwards-compatible: treat invite flag as a non-token immediate add only if caller is club owner/admin
-            const isAdmin = (club.owner_id === userId) || (await ClubModel.getMembers(clubId).then(rows => rows.some(r => r.id === userId && r.club_role === 'admin')));
-            if (!isAdmin) return res.status(403).json({ error: 'Invite acceptance requires a valid token.' });
-            await ClubModel.addMember(clubId, userId);
-            return res.json({ message: 'Joined club via owner-invitation.' });
+        if (await ClubModel.getMembership(clubId, userId)) {
+            return res.status(409).json({ error: 'You are already a member of this club.' });
         }
 
         // Otherwise create a join request for admin approval
@@ -178,7 +182,8 @@ export async function joinByToken(req, res, next) {
         // If the user is not authenticated, instruct client to register first
         if (!req.user) return res.status(401).json({ error: 'Authentication required to accept invite.' });
 
-        await ClubModel.acceptInviteToken(token, req.user.id);
+        const accepted = await ClubModel.acceptInviteToken(token, req.user.id);
+        if (!accepted) return res.status(404).json({ error: 'Invite not found or expired.' });
         res.json({ message: 'Joined via invite token.', clubId: inv.club_id });
     } catch (err) {
         next(err);
@@ -190,7 +195,11 @@ export async function createInvite(req, res, next) {
     try {
         const { clubId } = req.params;
         const { expiresAt } = req.body || {};
-        const invite = await ClubModel.createInvite(clubId, req.user.id, expiresAt ? new Date(expiresAt) : null);
+        const expiry = expiresAt ? new Date(expiresAt) : null;
+        if (expiry && (Number.isNaN(expiry.valueOf()) || expiry <= new Date())) {
+            return res.status(400).json({ error: 'Invite expiration must be a future date.' });
+        }
+        const invite = await ClubModel.createInvite(clubId, req.user.id, expiry);
         res.status(201).json({ invite });
     } catch (err) {
         next(err);
@@ -231,8 +240,8 @@ export async function getJoinRequests(req, res, next) {
 // PATCH /api/v1/clubs/:clubId/join-requests/:requestId/approve — admin only
 export async function approveJoin(req, res, next) {
     try {
-        const { requestId } = req.params;
-        const result = await ClubModel.approveJoinRequest(requestId);
+        const { clubId, requestId } = req.params;
+        const result = await ClubModel.approveJoinRequest(clubId, requestId);
         if (!result) return res.status(404).json({ error: 'Join request not found.' });
         res.json({ message: 'Approved.' });
     } catch (err) {
@@ -243,8 +252,8 @@ export async function approveJoin(req, res, next) {
 // PATCH /api/v1/clubs/:clubId/join-requests/:requestId/reject — admin only
 export async function rejectJoin(req, res, next) {
     try {
-        const { requestId } = req.params;
-        const row = await ClubModel.rejectJoinRequest(requestId);
+        const { clubId, requestId } = req.params;
+        const row = await ClubModel.rejectJoinRequest(clubId, requestId);
         if (!row) return res.status(404).json({ error: 'Join request not found.' });
         res.json({ message: 'Rejected.' });
     } catch (err) {
@@ -257,7 +266,7 @@ export async function getMembers(req, res, next) {
     try {
         const rows = await ClubModel.getMembers(req.params.clubId);
         // Map DB snake_case to client-friendly camelCase and consistent keys
-        const members = rows.map(r => ({ userId: r.id, email: r.email, role: r.role, joinedAt: r.joined_at }));
+        const members = rows.map(r => ({ userId: r.id, email: r.email, role: r.club_role, joinedAt: r.joined_at }));
         res.json({ members });
     } catch (err) {
         next(err);

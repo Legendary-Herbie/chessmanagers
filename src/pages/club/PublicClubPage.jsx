@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { api, endpoints } from '../../config/api.js';
-import { useAuth } from '../../app/providers.jsx';
-import { useNotifications } from '../../app/NotificationsProvider.jsx';
+import { useAuth, useNotifications } from '../../app/contextHooks.js';
 
 export default function PublicClubPage() {
     const { clubId } = useParams();
@@ -44,7 +43,7 @@ export default function PublicClubPage() {
                     try {
                         const m = await api.get(`/clubs/${clubId}/members`);
                         setMembersCount(Array.isArray(m?.members) ? m.members.length : (m?.members?.length ?? m?.length ?? null));
-                    } catch (e) {
+                    } catch {
                         // not admin — skip
                     }
 
@@ -52,7 +51,7 @@ export default function PublicClubPage() {
                     try {
                         const inv = await api.get(`/clubs/${clubId}/invites`);
                         setInvites(inv?.invites || []);
-                    } catch (e) {
+                    } catch {
                         // skip
                     }
 
@@ -60,7 +59,7 @@ export default function PublicClubPage() {
                     try {
                         const jr = await api.get(`/clubs/${clubId}/join-requests`);
                         setJoinRequests(jr?.requests || []);
-                    } catch (e) {
+                    } catch {
                         // skip
                     }
 
@@ -68,7 +67,7 @@ export default function PublicClubPage() {
                     try {
                         const st = await api.get(endpoints.leaderboard.stats(clubId));
                         setStats(st?.stats || null);
-                    } catch (e) {
+                    } catch {
                         // skip
                     }
                 }
@@ -86,7 +85,8 @@ export default function PublicClubPage() {
         setJoining(true);
         try {
             // POST /clubs/:clubId/join
-            await api.post(`/clubs/${clubId}/join`, {});
+            await api.post(endpoints.clubs.join(clubId), {});
+            setClub(current => current ? { ...current, join_request_pending: true } : current);
             notify('Join request submitted — club admins will review.', 'success');
         } catch (err) {
             notify(err?.message || 'Failed to request to join', 'error');
@@ -98,7 +98,7 @@ export default function PublicClubPage() {
     async function createInvite() {
         setCreatingInvite(true);
         try {
-            const res = await api.post(`/clubs/${clubId}/invites`, {});
+            const res = await api.post(endpoints.clubs.invites(clubId), {});
             const inv = res?.invite;
             if (inv?.token) {
                 setInvites(prev => [inv, ...prev]);
@@ -118,7 +118,7 @@ export default function PublicClubPage() {
 
     async function revokeInvite(inviteId) {
         try {
-            await api.delete(`/clubs/${clubId}/invites/${inviteId}`);
+            await api.delete(endpoints.clubs.invite(clubId, inviteId));
             setInvites(prev => prev.filter(i => i.id !== inviteId));
             notify('Invite revoked', 'info');
         } catch (err) {
@@ -156,7 +156,6 @@ export default function PublicClubPage() {
         <div>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                 {club.logo ? (
-                    // eslint-disable-next-line jsx-a11y/img-redundant-alt
                     <img src={club.logo} alt={`${club.name} logo`} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8 }} />
                 ) : (
                     <div style={{ width: 96, height: 96, background: 'var(--bg-muted)', borderRadius: 8 }} />
@@ -175,7 +174,7 @@ export default function PublicClubPage() {
                     {isMember ? (
                         <span style={{ color: 'var(--success)' }}>You are a member</span>
                     ) : user ? (
-                        <button type="button" disabled={joining} onClick={handleRequestJoin} style={{ padding: '8px 12px' }}>
+                        <button type="button" disabled={joining || club.join_request_pending} onClick={handleRequestJoin} style={{ padding: '8px 12px' }}>
                             {joining ? 'Requesting…' : 'Request to join'}
                         </button>
                     ) : (
@@ -205,7 +204,7 @@ export default function PublicClubPage() {
             </section>
 
             {/* Admin area: invites and join requests */}
-            {user && (
+            {(club.member_role === 'owner' || club.member_role === 'admin') && (
                 <section style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
                     <h3>Administration</h3>
 

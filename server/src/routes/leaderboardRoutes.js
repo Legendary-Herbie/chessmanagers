@@ -6,7 +6,7 @@ import {
     getClubStats,
 } from '../controllers/leaderboardController.js';
 import { requireAuth } from '../middleware/auth.js';
-import { requireRole, requireClubMember } from '../middleware/requireRole.js';
+import { requireClubMember } from '../middleware/requireRole.js';
 
 const router = Router({ mergeParams: true });
 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth, useClub } from '../app/providers.jsx';
+import { useAuth, useClub } from '../app/contextHooks.js';
 import PendingLinksList from '../features/players/admin/PendingLinksList.jsx';
 
 export default function Dashboard() {

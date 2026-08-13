@@ -13,21 +13,23 @@ export const MatchModel = {
         blackPlayerId,
         result,
         type = 'casual',
+        timeControl = 'blitz',
         tournamentId = null,
         notes = null,
+        playedAt = null,
     }, trx) => {
         return qry(trx)(
             `INSERT INTO matches
-                (club_id, white_player_id, black_player_id, result, type, tournament_id, notes)
-             VALUES ($1, $2, $3, $4, $5, $6, $7)
+                (club_id, white_player_id, black_player_id, result, type, time_control, tournament_id, notes, played_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, COALESCE($9, NOW()))
              RETURNING *`,
-            [clubId, whitePlayerId, blackPlayerId, result, type, tournamentId, notes]
+            [clubId, whitePlayerId, blackPlayerId, result, type, timeControl, tournamentId, notes, playedAt]
         ).then(r => r.first);
     },
 
     // ── Read ──────────────────────────────────────────────────────────────────
 
-    findById: async (id) => {
+    findById: async (id, clubId = null) => {
         return db.query(
             `SELECT m.*,
                     wp.name AS white_player_name,
@@ -35,8 +37,8 @@ export const MatchModel = {
              FROM matches m
              JOIN players wp ON wp.id = m.white_player_id
              JOIN players bp ON bp.id = m.black_player_id
-             WHERE m.id = $1`,
-            [id]
+             WHERE m.id = $1 AND ($2::TEXT IS NULL OR m.club_id = $2)`,
+            [id, clubId]
         ).then(r => r.first);
     },
 
@@ -75,7 +77,7 @@ export const MatchModel = {
         ).then(r => r.rows);
     },
 
-    findByPlayer: async (playerId, { limit = 20, offset = 0 } = {}) => {
+    findByPlayer: async (clubId, playerId, { limit = 20, offset = 0 } = {}) => {
         return db.query(
             `SELECT m.*,
                     wp.name AS white_player_name,
@@ -83,14 +85,14 @@ export const MatchModel = {
              FROM matches m
              JOIN players wp ON wp.id = m.white_player_id
              JOIN players bp ON bp.id = m.black_player_id
-             WHERE m.white_player_id = $1 OR m.black_player_id = $1
+             WHERE m.club_id = $1 AND (m.white_player_id = $2 OR m.black_player_id = $2)
              ORDER BY m.played_at DESC
-             LIMIT $2 OFFSET $3`,
-            [playerId, limit, offset]
+             LIMIT $3 OFFSET $4`,
+            [clubId, playerId, limit, offset]
         ).then(r => r.rows);
     },
 
-    findHeadToHead: async (playerAId, playerBId) => {
+    findHeadToHead: async (clubId, playerAId, playerBId) => {
         return db.query(
             `SELECT m.*,
                     wp.name AS white_player_name,
@@ -98,26 +100,27 @@ export const MatchModel = {
              FROM matches m
              JOIN players wp ON wp.id = m.white_player_id
              JOIN players bp ON bp.id = m.black_player_id
-             WHERE
-                (m.white_player_id = $1 AND m.black_player_id = $2)
+             WHERE m.club_id = $1 AND (
+                (m.white_player_id = $2 AND m.black_player_id = $3)
                 OR
-                (m.white_player_id = $2 AND m.black_player_id = $1)
+                (m.white_player_id = $3 AND m.black_player_id = $2))
              ORDER BY m.played_at DESC`,
-            [playerAId, playerBId]
+            [clubId, playerAId, playerBId]
         ).then(r => r.rows);
     },
 
     // ── Update ────────────────────────────────────────────────────────────────
 
-    updateResult: async (id, { result, notes }) => {
-        return db.query(
+    updateResult: async (id, clubId, { result, notes, timeControl }, trx) => {
+        return qry(trx)(
             `UPDATE matches
-             SET result     = COALESCE($1, result),
+                 SET result     = COALESCE($1, result),
                  notes      = COALESCE($2, notes),
+                 time_control = COALESCE($3, time_control),
                  updated_at = NOW()
-             WHERE id = $3
+             WHERE id = $4 AND club_id = $5
              RETURNING *`,
-            [result, notes, id]
+            [result, notes, timeControl, id, clubId]
         ).then(r => r.first);
     },
 
@@ -135,10 +138,10 @@ export const MatchModel = {
 
     // ── Delete ────────────────────────────────────────────────────────────────
 
-    delete: async (id) => {
-        return db.query(
-            `DELETE FROM matches WHERE id = $1 RETURNING id`,
-            [id]
+    delete: async (id, clubId, trx) => {
+        return qry(trx)(
+            `DELETE FROM matches WHERE id = $1 AND club_id = $2 RETURNING id`,
+            [id, clubId]
         ).then(r => r.first);
     },
 };

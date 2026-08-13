@@ -2,7 +2,7 @@ import { BrowserRouter } from 'react-router-dom';
 import Providers from './providers.jsx';
 import AppRoutes from './routes.jsx';
 import { useEffect } from 'react';
-import { useAuth } from './providers.jsx';
+import { useAuth } from './contextHooks.js';
 import { clearToken } from '../config/api.js';
 
 

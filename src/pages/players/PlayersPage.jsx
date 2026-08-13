@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth, useClub } from '../../app/providers.jsx';
+import { useAuth, useClub } from '../../app/contextHooks.js';
 import { usePlayers } from '../../features/players/hooks/usePlayers.js';
 
 import PlayerCard from '../../features/players/components/PlayerCard.jsx';

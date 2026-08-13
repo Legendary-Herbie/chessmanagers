@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useAuth, useClub } from '../../app/providers.jsx';
+import { useAuth, useClub } from '../../app/contextHooks.js';
 import { usePlayer } from '../../features/players/hooks/usePlayer.js';
 
 import EditPlayerForm from '../../features/players/admin/EditPlayerForm.jsx';

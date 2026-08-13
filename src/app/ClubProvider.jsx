@@ -1,5 +1,5 @@
-import { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { useAuth } from './AuthProvider.jsx';
+import { useState, useEffect, useCallback } from 'react';
+import { useAuth, ClubContext } from './contextHooks.js';
 import { api } from '../config/api.js';
 
 // Holds the active club's metadata. Fetched once after auth resolves.
@@ -12,8 +12,6 @@ import { api } from '../config/api.js';
 //   description: string | null,
 //   logo: string | null,
 // }
-
-const ClubContext = createContext(null);
 
 export function ClubProvider({ children }) {
     const { user, loading: authLoading } = useAuth();
@@ -52,10 +50,4 @@ export function ClubProvider({ children }) {
             {children}
         </ClubContext.Provider>
     );
-}
-
-export function useClub() {
-    const ctx = useContext(ClubContext);
-    if (!ctx) throw new Error('useClub must be used within ClubProvider');
-    return ctx;
 }

@@ -79,6 +79,13 @@ export const ClubModel = {
         ).then(r => r.rows);
     },
 
+    getMembership: async (clubId, userId) => {
+        return db.query(
+            `SELECT role FROM user_clubs WHERE club_id = $1 AND user_id = $2`,
+            [clubId, userId]
+        ).then(r => r.first);
+    },
+
     addMember: async (clubId, userId, role = 'member') => {
         return db.query(
             `INSERT INTO user_clubs (club_id, user_id, role)
@@ -109,7 +116,14 @@ export const ClubModel = {
     },
 
     listInvites: async (clubId) => {
-        return db.query(`SELECT * FROM club_invites WHERE club_id = $1 ORDER BY created_at DESC`, [clubId]).then(r => r.rows);
+        return db.query(
+            `SELECT * FROM club_invites
+             WHERE club_id = $1
+               AND revoked = FALSE
+               AND (expires_at IS NULL OR expires_at > NOW())
+             ORDER BY created_at DESC`,
+            [clubId]
+        ).then(r => r.rows);
     },
 
     verifyInviteToken: async (token) => {
@@ -190,9 +204,12 @@ export const ClubModel = {
         ).then(r => r.rows);
     },
 
-    approveJoinRequest: async (requestId) => {
+    approveJoinRequest: async (clubId, requestId) => {
         return db.transaction(async (trx) => {
-            const reqRow = await trx.query(`SELECT * FROM club_join_requests WHERE id = $1 FOR UPDATE`, [requestId]).then(r => r.first);
+            const reqRow = await trx.query(
+                `SELECT * FROM club_join_requests WHERE id = $1 AND club_id = $2 AND status = 'pending' FOR UPDATE`,
+                [requestId, clubId]
+            ).then(r => r.first);
             if (!reqRow) return null;
 
             // Mark request approved
@@ -203,7 +220,13 @@ export const ClubModel = {
         });
     },
 
-    rejectJoinRequest: async (requestId) => {
-        return db.query(`UPDATE club_join_requests SET status = 'rejected', processed_at = NOW() WHERE id = $1 RETURNING *`, [requestId]).then(r => r.first);
+    rejectJoinRequest: async (clubId, requestId) => {
+        return db.query(
+            `UPDATE club_join_requests
+             SET status = 'rejected', processed_at = NOW()
+             WHERE id = $1 AND club_id = $2 AND status = 'pending'
+             RETURNING *`,
+            [requestId, clubId]
+        ).then(r => r.first);
     },
 };
