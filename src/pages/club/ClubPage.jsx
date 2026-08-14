@@ -15,6 +15,7 @@ export default function ClubPage() {
     const [creatingInvite, setCreatingInvite] = useState(false);
     const [invites, setInvites] = useState([]);
     const [joinRequests, setJoinRequests] = useState([]);
+    const [stats, setStats] = useState(null);
 
     const loadMembers = useCallback(async () => {
         if (!club) return;
@@ -30,7 +31,13 @@ export default function ClubPage() {
         }
     }, [club]);
 
-    const [stats, setStats] = useState(null);
+    // NOTE: all hooks below are declared unconditionally, before any early
+    // `return`. The original component called `useEffect` for join-request
+    // loading *after* an `if (!club) return ...` guard — that violates the
+    // Rules of Hooks (the number/order of hooks must be identical on every
+    // render) and would throw "Rendered fewer hooks than expected" the first
+    // time `club` transitions from null to a value, or silently leave the
+    // join-requests panel stuck empty depending on render timing.
 
     useEffect(() => {
         if (!club) return;
@@ -55,6 +62,24 @@ export default function ClubPage() {
         }
         loadAdminData();
     }, [club, loadMembers]);
+
+    // determine club-level admin (owner/admin) for the current user
+    const currentMember = members.find(m => m.userId === user?.id);
+    const isClubAdmin = Boolean(currentMember && (currentMember.role === 'owner' || currentMember.role === 'admin'));
+
+    const loadJoinRequests = useCallback(async () => {
+        if (!club) return;
+        try {
+            const result = await api.get(`/clubs/${club.id}/join-requests`);
+            setJoinRequests(result.requests || []);
+        } catch {
+            setJoinRequests([]);
+        }
+    }, [club]);
+
+    useEffect(() => {
+        if (isClubAdmin) loadJoinRequests();
+    }, [isClubAdmin, loadJoinRequests]);
 
     async function saveProfile() {
         if (!club) return;
@@ -88,16 +113,6 @@ export default function ClubPage() {
         }
     }
 
-    async function loadJoinRequests() {
-        if (!club) return;
-        try {
-            const result = await api.get(`/clubs/${club.id}/join-requests`);
-            setJoinRequests(result.requests || []);
-        } catch {
-            setJoinRequests([]);
-        }
-    }
-
     async function reviewJoinRequest(requestId, action) {
         if (!club) return;
         try {
@@ -122,14 +137,6 @@ export default function ClubPage() {
     }
 
     if (!club) return <div className="muted">No active club selected.</div>;
-
-    // determine club-level admin (owner/admin) for the current user
-    const currentMember = members.find(m => m.userId === user?.id);
-    const isClubAdmin = currentMember && (currentMember.role === 'owner' || currentMember.role === 'admin');
-
-    useEffect(() => {
-        if (isClubAdmin) loadJoinRequests();
-    }, [isClubAdmin, club]);
 
     return (
         <div className="club-page">

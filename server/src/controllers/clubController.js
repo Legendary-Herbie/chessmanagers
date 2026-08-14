@@ -61,11 +61,19 @@ export async function getClub(req, res, next) {
         const membership = req.user
             ? await ClubModel.getMembership(club.id, req.user.id)
             : null;
+
+        // Only relevant for authenticated non-members — tells the UI whether
+        // "Request to join" should stay disabled after a prior request.
+        const pendingJoinRequest = (req.user && !membership)
+            ? await ClubModel.getPendingJoinRequest(club.id, req.user.id)
+            : null;
+
         res.json({
             club: {
                 ...club,
                 is_member: Boolean(membership),
                 member_role: membership?.role ?? null,
+                join_request_pending: Boolean(pendingJoinRequest),
             },
         });
     } catch (err) {
@@ -76,7 +84,7 @@ export async function getClub(req, res, next) {
 // POST /api/v1/clubs — admin only
 export async function createClub(req, res, next) {
     try {
-        const { name, description, logo, contactInfo, federation } = req.body;
+        const { name, description, logo, contactInfo, federation, is_public } = req.body;
 
         if (!name) {
             return res.status(400).json({ error: 'Club name is required.' });
@@ -99,10 +107,19 @@ export async function createClub(req, res, next) {
             description,
             logo,
             contactInfo,
+            is_public: Boolean(is_public),
         });
 
-        // Add the creating user as the first member
-        await ClubModel.addMember(club.id, req.user.id);
+        // IMPORTANT: ClubModel.create() already inserts the creator into
+        // user_clubs with role 'owner' as part of its own transaction.
+        // Do NOT call ClubModel.addMember() here — addMember() upserts with
+        // `ON CONFLICT ... DO UPDATE SET role = EXCLUDED.role`, and its
+        // default role is 'member'. Calling it a second time would silently
+        // overwrite the owner's 'owner' role with 'member', which then hides
+        // the invite panel, join-request queue, and club-edit controls from
+        // the very person who just created the club (see requireClubAdmin
+        // and ClubPage.jsx's isClubAdmin check, both of which key off this
+        // user_clubs.role value).
 
         // Promote the creator to admin so they can manage the club immediately.
         const updatedUser = await UserModel.updateRole(req.user.id, 'admin');
@@ -268,6 +285,38 @@ export async function getMembers(req, res, next) {
         // Map DB snake_case to client-friendly camelCase and consistent keys
         const members = rows.map(r => ({ userId: r.id, email: r.email, role: r.club_role, joinedAt: r.joined_at }));
         res.json({ members });
+    } catch (err) {
+        next(err);
+    }
+}
+
+// PATCH /api/v1/clubs/:clubId/members/:userId/role — admin only
+// Promotes/demotes a member between 'member' and 'admin'. This is the
+// club-scoped role used by requireClubAdmin (distinct from the global
+// users.role JWT claim used by requireRole('admin') elsewhere). Before
+// this endpoint existed, the only way to become a club admin was to be
+// the club's creator — there was no permission-granting path at all.
+export async function setMemberRole(req, res, next) {
+    try {
+        const { clubId, userId } = req.params;
+        const { role } = req.body;
+
+        const club = await ClubModel.findById(clubId);
+        if (!club) return res.status(404).json({ error: 'Club not found.' });
+
+        if (club.owner_id === userId) {
+            return res.status(400).json({ error: "The owner's role cannot be changed here." });
+        }
+
+        const membership = await ClubModel.getMembership(clubId, userId);
+        if (!membership) {
+            return res.status(404).json({ error: 'That user is not a member of this club.' });
+        }
+
+        const updated = await ClubModel.setMemberRole(clubId, userId, role);
+        if (!updated) return res.status(404).json({ error: 'Member not found.' });
+
+        res.json({ member: { userId, role: updated.role } });
     } catch (err) {
         next(err);
     }

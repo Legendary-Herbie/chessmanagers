@@ -107,6 +107,10 @@ export const createClubSchema = z.object({
     logo:        z.string().url('Logo must be a valid URL.').optional().nullable(),
     description: z.string().max(1000).optional().nullable(),
     contactInfo: z.string().max(500).optional().nullable(),
+    // Previously accepted by the frontend (CreateClub.jsx) but silently
+    // dropped here — every club ended up private regardless of what the
+    // user picked. Now validated and passed through to ClubModel.create().
+    is_public:   z.boolean().optional(),
 });
 
 export const addTournamentPlayerSchema = z.object({
@@ -116,4 +120,12 @@ export const addTournamentPlayerSchema = z.object({
 
 export const unlinkPlayerSchema = z.object({
     userId: z.string().min(1, 'Invalid user ID.'),
+});
+
+// Promotes/demotes a club member between 'member' and 'admin'.
+// Used by the (new) PATCH /clubs/:clubId/members/:userId/role route.
+export const setMemberRoleSchema = z.object({
+    role: z.enum(['admin', 'member'], {
+        errorMap: () => ({ message: "Role must be 'admin' or 'member'." }),
+    }),
 });

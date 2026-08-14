@@ -17,7 +17,10 @@ export const ClubModel = {
                 [name, federation, ownerId, description, logo, contactInfo, is_public, JSON.stringify(settings)]
             ).then(r => r.first);
 
-            // Add creator as owner in user_clubs with role 'owner'
+            // Add creator as owner in user_clubs with role 'owner'.
+            // Callers must NOT also call addMember() for the same user/club —
+            // addMember() upserts on conflict and defaults to role 'member',
+            // which would silently demote the owner set here.
             await trx.query(
                 `INSERT INTO user_clubs (user_id, club_id, role) VALUES ($1, $2, 'owner') ON CONFLICT DO NOTHING`,
                 [ownerId, club.id]
@@ -86,6 +89,9 @@ export const ClubModel = {
         ).then(r => r.first);
     },
 
+    // Adds (or re-roles, via upsert) a member. NEVER call this for a user who
+    // was just inserted as 'owner' by create() — it will overwrite that role
+    // with whatever `role` defaults to here ('member').
     addMember: async (clubId, userId, role = 'member') => {
         return db.query(
             `INSERT INTO user_clubs (club_id, user_id, role)
@@ -93,6 +99,23 @@ export const ClubModel = {
              ON CONFLICT (user_id, club_id) DO UPDATE SET role = EXCLUDED.role
              RETURNING *`,
             [clubId, userId, role]
+        ).then(r => r.first);
+    },
+
+    // Promotes/demotes an existing club member's club-scoped role.
+    // Does not touch the global users.role (system_role) column.
+    // Guards against ever re-assigning the owner's row via this path —
+    // ownership transfer is intentionally out of scope for this helper.
+    setMemberRole: async (clubId, userId, role) => {
+        if (!['admin', 'member'].includes(role)) {
+            throw new Error(`Invalid club role: "${role}". Expected 'admin' or 'member'.`);
+        }
+        return db.query(
+            `UPDATE user_clubs
+             SET role = $1
+             WHERE club_id = $2 AND user_id = $3 AND role <> 'owner'
+             RETURNING *`,
+            [role, clubId, userId]
         ).then(r => r.first);
     },
 
@@ -190,6 +213,19 @@ export const ClubModel = {
              ON CONFLICT (club_id, user_id) DO UPDATE SET status = 'pending', message = EXCLUDED.message, created_at = NOW()
              RETURNING *`,
             [clubId, userId, message]
+        ).then(r => r.first);
+    },
+
+    // Returns the caller's own pending request for this club, if any.
+    // Used by getClub() so the "Request to join" button can stay disabled
+    // across page reloads instead of only within the current session.
+    getPendingJoinRequest: async (clubId, userId) => {
+        return db.query(
+            `SELECT id, created_at
+             FROM club_join_requests
+             WHERE club_id = $1 AND user_id = $2 AND status = 'pending'
+             LIMIT 1`,
+            [clubId, userId]
         ).then(r => r.first);
     },
 

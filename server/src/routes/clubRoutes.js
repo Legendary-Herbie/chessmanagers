@@ -10,6 +10,7 @@ import {
     approveJoin,
     rejectJoin,
     getMembers,
+    setMemberRole,
     removeMember,
     createInvite,
     listInvites,
@@ -18,7 +19,7 @@ import {
 } from '../controllers/clubController.js';
 import { requireAuth, optionalAuth } from '../middleware/auth.js';
 import { requireClubMember, requireClubAdmin } from '../middleware/requireRole.js';
-import { validate, updateClubSchema, createClubSchema } from '../middleware/validate.js';
+import { validate, updateClubSchema, createClubSchema, setMemberRoleSchema } from '../middleware/validate.js';
 
 const router = Router();
 
@@ -60,6 +61,14 @@ router.patch('/:clubId', requireClubMember, requireClubAdmin, validate(updateClu
 
 // GET /api/v1/clubs/:clubId/members
 router.get('/:clubId/members', requireClubMember, requireClubAdmin, getMembers);
+
+// PATCH /api/v1/clubs/:clubId/members/:userId/role — club admin only
+// Grants/revokes club-scoped admin permissions for a member. Previously
+// there was no route for this at all — club-admin status could only ever
+// be acquired by being the club's creator (the owner). requireClubAdmin
+// already covers both the owner and any existing club-admin, so this lets
+// an owner deputize other members without touching the global user role.
+router.patch('/:clubId/members/:userId/role', requireClubMember, requireClubAdmin, validate(setMemberRoleSchema), setMemberRole);
 
 // DELETE /api/v1/clubs/:clubId/members/:userId
 router.delete('/:clubId/members/:userId', requireClubMember, requireClubAdmin, removeMember);
