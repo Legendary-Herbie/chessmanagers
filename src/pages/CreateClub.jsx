@@ -120,9 +120,14 @@ export default function CreateClub() {
           updateSession(data.token, data.user);
         }
 
-        // Small delay so the success message is visible, then navigate home.
+        // Small delay so the success message is visible, then navigate to
+        // the new owner's dashboard. This previously navigated to '/', which
+        // renders the public marketing Landing page — an authenticated user
+        // who just created a club would land back on a "Get Started" button
+        // for the app they're already inside of, instead of seeing their
+        // new club.
         setMessage('Club created! Redirecting…');
-        setTimeout(() => navigate('/'), 1200);
+        setTimeout(() => navigate('/dashboard'), 1200);
       } catch (apiErr) {
         if (isValidationError(apiErr)) {
           setErrors(getFieldErrors(apiErr));
@@ -171,6 +176,11 @@ export default function CreateClub() {
               <option value="public">Public (listed)</option>
               <option value="private">Private (invite-only)</option>
             </select>
+            <div className="form-helper" style={{ marginTop: 4, fontSize: 13, color: '#6b7280' }}>
+              {isPublic
+                ? 'Anyone can find this club on the Find Clubs page and request to join.'
+                : "This club won't appear on the Find Clubs page. People can still join via an invite link, or by requesting to join if they have the club's direct URL."}
+            </div>
 
             <div className="controls">
               <button type="button" className="btn btn-secondary" onClick={handleNext}>Proceed to Rating</button>

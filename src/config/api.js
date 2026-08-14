@@ -189,15 +189,21 @@ export const endpoints = {
         password: ()      => '/auth/password',
     },
     clubs: {
-        mine:    ()                  => '/clubs/mine',
-        create:  ()                  => '/clubs',
-        byId:    (clubId)            => `/clubs/${clubId}`,
-        members: (clubId)            => `/clubs/${clubId}/members`,
-        member:  (clubId, userId)    => `/clubs/${clubId}/members/${userId}`,
-        join:    (clubId)            => `/clubs/${clubId}/join`,
-        invites: (clubId)            => `/clubs/${clubId}/invites`,
-        invite:  (clubId, inviteId)  => `/clubs/${clubId}/invites/${inviteId}`,
-        joinByToken: ()              => '/clubs/join-by-token',
+        // Same URL as create() (GET vs POST /clubs) but named separately so
+        // callers reach for the right verb's intent — mixing the two up is
+        // exactly how FindClubsPage.jsx ended up calling create() + '?all=1'
+        // for what was really a listing request.
+        list:        ()                  => '/clubs',
+        mine:        ()                  => '/clubs/mine',
+        create:      ()                  => '/clubs',
+        byId:        (clubId)            => `/clubs/${clubId}`,
+        members:     (clubId)            => `/clubs/${clubId}/members`,
+        member:      (clubId, userId)    => `/clubs/${clubId}/members/${userId}`,
+        memberRole:  (clubId, userId)    => `/clubs/${clubId}/members/${userId}/role`,
+        join:        (clubId)            => `/clubs/${clubId}/join`,
+        invites:     (clubId)            => `/clubs/${clubId}/invites`,
+        invite:      (clubId, inviteId)  => `/clubs/${clubId}/invites/${inviteId}`,
+        joinByToken: ()                  => '/clubs/join-by-token',
     },
     players: {
         list:          (clubId)            => `/clubs/${clubId}/players`,

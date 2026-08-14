@@ -42,7 +42,18 @@ export async function listClubs(req, res, next) {
     try {
         const { q, limit, offset, all } = req.query;
         const opts = { q, limit: Number(limit) || 50, offset: Number(offset) || 0 };
-        const clubs = all === '1' ? await ClubModel.listAll(opts) : await ClubModel.listPublic(opts);
+
+        // listAll() ignores public_leaderboard/is_public entirely and returns
+        // every club (including ones a user deliberately marked "Private
+        // (invite-only)" in CreateClub.jsx) to whoever asks. This route has
+        // no requireAuth in front of it, so ?all=1 must never be trusted from
+        // an anonymous or regular caller — only a genuine system admin
+        // (req.user.role === 'admin', set via optionalAuth) may request it.
+        // Everyone else — including logged-out visitors and ordinary
+        // members — gets the public-only listing regardless of the `all`
+        // query param.
+        const wantsAll = all === '1' && req.user?.role === 'admin';
+        const clubs = wantsAll ? await ClubModel.listAll(opts) : await ClubModel.listPublic(opts);
         res.json({ clubs });
     } catch (err) {
         next(err);

@@ -1,42 +1,47 @@
 ---
-name: Leaderboard
-description: Implements ranking, statistics, and player rating history.
+name: leaderboard
+description: Implement club leaderboards with one table and independent Blitz, Rapid, and Classical ranking dimensions, active-player eligibility, deterministic sorting, and responsive presentation.
 ---
 
 # Leaderboard
 
-## When to use
+## Structure
 
-Use inside:
+Use one leaderboard table/UI with side-by-side columns:
+`Rank | Player | Blitz | Rapid | Classical | Total Games`
 
-- LeaderboardPage.jsx
-- Player profile
-- Rating history
+Ranking is independent by category. Never invent or compute a combined rating unless explicitly specified.
 
-## Rules
+The selected category determines which rank is shown. The table may present all three ratings while rank is category-specific.
 
-Sort:
+## Eligibility
 
-Rating DESC
+A player is eligible for a category leaderboard when:
+- player is not soft-deleted
+- player belongs to the club
+- player has at least one rated match in that category
 
-Display:
+Linked and unlinked players are equally eligible.
 
-- Rank
-- Name
-- Rating
-- Games
-- Wins
-- Draws
-- Losses
-- Win rate
+## Sorting
 
-## Rating History
+Use deterministic ordering for a selected category:
+1. displayed/rounded rating descending
+2. raw rating descending
+3. category score/win rate descending
+4. rated category games descending
+5. full name ascending
 
-Do not render sparklines inside the leaderboard.
+Use the exact product definition for tie-breaking; do not add hidden criteria.
 
-Only render them inside:
+## Performance
 
-- Player modal
-- Player profile
+Prefer server-side sorting/pagination for large rosters. Preserve club/category filters in URLs where appropriate.
 
-Load rating history lazily.
+## Privacy
+
+Public leaderboard access depends on club visibility. Private club data must never leak through public endpoints.
+
+## Responsive UI
+
+On small screens, convert dense tables to cards while retaining category switching and rank clarity.

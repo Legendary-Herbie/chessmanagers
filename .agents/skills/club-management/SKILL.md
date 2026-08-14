@@ -1,41 +1,57 @@
 ---
-name: Club Management
-description: Implements club profile editing,permissions, member management, and invite links.
+name: club-management
+description: Build and maintain club creation, club identity, visibility, administration, settings, owners, admins, public pages, invites, join codes, and club-scoped operations in Chess Managers.
 ---
 
 # Club Management
 
-## When to use
+## Club model
 
-Use for:
+A club is an isolated tenant. All club members, players, matches, ratings, tournaments, announcements, notifications, and permissions are scoped to one club.
 
-- ClubPage.jsx
-- Club API
-- Membership logic
+Registered users may create clubs. Club names do not need to be globally unique; each club has a unique URL slug.
 
-## Permissions
+## Visibility
 
-Owner:
+Public clubs:
+- appear in public discovery
+- expose the public club information defined by the product contract
 
-- Full access
+Private clubs:
+- are hidden from discovery/search
+- are accessible through a direct invite or join code
 
-Admin:
+Do not leak private club data through APIs, search, autocomplete, error messages, or counts.
 
-- Manage members
-- Edit club
-- Generate invite links
+## Administration
 
-Member:
+Club Owner can:
+- manage club settings
+- assign/revoke admins
+- transfer ownership
+- delete/archive the club according to product rules
 
-- Read-only
+Club Admin can:
+- manage members
+- manage players
+- record/edit/void/delete matches
+- approve joins and player claims
+- manage announcements and tournaments
 
-## Rules
+Every authorization decision is club-specific.
 
-Never allow:
+## Joining
 
-- Removing the owner
-- Removing yourself
+Support both:
+- membership request flow
+- direct join code/invite flow
 
-Always validate permissions server-side.
+Join code is six digits. Successful join-code entry may transition directly to active membership as defined by the membership skill.
 
-Invite links are visible only to admins.
+## Settings
+
+Rating configuration, notification preferences, visibility, metadata, contacts, affiliations, and club presentation are club-scoped.
+
+## Data integrity
+
+Club deletion or archive must not destroy historical matches/rating records. Use soft deletion and prevent new operational activity for inactive/deleted clubs.

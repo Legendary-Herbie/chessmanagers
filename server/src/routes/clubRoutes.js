@@ -24,7 +24,10 @@ import { validate, updateClubSchema, createClubSchema, setMemberRoleSchema } fro
 const router = Router();
 
 // Public listing: GET /api/v1/clubs
-router.get('/', listClubs);
+// optionalAuth lets listClubs() tell a real system admin apart from an
+// anonymous/regular visitor, so the ?all=1 escape hatch (which bypasses
+// the public_leaderboard/is_public flag entirely) can be gated below.
+router.get('/', optionalAuth, listClubs);
 
 // GET /api/v1/clubs/mine
 // Must be declared before /:clubId to avoid 'mine' being treated as an ID

@@ -25,11 +25,6 @@ export function kFactor(player, settings = DEFAULT_SETTINGS) {
     return settings.baseK;
 }
 
-// ─── Result normalisation ─────────────────────────────────────────────────────
-//
-// The rest of the backend uses 'white' | 'black' | 'draw' (from createMatchSchema).
-// This converts to a numeric score from white's perspective.
-
 function resultToScore(result) {
     if (result === 'white') return 1;
     if (result === 'draw')  return 0.5;
