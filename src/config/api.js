@@ -235,6 +235,9 @@ export const endpoints = {
     leaderboard: {
         list:       (clubId)           => `/clubs/${clubId}/leaderboard`,
         stats:      (clubId)           => `/clubs/${clubId}/leaderboard/stats`,
+        // Full dashboard payload: summary counters, games-by-time-control,
+        // top players, recent matches, pending admin-action counts.
+        dashboard:  (clubId)           => `/clubs/${clubId}/leaderboard/dashboard`,
         headToHead: (clubId, aId, bId) => `/clubs/${clubId}/leaderboard/players/${aId}/vs/${bId}/summary`,
     },
     public: {

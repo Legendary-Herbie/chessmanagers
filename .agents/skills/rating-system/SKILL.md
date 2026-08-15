@@ -19,11 +19,11 @@ A match changes only the rating for its selected category.
 ## Default configuration
 
 These are defaults, not global hard-coded constants:
-- initial rating = 1200.0
-- rating floor = 100.0
-- established K-factor = 16
-- provisional K-factor = 32
-- provisional games = 30
+- initial rating = 1500.0
+- rating floor = 500.0
+- established K-factor = 32
+- provisional K-factor = 40
+- provisional games = 10
 
 The club may configure:
 - K-factor
@@ -45,14 +45,14 @@ Actual score:
 - black win: Sw=0, Sb=1
 - draw: Sw=0.5, Sb=0.5
 
-`Rw' = max(100, Rw + Kw * (Sw - Ew))`
-`Rb' = max(100, Rb + Kb * (Sb - Eb))`
+`Rw' = max(500, Rw + Kw * (Sw - Ew))`
+`Rb' = max(500, Rb + Kb * (Sb - Eb))`
 
 Each player's K is selected independently using their completed rated games count in that specific category.
 
 ## Precision
 
-Store ratings as PostgreSQL `DOUBLE PRECISION`.
+Store ratings as PostgreSQL `INTEGER`.
 Display ratings rounded with standard `Math.round()` behavior.
 Never round intermediate calculations.
 

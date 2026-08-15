@@ -11,7 +11,7 @@ import RegisterView from '../pages/auth/RegisterView.jsx';
 
 // Pages — app
 import Landing     from '../pages/Landing.jsx';
-import Dashboard   from '../pages/Dashboard.jsx';
+import ClubDashboard   from '../pages/club/ClubDashboard.jsx';
 import CreateClub  from '../pages/CreateClub.jsx';
 import NotFound    from '../pages/NotFound.jsx';
 
@@ -98,7 +98,7 @@ export default function AppRoutes() {
                 }
             >
                 {/* Dashboard */}
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard" element={<ClubDashboard />} />
 
                 {/* Create club — shown when user has no club yet */}
                 <Route path="/create-club" element={<CreateClub />} />

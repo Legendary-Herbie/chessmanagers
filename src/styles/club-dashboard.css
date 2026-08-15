@@ -1,0 +1,209 @@
+.club-dashboard {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-md);
+}
+
+.dash-empty {
+    padding: var(--gap-lg);
+    text-align: center;
+}
+
+/* ── Pending actions banner ─────────────────────────────────────────────── */
+
+.dash-pending-banner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+    background: color-mix(in srgb, var(--warning) 12%, transparent);
+    border: 1px solid color-mix(in srgb, var(--warning) 35%, transparent);
+    color: var(--text-strong);
+    border-radius: var(--radius-md);
+    padding: 10px 14px;
+    font-size: var(--font-size-sm);
+}
+
+.dash-pending-banner span {
+    color: var(--text-muted);
+}
+
+/* ── Stat cards ──────────────────────────────────────────────────────────── */
+
+.dash-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: var(--gap-sm);
+}
+
+.dash-stat-card {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    box-shadow: var(--shadow-sm);
+}
+
+.dash-stat-card__label {
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-bold);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-muted);
+}
+
+.dash-stat-card__value {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-black);
+    color: var(--text-strong);
+}
+
+.dash-stat-card__sub {
+    font-size: var(--font-size-xs);
+    color: var(--text-muted);
+}
+
+/* ── Two-column layout ──────────────────────────────────────────────────── */
+
+.dash-columns {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: var(--gap-sm);
+    align-items: start;
+}
+
+.dash-panel {
+    background: var(--bg-surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    box-shadow: var(--shadow-sm);
+}
+
+.dash-panel__title {
+    margin: 0 0 14px 0;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-bold);
+    color: var(--text-strong);
+}
+
+/* ── Games by category ──────────────────────────────────────────────────── */
+
+.dash-category-bars {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.dash-category-row {
+    display: grid;
+    grid-template-columns: 70px 1fr 32px;
+    align-items: center;
+    gap: 10px;
+}
+
+.dash-category-label {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-medium);
+    color: var(--text);
+    text-transform: capitalize;
+}
+
+.dash-category-track {
+    height: 8px;
+    border-radius: var(--radius-full, 9999px);
+    background: var(--bg-muted);
+    overflow: hidden;
+}
+
+.dash-category-fill {
+    height: 100%;
+    background: var(--primary);
+    border-radius: inherit;
+    transition: width var(--motion-normal) var(--ease);
+}
+
+.dash-category-count {
+    text-align: right;
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-bold);
+    color: var(--text-strong);
+}
+
+/* ── Top players ─────────────────────────────────────────────────────────── */
+
+.dash-top-players {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.dash-top-players li {
+    display: grid;
+    grid-template-columns: 22px 1fr auto;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 4px;
+    border-bottom: 1px solid var(--border);
+    font-size: var(--font-size-sm);
+}
+
+.dash-top-players li:last-child {
+    border-bottom: none;
+}
+
+.dash-top-players__rank {
+    color: var(--text-muted);
+    font-weight: var(--font-bold);
+}
+
+.dash-top-players__name {
+    color: var(--text-strong);
+    font-weight: var(--font-medium);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.dash-top-players__rating {
+    color: var(--primary);
+    font-weight: var(--font-bold);
+}
+
+/* ── Recent matches ──────────────────────────────────────────────────────── */
+
+.dash-matches-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--font-size-sm);
+}
+
+.dash-matches-table th,
+.dash-matches-table td {
+    padding: 10px 8px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+}
+
+.dash-matches-table th {
+    color: var(--text-muted);
+    font-weight: var(--font-bold);
+    font-size: var(--font-size-xs);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.dash-matches-table tr:last-child td {
+    border-bottom: none;
+}
+
+.dash-matches-table__tc {
+    text-transform: capitalize;
+    color: var(--text-muted);
+}

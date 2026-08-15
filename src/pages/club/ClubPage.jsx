@@ -15,7 +15,11 @@ export default function ClubPage() {
     const [creatingInvite, setCreatingInvite] = useState(false);
     const [invites, setInvites] = useState([]);
     const [joinRequests, setJoinRequests] = useState([]);
-    const [stats, setStats] = useState(null);
+    // Dashboard payload from GET /clubs/:clubId/leaderboard/dashboard — see
+    // LeaderboardModel.getDashboardStats(). Kept as `dashboard` (not `stats`)
+    // since it now carries top players / recent matches / pending-action
+    // counts, not just the four summary numbers it used to.
+    const [dashboard, setDashboard] = useState(null);
 
     const loadMembers = useCallback(async () => {
         if (!club) return;
@@ -54,10 +58,10 @@ export default function ClubPage() {
             }
 
             try {
-                const s = await api.get(endpoints.leaderboard.stats(club.id));
-                setStats(s?.stats || null);
+                const d = await api.get(endpoints.leaderboard.dashboard(club.id));
+                setDashboard(d?.dashboard || null);
             } catch {
-                // ignore
+                // ignore — non-admins won't be able to fetch
             }
         }
         loadAdminData();
@@ -143,9 +147,9 @@ export default function ClubPage() {
             <div className="page-header">
                 <h1>Club: {club.name}</h1>
                 <div className="club-stats">
-                    {stats ? (
+                    {dashboard ? (
                         <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>
-                            Players: {stats.total_players} · Matches: {stats.total_matches} · Avg rating: {stats.average_rating ?? '—'}
+                            Players: {dashboard.total_players} · Matches: {dashboard.total_matches} · Avg rating: {dashboard.average_rating ?? '—'}
                         </div>
                     ) : null}
                 </div>
@@ -271,7 +275,7 @@ export default function ClubPage() {
                 </div>
             )}
 
-            {activeTab === 'dashboard' && <ClubDashboard stats={stats} />}
+            {activeTab === 'dashboard' && <ClubDashboard data={dashboard} />}
         </div>
     );
 }

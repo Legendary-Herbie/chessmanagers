@@ -4,6 +4,7 @@ import {
     getRatingHistory,
     getHeadToHeadSummary,
     getClubStats,
+    getClubDashboard,
 } from '../controllers/leaderboardController.js';
 import { requireAuth } from '../middleware/auth.js';
 import { requireClubMember } from '../middleware/requireRole.js';
@@ -20,6 +21,12 @@ router.get('/', getLeaderboard);
 // Allow club admins (owner/admin) to view club stats as well as system admins
 import { requireClubAdmin } from '../middleware/requireRole.js';
 router.get('/stats', requireClubAdmin, getClubStats);
+
+// GET /api/v1/clubs/:clubId/leaderboard/dashboard
+// Full dashboard payload (summary + top players + recent matches + pending
+// admin actions) for the club-scoped "Dashboard" tab. Admin-only, same as
+// /stats, since it surfaces pending join-request/claim counts.
+router.get('/dashboard', requireClubAdmin, getClubDashboard);
 
 // GET /api/v1/clubs/:clubId/players/:playerId/rating-history
 router.get('/players/:playerId/rating-history', getRatingHistory);

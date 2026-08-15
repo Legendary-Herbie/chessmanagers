@@ -11,7 +11,7 @@ description: Global engineering standards for Chess Managers frontend, backend, 
 - Backend: Node.js + Express.
 - Database: PostgreSQL.
 - Validation: Zod on every incoming request endpoint.
-- IDs: use the project's established UUID strategy consistently.
+- IDs: Use the project's established prefixed TEXT id strategy consistently (e.g. 'player_' + md5(...), 'match_' + md5(...)) — not UUIDs. Zod schemas should validate these as non-empty strings, not z.string().uuid().
 - SQL/database access: use the existing database abstraction; do not introduce a second ORM/query abstraction without approval.
 
 ## Architecture

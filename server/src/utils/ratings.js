@@ -8,7 +8,7 @@ export const DEFAULT_SETTINGS = {
     baseK:            32,   // K-factor for established players
     provisionalK:     40,   // K-factor for players below provisionalGames threshold
     provisionalGames: 10,   // games played before a player is considered established
-    defaultStartRating: 1200,
+    defaultStartRating: 1500,
     minRating:        500,
     maxRating:        3200,
     roundRatings:     true,

@@ -62,3 +62,15 @@ export async function getClubStats(req, res, next) {
         next(err);
     }
 }
+
+// GET /api/v1/clubs/:clubId/leaderboard/dashboard — club admin (owner/admin) only
+// Full club dashboard payload: summary counters, games-by-time-control,
+// top players, recent matches, and pending admin action counts.
+export async function getClubDashboard(req, res, next) {
+    try {
+        const dashboard = await LeaderboardModel.getDashboardStats(req.params.clubId);
+        res.json({ dashboard });
+    } catch (err) {
+        next(err);
+    }
+}
