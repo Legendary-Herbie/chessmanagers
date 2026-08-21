@@ -7,27 +7,34 @@ import EditPlayerForm from '../../features/players/admin/EditPlayerForm.jsx';
 import PlayerRatingChart from '../../features/players/profile/PlayerRatingChart.jsx';
 import HeadToHeadView from '../../features/players/profile/HeadToHeadView.jsx';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
+import { resolveAssetUrl } from '../../config/api.js';
 
 import '../../styles/players.css';
+
+const RATING_CATEGORIES = ['blitz', 'rapid', 'classical'];
+const categoryLabel = category => category[0].toUpperCase() + category.slice(1);
 
 export default function PlayerPage() {
     const { playerId } = useParams();
     const navigate = useNavigate();
-    const { user, isAdmin } = useAuth();
-    const { club, loading: clubLoading } = useClub();
+    const { user } = useAuth();
+    const { club, linkedPlayer, capabilities, loading: clubLoading } = useClub();
+    const isAdmin = Boolean(capabilities.canManagePlayers);
+    const [ratingCategory, setRatingCategory] = useState('blitz');
 
     const {
         player,
         allPlayers,
         matches,
         ratingHistory,
+        statistics,
         loading,
         error,
         refetch,
         claimPlayer,
         unlinkPlayer,
-        deletePlayer,
-    } = usePlayer(club?.id, playerId);
+        archivePlayer,
+    } = usePlayer(club?.id, playerId, ratingCategory);
 
     const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'matches' | 'headToHead'
     const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -83,19 +90,18 @@ export default function PlayerPage() {
         });
     };
 
-    // Delete Player Handler with ConfirmDialog
-    const handleDelete = () => {
+    const handleArchive = () => {
         setConfirmModal({
             isOpen: true,
-            title: 'Delete Player',
-            message: `PERMANENTLY DELETE "${player?.name}"? This action cannot be undone.`,
-            variant: 'danger',
+            title: 'Archive Player',
+            message: `Archive "${player?.name}"? Match and rating history will be preserved.`,
+            variant: 'warning',
             onConfirm: async () => {
                 try {
-                    await deletePlayer();
+                    await archivePlayer();
                     navigate('/players');
                 } catch (err) {
-                    alert(err.message || 'Failed to delete player.');
+                    alert(err.message || 'Failed to archive player.');
                 } finally {
                     closeConfirmModal();
                 }
@@ -132,29 +138,32 @@ export default function PlayerPage() {
 
     const {
         name,
-        rating = 1200,
-        start_rating = 1200,
         bio,
-        games = 0,
-        wins = 0,
-        draws = 0,
-        losses = 0,
         link_status,
-        linked_user_id,
+        status,
+        photo_url,
         created_at,
     } = player;
+    const selectedRating = player.ratings?.[ratingCategory];
+    const categoryStats = statistics?.categories?.[ratingCategory] || {
+        games: 0, wins: 0, draws: 0, losses: 0, weightedWinRate: 0,
+        currentWinStreak: 0, currentLossStreak: 0,
+    };
+    const { games, wins, draws, losses } = categoryStats;
+    const rating = categoryStats.currentRating ?? selectedRating?.current_rating ?? 1500;
+    const start_rating = selectedRating?.start_rating ?? player.start_rating ?? 1500;
 
     const initials = name
         ? name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase()
         : 'P';
 
-    const winRate = games > 0 ? Math.round(((wins + draws * 0.5) / games) * 100) : 0;
+    const winRate = Math.round(categoryStats.weightedWinRate * 100);
     const ratingDelta = rating - start_rating;
-    const isSelf = user && linked_user_id === user.id;
+    const isSelf = player.is_self || linkedPlayer?.id === player.id;
     const canEdit = isAdmin || isSelf;
     const isLinked = link_status === 'approved';
     const isPending = link_status === 'pending';
-    const canClaim = user && !isAdmin && !isLinked && !isPending && !user.linkStatus;
+    const canClaim = user && !isAdmin && !isLinked && !isPending && !linkedPlayer;
 
     return (
         <div className="players-container">
@@ -170,12 +179,14 @@ export default function PlayerPage() {
             {/* Profile Header Card */}
             <div className="player-detail__header-card">
                 <div className="player-detail__identity">
-                    <div className="player-detail__avatar">{initials}</div>
+                    <div className="player-detail__avatar">
+                        {photo_url ? <img src={resolveAssetUrl(photo_url)} alt={`${name} profile`} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} /> : initials}
+                    </div>
                     <div className="player-detail__title-block">
                         <h1>{name}</h1>
                         <div className="player-detail__badges">
                             <span className="rating-badge" style={{ fontSize: '0.85rem', padding: '4px 10px' }}>
-                                🏆 {rating} ELO
+                                🏆 {rating} {categoryLabel(ratingCategory)} Elo
                             </span>
                             {isLinked && <span className="link-badge link-badge--approved">✓ Claimed Profile</span>}
                             {isPending && <span className="link-badge link-badge--pending">⏳ Pending Claim</span>}
@@ -198,17 +209,30 @@ export default function PlayerPage() {
                             ✏️ Edit Profile
                         </button>
                     )}
-                    {isAdmin && isLinked && (
+                    {(isAdmin || isSelf) && isLinked && (
                         <button type="button" className="btn-secondary" onClick={handleUnlink}>
                             Unlink Account
                         </button>
                     )}
-                    {isAdmin && (
-                        <button type="button" className="btn-danger" onClick={handleDelete}>
-                            Delete
+                    {isAdmin && status === 'active' && (
+                        <button type="button" className="btn-danger" onClick={handleArchive}>
+                            Archive
                         </button>
                     )}
                 </div>
+            </div>
+
+            <div className="player-detail__tabs" role="group" aria-label="Rating category">
+                {RATING_CATEGORIES.map(category => (
+                    <button
+                        type="button"
+                        key={category}
+                        className={`player-tab-btn ${ratingCategory === category ? 'player-tab-btn--active' : ''}`}
+                        onClick={() => setRatingCategory(category)}
+                    >
+                        {categoryLabel(category)}
+                    </button>
+                ))}
             </div>
 
             {/* Biography */}
@@ -246,7 +270,13 @@ export default function PlayerPage() {
                     <span className="stat-card__value">{winRate}%</span>
                 </div>
                 <div className="stat-card">
-                    <span className="stat-card__label">ELO Growth</span>
+                    <span className="stat-card__label">Current streak</span>
+                    <span className="stat-card__value">
+                        {categoryStats.currentWinStreak ? `${categoryStats.currentWinStreak} W` : categoryStats.currentLossStreak ? `${categoryStats.currentLossStreak} L` : '—'}
+                    </span>
+                </div>
+                <div className="stat-card">
+                    <span className="stat-card__label">{categoryLabel(ratingCategory)} Elo Growth</span>
                     <span className="stat-card__value" style={{ color: ratingDelta >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
                         {ratingDelta >= 0 ? `+${ratingDelta}` : ratingDelta}
                     </span>
@@ -281,7 +311,11 @@ export default function PlayerPage() {
 
             {/* Tab 1: Overview & Rating Chart */}
             {activeTab === 'overview' && (
-                <PlayerRatingChart history={ratingHistory} startRating={start_rating} />
+                <PlayerRatingChart
+                    history={ratingHistory}
+                    startRating={start_rating}
+                    category={ratingCategory}
+                />
             )}
 
             {/* Tab 2: Match History Table */}
@@ -304,10 +338,10 @@ export default function PlayerPage() {
                             </thead>
                             <tbody>
                                 {matches.map((m) => {
-                                    const isWhite = m.white_player_id === player.id;
+                                    const isWhite = m.whitePlayerId === player.id;
                                     const colorPlayed = isWhite ? 'White ♔' : 'Black ♚';
-                                    const opponentName = isWhite ? (m.black_name || 'Opponent') : (m.white_name || 'Opponent');
-                                    const opponentId = isWhite ? m.black_player_id : m.white_player_id;
+                                    const opponentName = isWhite ? m.blackPlayerName : m.whitePlayerName;
+                                    const opponentId = isWhite ? m.blackPlayerId : m.whitePlayerId;
 
                                     let outcome = 'Draw';
                                     let outcomeColor = 'var(--warning)';
@@ -325,7 +359,7 @@ export default function PlayerPage() {
 
                                     return (
                                         <tr key={m.id}>
-                                            <td>{new Date(m.played_at || m.created_at).toLocaleDateString()}</td>
+                                            <td>{new Date(m.playedAt).toLocaleDateString()}</td>
                                             <td>{colorPlayed}</td>
                                             <td>
                                                 <Link to={`/players/${opponentId}`} style={{ color: 'var(--text-strong)', textDecoration: 'none', fontWeight: 600 }}>
@@ -335,7 +369,7 @@ export default function PlayerPage() {
                                             <td>
                                                 <strong style={{ color: outcomeColor }}>{outcome}</strong>
                                             </td>
-                                            <td style={{ textTransform: 'capitalize' }}>{m.type}</td>
+                                            <td style={{ textTransform: 'capitalize' }}>{m.ratingCategory}</td>
                                         </tr>
                                     );
                                 })}
@@ -360,6 +394,7 @@ export default function PlayerPage() {
                 onClose={() => setIsEditModalOpen(false)}
                 clubId={club.id}
                 player={player}
+                isAdmin={isAdmin}
                 onPlayerUpdated={refetch}
             />
 

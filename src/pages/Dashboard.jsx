@@ -1,24 +1,44 @@
-import React from 'react';
-import { useAuth, useClub } from '../app/contextHooks.js';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { useClub } from '../app/contextHooks.js';
 import PendingLinksList from '../features/players/admin/PendingLinksList.jsx';
+import { leaderboardApi } from '../features/leaderboard/api/leaderboardApi.js';
+import ClubDashboard from './club/ClubDashboard.jsx';
+
+const CATEGORIES = ['blitz', 'rapid', 'classical'];
 
 export default function Dashboard() {
-  const { isAdmin } = useAuth();
-  const { club } = useClub();
+    const { club, capabilities } = useClub();
+    const [searchParams, setSearchParams] = useSearchParams();
+    const requestedCategory = searchParams.get('category');
+    const category = CATEGORIES.includes(requestedCategory) ? requestedCategory : 'blitz';
+    const [dashboard, setDashboard] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState('');
 
-  return (
-    <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
-      <div>
-        <h1 style={{ margin: 0, fontSize: '1.75rem', color: 'var(--text-strong)' }}>Dashboard</h1>
-        <p style={{ margin: '4px 0 0 0', color: 'var(--text-muted)' }}>
-          Welcome back{club?.name ? ` to ${club.name}` : ''}!
-        </p>
-      </div>
+    useEffect(() => {
+        if (!club?.id) return;
+        let active = true;
+        setLoading(true);
+        setError('');
+        leaderboardApi.fetchDashboard(club.id, category)
+            .then(data => active && setDashboard(data))
+            .catch(fetchError => active && setError(fetchError.message || 'Unable to load the dashboard.'))
+            .finally(() => active && setLoading(false));
+        return () => { active = false; };
+    }, [club?.id, category]);
 
-      {/* Pending player claim requests for admins */}
-      {isAdmin && club?.id && (
-        <PendingLinksList clubId={club.id} />
-      )}
-    </div>
-  );
+    function changeCategory(nextCategory) {
+        const next = new URLSearchParams(searchParams);
+        next.set('category', nextCategory);
+        setSearchParams(next, { replace: true });
+    }
+
+    return <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+        <div><h1 style={{ margin: 0 }}>Dashboard</h1><p className="muted">{club?.name || 'Your club'}</p></div>
+        {loading && <div className="muted">Loading dashboard...</div>}
+        {error && <div className="error-banner">{error}</div>}
+        {!loading && dashboard && <ClubDashboard data={dashboard} onCategoryChange={changeCategory} />}
+        {capabilities.canManagePlayers && club?.id && <PendingLinksList clubId={club.id} />}
+    </div>;
 }

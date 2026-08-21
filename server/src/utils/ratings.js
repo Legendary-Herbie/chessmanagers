@@ -5,12 +5,11 @@
  * These match what the frontend ratingUtils expect.
  */
 export const DEFAULT_SETTINGS = {
-    baseK:            32,   // K-factor for established players
-    provisionalK:     40,   // K-factor for players below provisionalGames threshold
+    establishedKFactor: 32,
+    provisionalKFactor: 40,
     provisionalGames: 10,   // games played before a player is considered established
-    defaultStartRating: 1500,
-    minRating:        500,
-    maxRating:        3200,
+    initialRating:    1500,
+    ratingFloor:      500,
     roundRatings:     true,
 };
 
@@ -20,12 +19,14 @@ export function expectedScore(rSelf, rOpp) {
 }
 
 export function kFactor(player, settings = DEFAULT_SETTINGS) {
-    if (!player) return settings.baseK;
-    if ((player.games || 0) < (settings.provisionalGames || 0)) return settings.provisionalK;
-    return settings.baseK;
+    const established = settings.establishedKFactor ?? settings.baseK ?? DEFAULT_SETTINGS.establishedKFactor;
+    const provisional = settings.provisionalKFactor ?? settings.provisionalK ?? DEFAULT_SETTINGS.provisionalKFactor;
+    const threshold = settings.provisionalGames ?? DEFAULT_SETTINGS.provisionalGames;
+    const games = player?.completedRatedGames ?? player?.completed_rated_games ?? player?.games ?? 0;
+    return games < threshold ? provisional : established;
 }
 
-function resultToScore(result) {
+export function resultToScore(result) {
     if (result === 'white') return 1;
     if (result === 'draw')  return 0.5;
     if (result === 'black') return 0;
@@ -144,16 +145,14 @@ export function calculateNewRatings(
     const KA = kFactor(whitePlayer, settings);
     const KB = kFactor(blackPlayer, settings);
 
-    let newWhiteRating = whiteRating + KA * (SA - EA);
-    let newBlackRating = blackRating + KB * (SB - EB);
+    const floor = settings.ratingFloor ?? settings.minRating ?? DEFAULT_SETTINGS.ratingFloor;
+    let newWhiteRating = Math.max(floor, whiteRating + KA * (SA - EA));
+    let newBlackRating = Math.max(floor, blackRating + KB * (SB - EB));
 
     if (settings.roundRatings) {
         newWhiteRating = Math.round(newWhiteRating);
         newBlackRating = Math.round(newBlackRating);
     }
-
-    newWhiteRating = Math.min(settings.maxRating, Math.max(settings.minRating, newWhiteRating));
-    newBlackRating = Math.min(settings.maxRating, Math.max(settings.minRating, newBlackRating));
 
     return { newWhiteRating, newBlackRating };
 }

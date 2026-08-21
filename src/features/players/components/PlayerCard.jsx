@@ -1,9 +1,11 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { resolveAssetUrl } from '../../../config/api.js';
 
 export default function PlayerCard({
     player,
     currentUser,
+    currentLinkedPlayerId,
     isAdmin,
     onClaim,
     onEdit,
@@ -15,14 +17,14 @@ export default function PlayerCard({
     const {
         id,
         name,
-        rating = 1200,
+        rating = 1500,
         bio,
         games = 0,
         wins = 0,
         draws = 0,
         losses = 0,
         link_status,
-        linked_user_id,
+        photo_url,
     } = player;
 
     const initials = name
@@ -30,18 +32,20 @@ export default function PlayerCard({
         : 'P';
 
     const winRate = games > 0 ? Math.round(((wins + (draws * 0.5)) / games) * 100) : 0;
-    const isSelf = currentUser && linked_user_id === currentUser.id;
+    const isSelf = currentLinkedPlayerId === id;
     const canEdit = isAdmin || isSelf;
     const isLinked = link_status === 'approved';
     const isPending = link_status === 'pending';
 
     // A regular user can claim if unlinked and they don't already have an active link
-    const canClaim = currentUser && !isAdmin && !isLinked && !isPending && !currentUser.linkStatus;
+    const canClaim = currentUser && !isAdmin && !isLinked && !isPending && !currentLinkedPlayerId;
 
     return (
         <div className="player-card">
             <div className="player-card__header">
-                <div className="player-card__avatar">{initials}</div>
+                <div className="player-card__avatar">
+                    {photo_url ? <img src={resolveAssetUrl(photo_url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} /> : initials}
+                </div>
                 <div className="player-card__main">
                     <Link to={`/players/${id}`} className="player-card__name" title={name}>
                         {name}
@@ -117,7 +121,7 @@ export default function PlayerCard({
                         </button>
                     )}
 
-                    {isAdmin && isLinked && (
+                    {(isAdmin || isSelf) && isLinked && (
                         <button
                             type="button"
                             className="btn-secondary btn-sm"
@@ -134,8 +138,8 @@ export default function PlayerCard({
                             type="button"
                             className="btn-danger btn-sm btn-icon"
                             onClick={() => onDelete && onDelete(player)}
-                            title="Delete Player"
-                            aria-label="Delete Player"
+                            title="Archive Player"
+                            aria-label="Archive Player"
                         >
                             🗑️
                         </button>

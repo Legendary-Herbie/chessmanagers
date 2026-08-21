@@ -64,6 +64,12 @@
   --shadow-lg: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 
 
+  /* Backward compatibility aliases */
+  --bg: var(--bg-surface);
+  --bg-secondary: var(--bg-muted);
+  --surface: var(--bg-surface);
+  --radius-full: 9999px;
+
   /* Typography scale */
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
@@ -80,7 +86,7 @@
   --font-bold: 600;
   --font-black: 800;
 
-  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-sans: system-ui, -apple-system, 'Segoe UI', sans-serif;
   --line-height: 1.5;
 
   /* Accessibility */
@@ -100,11 +106,17 @@
   --bg-muted: #1f2937;
   --glass: rgba(17, 24, 39, 0.8);
 
+  --bg: var(--bg-surface);
+  --bg-secondary: var(--bg-muted);
+  --surface: var(--bg-surface);
+
   --text-strong: #f9fafb;
   --text: #e5e7eb;
   --text-muted: #9ca3af;
   --text-success: #34d399;       /* bumped from #16a34a — passes AA on dark surfaces */
-  --text-danger: #f87171;       
+  --text-green: #34d399;
+  --text-danger: #f87171;
+  --text-red: #f87171;
 
   --border: #374151;
   --border-emphasis: #4b5563;

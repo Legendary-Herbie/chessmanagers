@@ -17,6 +17,7 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest",
+    "test:all": "vitest run && npm --prefix server test",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage"
   },

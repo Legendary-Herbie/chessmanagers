@@ -9,56 +9,77 @@ import {
     getTournamentPlayers,
     addTournamentPlayer,
     removeTournamentPlayer,
+    withdrawTournamentPlayer,
     getTournamentStandings,
+    createTournamentRound,
+    setPairingResult,
 } from '../controllers/tournamentController.js';
 
 import { requireAuth } from '../middleware/auth.js';
-import { requireRole, requireClubMember } from '../middleware/requireRole.js';
+import { loadClubContext, requireActiveClubMember, requireClubAdmin } from '../middleware/requireRole.js';
 import {
     validate,
+    validateRequest,
+    clubParamsSchema,
+    clubTournamentParamsSchema,
+    clubTournamentPlayerParamsSchema,
+    clubTournamentPairingParamsSchema,
+    tournamentListQuerySchema,
     createTournamentSchema,
     updateTournamentSchema,
     setTournamentStatusSchema,
     addTournamentPlayerSchema,
+    recordTournamentResultSchema,
+    tournamentReasonSchema,
+    emptyBodySchema,
 } from '../middleware/validate.js';
 
 const router = Router({ mergeParams: true });
 
 // All tournament routes require authentication and club membership
-router.use(requireAuth, requireClubMember);
+router.use(requireAuth, validateRequest({ params: clubParamsSchema }), loadClubContext, requireActiveClubMember);
 
 // GET /api/v1/clubs/:clubId/tournaments
 // Supports query param: ?status=upcoming|active|completed
-router.get('/', getTournaments);
+router.get('/', validateRequest({ query: tournamentListQuerySchema }), getTournaments);
 
 // POST /api/v1/clubs/:clubId/tournaments
-router.post('/', requireRole('admin'), validate(createTournamentSchema), createTournament);
+router.post('/', requireClubAdmin, validate(createTournamentSchema), createTournament);
 
 // GET /api/v1/clubs/:clubId/tournaments/:tournamentId
 // Returns tournament + players + standings in one response
-router.get('/:tournamentId', getTournament);
+router.get('/:tournamentId', validateRequest({ params: clubTournamentParamsSchema }), getTournament);
 
 // PATCH /api/v1/clubs/:clubId/tournaments/:tournamentId
-router.patch('/:tournamentId', requireRole('admin'), validate(updateTournamentSchema), updateTournament);
+router.patch('/:tournamentId', validateRequest({ params: clubTournamentParamsSchema }), requireClubAdmin, validate(updateTournamentSchema), updateTournament);
 
 // PATCH /api/v1/clubs/:clubId/tournaments/:tournamentId/status
-router.patch('/:tournamentId/status', requireRole('admin'), validate(setTournamentStatusSchema), setTournamentStatus);
+router.patch('/:tournamentId/status', validateRequest({ params: clubTournamentParamsSchema }), requireClubAdmin, validate(setTournamentStatusSchema), setTournamentStatus);
 
 // DELETE /api/v1/clubs/:clubId/tournaments/:tournamentId
-router.delete('/:tournamentId', requireRole('admin'), deleteTournament);
+router.delete('/:tournamentId', validateRequest({ params: clubTournamentParamsSchema }), requireClubAdmin, validate(tournamentReasonSchema), deleteTournament);
 
 // ── Roster management ─────────────────────────────────────────────────────────
 
 // GET /api/v1/clubs/:clubId/tournaments/:tournamentId/players
-router.get('/:tournamentId/players', getTournamentPlayers);
+router.get('/:tournamentId/players', validateRequest({ params: clubTournamentParamsSchema }), getTournamentPlayers);
 
 // POST /api/v1/clubs/:clubId/tournaments/:tournamentId/players
-router.post('/:tournamentId/players', requireRole('admin'), validate(addTournamentPlayerSchema), addTournamentPlayer);
+router.post('/:tournamentId/players', validateRequest({ params: clubTournamentParamsSchema }), requireClubAdmin, validate(addTournamentPlayerSchema), addTournamentPlayer);
 
 // DELETE /api/v1/clubs/:clubId/tournaments/:tournamentId/players/:playerId
-router.delete('/:tournamentId/players/:playerId', requireRole('admin'), removeTournamentPlayer);
+router.delete('/:tournamentId/players/:playerId', validateRequest({ params: clubTournamentPlayerParamsSchema }), requireClubAdmin, removeTournamentPlayer);
+
+// PATCH /api/v1/clubs/:clubId/tournaments/:tournamentId/players/:playerId/withdraw
+router.patch('/:tournamentId/players/:playerId/withdraw', validateRequest({ params: clubTournamentPlayerParamsSchema }), requireClubAdmin, validate(emptyBodySchema), withdrawTournamentPlayer);
+
+// POST /api/v1/clubs/:clubId/tournaments/:tournamentId/rounds
+router.post('/:tournamentId/rounds', validateRequest({ params: clubTournamentParamsSchema }), requireClubAdmin, validate(emptyBodySchema), createTournamentRound);
+
+// POST /api/v1/clubs/:clubId/tournaments/:tournamentId/pairings/:pairingId/result
+router.post('/:tournamentId/pairings/:pairingId/result', validateRequest({ params: clubTournamentPairingParamsSchema }), requireClubAdmin, validate(recordTournamentResultSchema), setPairingResult);
 
 // GET /api/v1/clubs/:clubId/tournaments/:tournamentId/standings
-router.get('/:tournamentId/standings', getTournamentStandings);
+router.get('/:tournamentId/standings', validateRequest({ params: clubTournamentParamsSchema }), getTournamentStandings);
 
 export default router;

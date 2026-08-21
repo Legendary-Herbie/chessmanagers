@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 
-export default function PlayerRatingChart({ history = [], startRating = 1200 }) {
+export default function PlayerRatingChart({ history = [], startRating = 1500, category = 'blitz' }) {
     const [hoverPoint, setHoverPoint] = useState(null);
+    const categoryLabel = category[0].toUpperCase() + category.slice(1);
 
     // Build timeline data
     let points = [];
@@ -10,20 +11,21 @@ export default function PlayerRatingChart({ history = [], startRating = 1200 }) 
             { label: 'Start', rating: startRating, date: 'Initial' }
         ];
     } else {
-        // First entry starts from its rating_before
+        // The rating-history endpoint uses one canonical camelCase DTO.
         const first = history[0];
         points.push({
             label: 'Start',
-            rating: first.rating_before,
-            date: new Date(first.created_at).toLocaleDateString(),
+            rating: first.ratingBefore,
+            date: new Date(first.playedAt).toLocaleDateString(),
         });
 
         history.forEach((h, idx) => {
+            const rating = h.ratingAfter;
             points.push({
                 label: `Match #${idx + 1}`,
-                rating: h.rating_after,
-                delta: h.rating_after - h.rating_before,
-                date: new Date(h.created_at).toLocaleDateString(),
+                rating,
+                delta: rating - h.ratingBefore,
+                date: new Date(h.playedAt).toLocaleDateString(),
             });
         });
     }
@@ -32,7 +34,7 @@ export default function PlayerRatingChart({ history = [], startRating = 1200 }) 
         return (
             <div className="chart-card">
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-strong)' }}>
-                    Rating History Trajectory
+                    {categoryLabel} Rating History Trajectory
                 </h3>
                 <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
                     Starting Rating: <strong>{startRating}</strong>. No matches played yet.
@@ -60,7 +62,7 @@ export default function PlayerRatingChart({ history = [], startRating = 1200 }) 
         <div className="chart-card">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-strong)' }}>
-                    Rating History Trajectory
+                    {categoryLabel} Rating History Trajectory
                 </h3>
                 <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
                     {points.length - 1} match{points.length - 1 === 1 ? '' : 'es'} recorded

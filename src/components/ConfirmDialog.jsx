@@ -10,6 +10,7 @@ export default function ConfirmDialog({
     loading = false,
     onConfirm,
     onClose,
+    children = null,
 }) {
     // Scroll lock & Escape key
     useEffect(() => {
@@ -34,10 +35,10 @@ export default function ConfirmDialog({
         : 'btn-primary';
 
     return (
-        <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
+        <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
             <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
                 <div className="modal-card__header">
-                    <h2 className="modal-card__title">{title}</h2>
+                    <h2 id="confirm-dialog-title" className="modal-card__title">{title}</h2>
                     <button type="button" className="modal-card__close" onClick={onClose} aria-label="Close modal">
                         ✕
                     </button>
@@ -47,6 +48,7 @@ export default function ConfirmDialog({
                     <p style={{ margin: 0, color: 'var(--text)', lineHeight: 1.5, fontSize: '0.95rem' }}>
                         {message}
                     </p>
+                    {children}
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '12px' }}>
                         <button

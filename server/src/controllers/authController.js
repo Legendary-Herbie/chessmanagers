@@ -1,148 +1,213 @@
-import bcrypt from 'bcryptjs';
-import jwt from 'jsonwebtoken';
-import { UserModel } from '../models/User.js';
 import env from '../config/env.js';
+import { UserModel } from '../models/User.js';
+import {
+    authenticatePassword,
+    changeAccountPassword,
+    deleteAccount,
+    logoutAllSessions,
+    registerAccount,
+    requestPasswordReset,
+    resendVerification,
+    resetPassword,
+    toAuthUser,
+    verifyEmailToken,
+} from '../services/AuthService.js';
+import {
+    completeGoogleOAuth,
+    safeContinuation,
+    startGoogleOAuth,
+} from '../services/GoogleAuthService.js';
+import {
+    clearSessionCookies,
+    REFRESH_COOKIE,
+    revokeRefreshToken,
+    rotateRefreshSession,
+    setSessionCookies,
+} from '../services/SessionService.js';
 
-const { JWT_SECRET, JWT_EXPIRES_IN = '7d' } = env;
+const FAILURES = {
+    EMAIL_ALREADY_EXISTS: [409, 'An account with that email already exists.'],
+    USERNAME_ALREADY_EXISTS: [409, 'An account with that username already exists.'],
+    INVALID_CREDENTIALS: [401, 'Invalid email or password.'],
+    EMAIL_VERIFICATION_REQUIRED: [403, 'Verify your email before signing in.'],
+    VERIFICATION_TOKEN_INVALID: [400, 'This verification link is invalid or expired.'],
+    PASSWORD_RESET_TOKEN_INVALID: [400, 'This password reset link is invalid or expired.'],
+    CURRENT_PASSWORD_INVALID: [401, 'Current password is incorrect.'],
+    ACCOUNT_NOT_FOUND: [404, 'Account not found.'],
+    REFRESH_REQUIRED: [401, 'Session refresh is required.'],
+    REFRESH_INVALID: [401, 'Session expired. Please sign in again.'],
+    REFRESH_REUSED: [401, 'Session reuse was detected. Please sign in again.'],
+    GOOGLE_OAUTH_NOT_CONFIGURED: [503, 'Google sign-in is not configured.'],
+    GOOGLE_OAUTH_INVALID: [401, 'Google sign-in could not be completed.'],
+    OAUTH_STATE_INVALID: [400, 'Google sign-in state is invalid or expired.'],
+};
 
-const signToken = (user) =>
-    jwt.sign(
-        {
-            id: user.id,
-            email: user.email,
-            role: user.role,
-            playerId: user.player_id ?? null,
-            linkStatus: user.link_status ?? null,
-        },
-        JWT_SECRET,
-        { expiresIn: JWT_EXPIRES_IN }
-    );
+const meta = req => ({ ip: req.ip, userAgent: req.get('user-agent') ?? null });
 
-// POST /api/v1/auth/register
+function sendFailure(res, result) {
+    const [status, message] = FAILURES[result.code] ?? [400, 'Authentication operation failed.'];
+    return res.status(status).json({ error: message, code: result.code });
+}
+
+function sessionResponse(res, result, status = 200) {
+    setSessionCookies(res, result.session);
+    return res.status(status).json({ accessToken: result.accessToken, user: toAuthUser(result.user) });
+}
+
 export async function register(req, res, next) {
     try {
-        const { email, name, password } = req.validated;
-
-        if (!email || !name || !password) {
-            return res.status(400).json({ error: 'Email, name, and password are required.' });
-        }
-
-        const existingemail = await UserModel.findByEmail(email);
-        if (existingemail) {
-            return res.status(409).json({ error: 'An account with that email already exists.' });
-        }
-
-        const existingname = await UserModel.findByName(name);
-        if (existingname) {
-            return res.status(409).json({ error: 'An account with that name already exists.' });
-        }
-
-        const passwordHash = await bcrypt.hash(password, 12);
-        const user = await UserModel.create({ email, name, passwordHash });
-
-        const token = signToken(user);
-
+        const result = await registerAccount(req.validated, meta(req));
+        if (!result.ok) return sendFailure(res, result);
         res.status(201).json({
-            token,
-            user: {
-                id:         user.id,
-                email:      user.email,
-                name:       user.name,
-                role:       user.role,
-                playerId:   null,
-                linkStatus: null,
-            },
+            user: toAuthUser(result.user),
+            requiresVerification: true,
+            message: 'Check your email to verify your account.',
         });
-    } catch (err) {
-        next(err);
+    } catch (error) {
+        if (error.code === '23505') {
+            const code = error.constraint?.includes('username')
+                ? 'USERNAME_ALREADY_EXISTS' : 'EMAIL_ALREADY_EXISTS';
+            return sendFailure(res, { code });
+        }
+        next(error);
     }
 }
 
-// POST /api/v1/auth/login
+export async function verifyEmail(req, res, next) {
+    try {
+        const result = await verifyEmailToken(req.validated.token);
+        if (!result.ok) return sendFailure(res, result);
+        res.json({ message: 'Email verified. You can now sign in.' });
+    } catch (error) { next(error); }
+}
+
+export async function resendEmailVerification(req, res, next) {
+    try {
+        await resendVerification(
+            req.validated.email, req.validated.continuation ?? '', meta(req)
+        );
+        res.json({ message: 'If the account needs verification, a new email has been sent.' });
+    } catch (error) { next(error); }
+}
+
 export async function login(req, res, next) {
     try {
-        const { email, password } = req.body;
-
-        if (!email || !password) {
-            return res.status(400).json({ error: 'Email and password are required.' });
-        }
-
-        const user = await UserModel.findByEmail(email);
-        // Use a constant-time compare regardless of whether user exists
-        // to prevent user enumeration via timing attacks.
-        const passwordHash = user?.password_hash ?? '$2b$12$invalidhashfortimingprotection';
-        const valid = await bcrypt.compare(password, passwordHash);
-
-        if (!user || !valid) {
-            return res.status(401).json({ error: 'Invalid email or password.' });
-        }
-
-        const token = signToken(user);
-
-        res.json({
-            token,
-            user: {
-                id:         user.id,
-                email:      user.email,
-                name:       user.name,
-                role:       user.role,
-                playerId:   user.player_id   ?? null,
-                linkStatus: user.link_status ?? null,
-            },
-        });
-    } catch (err) {
-        next(err);
-    }
+        const result = await authenticatePassword(req.validated.email, req.validated.password, meta(req));
+        if (!result.ok) return sendFailure(res, result);
+        return sessionResponse(res, result);
+    } catch (error) { next(error); }
 }
 
-// GET /api/v1/auth/me
-// Validates the stored JWT and returns fresh user data.
-// Called by AuthProvider on mount to rehydrate session.
+export async function refresh(req, res, next) {
+    try {
+        const result = await rotateRefreshSession(req.cookies?.[REFRESH_COOKIE], meta(req));
+        if (!result.ok) {
+            clearSessionCookies(res);
+            return sendFailure(res, result);
+        }
+        return sessionResponse(res, result);
+    } catch (error) { next(error); }
+}
+
+export async function logout(req, res, next) {
+    try {
+        await revokeRefreshToken(req.cookies?.[REFRESH_COOKIE]);
+        clearSessionCookies(res);
+        res.json({ message: 'Signed out.' });
+    } catch (error) { next(error); }
+}
+
+export async function logoutAll(req, res, next) {
+    try {
+        await logoutAllSessions(req.user.id);
+        clearSessionCookies(res);
+        res.json({ message: 'Signed out on all devices.' });
+    } catch (error) { next(error); }
+}
+
 export async function getMe(req, res, next) {
     try {
-        // req.user is attached by the auth middleware
         const user = await UserModel.findById(req.user.id);
-
-        if (!user) {
-            return res.status(404).json({ error: 'User not found.' });
-        }
-
-        res.json({
-            user: {
-                id:         user.id,
-                email:      user.email,
-                name:       user.name,
-                role:       user.role,
-                playerId:   user.player_id   ?? null,
-                linkStatus: user.link_status ?? null,
-            },
-        });
-    } catch (err) {
-        next(err);
-    }
+        if (!user) return res.status(404).json({ error: 'User not found.' });
+        res.json({ user: toAuthUser(user) });
+    } catch (error) { next(error); }
 }
 
-// PATCH /api/v1/auth/password
 export async function changePassword(req, res, next) {
     try {
-        const { currentPassword, newPassword } = req.body;
+        const result = await changeAccountPassword(
+            req.user.id, req.validated.currentPassword, req.validated.newPassword
+        );
+        if (!result.ok) return sendFailure(res, result);
+        clearSessionCookies(res);
+        res.json({ message: 'Password updated. Sign in again on this and other devices.' });
+    } catch (error) { next(error); }
+}
 
-        if (!currentPassword || !newPassword) {
-            return res.status(400).json({ error: 'Current and new password are required.' });
+export async function forgotPassword(req, res, next) {
+    try {
+        await requestPasswordReset(
+            req.validated.email, req.validated.continuation ?? '', meta(req)
+        );
+        res.json({ message: 'If an eligible account exists, a reset email has been sent.' });
+    } catch (error) { next(error); }
+}
+
+export async function completePasswordReset(req, res, next) {
+    try {
+        const result = await resetPassword(req.validated.token, req.validated.password);
+        if (!result.ok) return sendFailure(res, result);
+        clearSessionCookies(res);
+        res.json({ message: 'Password reset. Sign in with your new password.' });
+    } catch (error) { next(error); }
+}
+
+export async function softDeleteAccount(req, res, next) {
+    try {
+        const result = await deleteAccount(req.user.id, req.validated);
+        if (!result.ok) return sendFailure(res, result);
+        clearSessionCookies(res);
+        res.json({ message: 'Account deleted.' });
+    } catch (error) { next(error); }
+}
+
+const oauthCookie = {
+    httpOnly: true,
+    secure: env.NODE_ENV === 'production',
+    sameSite: 'lax',
+    path: '/api/v1/auth/google/callback',
+    maxAge: 10 * 60 * 1000,
+};
+const { maxAge: _oauthMaxAge, ...oauthClearCookie } = oauthCookie;
+
+export async function googleStart(req, res, next) {
+    try {
+        const result = await startGoogleOAuth(req.validatedQuery.continuation, meta(req));
+        if (!result.ok) return sendFailure(res, result);
+        res.cookie('cm_oauth_state', result.state, oauthCookie);
+        res.redirect(302, result.url);
+    } catch (error) { next(error); }
+}
+
+export async function googleCallback(req, res, next) {
+    const frontend = env.FRONTEND_URL || env.CORS_ORIGIN[0];
+    try {
+        if (req.validatedQuery.error || !req.cookies?.cm_oauth_state
+            || req.cookies.cm_oauth_state !== req.validatedQuery.state) {
+            res.clearCookie('cm_oauth_state', oauthClearCookie);
+            return res.redirect(302, `${frontend}/auth/oauth/callback?error=oauth_cancelled`);
         }
-
-        const user = await UserModel.findById(req.user.id);
-        const valid = await bcrypt.compare(currentPassword, user.password_hash);
-
-        if (!valid) {
-            return res.status(401).json({ error: 'Current password is incorrect.' });
+        const result = await completeGoogleOAuth({
+            code: req.validatedQuery.code,
+            state: req.validatedQuery.state,
+            meta: meta(req),
+        });
+        res.clearCookie('cm_oauth_state', oauthClearCookie);
+        if (!result.ok) {
+            return res.redirect(302, `${frontend}/auth/oauth/callback?error=${encodeURIComponent(result.code)}`);
         }
-
-        const passwordHash = await bcrypt.hash(newPassword, 12);
-        await UserModel.updatePassword(user.id, passwordHash);
-
-        res.json({ message: 'Password updated successfully.' });
-    } catch (err) {
-        next(err);
-    }
+        setSessionCookies(res, result.session);
+        const params = new URLSearchParams({ continuation: safeContinuation(result.continuation) });
+        return res.redirect(302, `${frontend}/auth/oauth/callback?${params}`);
+    } catch (error) { next(error); }
 }

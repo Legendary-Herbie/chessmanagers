@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../app/contextHooks.js';
 import Button from '../../shared/common/Button.jsx';
@@ -8,8 +8,12 @@ export default function RegisterView() {
     const navigate     = useNavigate();
     const [searchParams] = useSearchParams();
     const inviteToken = searchParams.get('inviteToken');
+    const joinCode = searchParams.get('joinCode');
+    const continuation = inviteToken
+        ? `?inviteToken=${encodeURIComponent(inviteToken)}`
+        : joinCode ? `?joinCode=${encodeURIComponent(joinCode)}` : '';
 
-    const [fields, setFields] = useState({ name: '', email: '', password: '', confirmPassword: '' });
+    const [fields, setFields] = useState({ username: '', fullName: '', email: '', password: '', confirmPassword: '' });
     const [error,  setError]  = useState('');
     const [busy,   setBusy]   = useState(false);
 
@@ -20,7 +24,7 @@ export default function RegisterView() {
         e.preventDefault();
         setError('');
 
-        if (!fields.name || !fields.email || !fields.password || !fields.confirmPassword) {
+        if (!fields.username || !fields.fullName || !fields.email || !fields.password || !fields.confirmPassword) {
             setError('Please fill in all fields.');
             return;
         }
@@ -35,8 +39,16 @@ export default function RegisterView() {
 
         setBusy(true);
         try {
-            await register({ name: fields.name, email: fields.email, password: fields.password });
-            navigate(inviteToken ? `/clubs/join?token=${encodeURIComponent(inviteToken)}` : '/dashboard');
+            await register({
+                username: fields.username,
+                fullName: fields.fullName,
+                email: fields.email,
+                password: fields.password,
+                continuation: inviteToken
+                    ? `/clubs/join?token=${encodeURIComponent(inviteToken)}`
+                    : joinCode ? `/clubs/join?code=${encodeURIComponent(joinCode)}` : '/dashboard',
+            });
+            navigate(`/auth/verification-pending?email=${encodeURIComponent(fields.email)}${continuation ? `&${continuation.slice(1)}` : ''}`);
         } catch (err) {
             setError(err.message || 'Registration failed. Please try again.');
         } finally {
@@ -63,19 +75,26 @@ export default function RegisterView() {
 
             <form onSubmit={handleSubmit} noValidate className="auth-form">
                 <div className="auth-field">
-                    <label htmlFor="name" className="auth-label">Display name</label>
+                    <label htmlFor="username" className="auth-label">Username</label>
                     <input
-                        id="name"
-                        name="name"
+                        id="username"
+                        name="username"
                         type="text"
-                        autoComplete="name"
+                        autoComplete="username"
                         required
                         className="auth-input"
-                        placeholder="Magnus Carlsen"
-                        value={fields.name}
+                        placeholder="magnus_carlsen"
+                        value={fields.username}
                         onChange={handleChange}
                         disabled={busy}
                     />
+                </div>
+
+                <div className="auth-field">
+                    <label htmlFor="fullName" className="auth-label">Full name</label>
+                    <input id="fullName" name="fullName" type="text" autoComplete="name" required
+                        className="auth-input" placeholder="Magnus Carlsen" value={fields.fullName}
+                        onChange={handleChange} disabled={busy} />
                 </div>
 
                 <div className="auth-field">
@@ -143,7 +162,7 @@ export default function RegisterView() {
 
             <p className="auth-switch">
                 Already have an account?{' '}
-                <Link to={inviteToken ? `/auth/login?inviteToken=${encodeURIComponent(inviteToken)}` : '/auth/login'} className="auth-link">Sign in</Link>
+                <Link to={`/auth/login${continuation}`} className="auth-link">Sign in</Link>
             </p>
         </div>
     );

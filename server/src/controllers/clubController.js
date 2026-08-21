@@ -1,37 +1,63 @@
 import { ClubModel } from '../models/Club.js';
+import { scheduleRatingRecalculation } from '../services/RatingService.js';
+import { MembershipModel } from '../models/Membership.js';
 import { UserModel } from '../models/User.js';
-import jwt from 'jsonwebtoken';
-import env from '../config/env.js';
-
-const { JWT_SECRET, JWT_EXPIRES_IN = '7d' } = env;
-
-// Re-signs a token after a role change so the client session stays in sync.
-function signToken(user) {
-    return jwt.sign(
-        {
-            id:         user.id,
-            email:      user.email,
-            role:       user.role,
-            playerId:   user.player_id  ?? null,
-            linkStatus: user.link_status ?? null,
-        },
-        JWT_SECRET,
-        { expiresIn: JWT_EXPIRES_IN }
-    );
-}
+import { signAccessToken } from '../services/SessionService.js';
+import {
+    toClubContextClub, toPublicClub, toPublicClubPresentation, toPrivateClubPresentation,
+} from '../utils/publicDtos.js';
+import { PublicClubAccessService } from '../services/PublicClubAccessService.js';
+import { getClubCapabilities } from '../utils/clubCapabilities.js';
+import { evaluateJoinEligibility, rejectionCooldownEndsAt } from '../utils/membershipPolicy.js';
 
 // GET /api/v1/clubs/mine
-// Returns the club associated with the authenticated user.
-// Called by ClubProvider in providers.jsx on mount.
+// Returns all active and historical memberships. Singular fields remain as
+// temporary compatibility for clients that have not adopted explicit context.
 export async function getMyClub(req, res, next) {
     try {
-        const club = await ClubModel.findByUserId(req.user.id);
+        const rows = await ClubModel.findMembershipsByUserId(req.user.id);
+        const clubs = rows.map(row => ({
+            club: {
+                id: row.id,
+                name: row.name,
+                slug: row.slug,
+                federation: row.federation,
+                description: row.description,
+                logo: row.logo,
+                visibility: row.visibility,
+                status: row.status,
+                created_at: row.created_at,
+            },
+            membership: {
+                role: row.member_role,
+                status: row.membership_status,
+                joinedAt: row.membership_joined_at,
+                rejectedAt: row.membership_rejected_at,
+                revokedAt: row.membership_revoked_at,
+            },
+            linkedPlayer: row.linked_player_id
+                ? { id: row.linked_player_id, name: row.linked_player_name }
+                : null,
+        }));
+        const activeRow = rows.find(row => (
+            row.membership_status === 'ACTIVE_MEMBER'
+            && row.status === 'active'
+            && !row.deleted_at
+        ));
+        const role = activeRow?.member_role ?? null;
+        const ratingSettings = activeRow
+            ? await ClubModel.getRatingSettings(activeRow.id)
+            : [];
 
-        if (!club) {
-            return res.status(404).json({ error: 'No club found for this account.' });
-        }
-
-        res.json({ club });
+        res.json({
+            clubs,
+            club: activeRow ? toClubContextClub(activeRow, ratingSettings) : null,
+            membership: activeRow ? { role } : null,
+            linkedPlayer: activeRow?.linked_player_id
+                ? { id: activeRow.linked_player_id, name: activeRow.linked_player_name }
+                : null,
+            capabilities: getClubCapabilities(role),
+        });
     } catch (err) {
         next(err);
     }
@@ -40,21 +66,16 @@ export async function getMyClub(req, res, next) {
 // GET /api/v1/clubs — public listing
 export async function listClubs(req, res, next) {
     try {
-        const { q, limit, offset, all } = req.query;
-        const opts = { q, limit: Number(limit) || 50, offset: Number(offset) || 0 };
+        const { q, limit = 50, offset = 0 } = req.validatedQuery;
+        const opts = { q, limit, offset };
 
-        // listAll() ignores public_leaderboard/is_public entirely and returns
-        // every club (including ones a user deliberately marked "Private
-        // (invite-only)" in CreateClub.jsx) to whoever asks. This route has
-        // no requireAuth in front of it, so ?all=1 must never be trusted from
-        // an anonymous or regular caller — only a genuine system admin
-        // (req.user.role === 'admin', set via optionalAuth) may request it.
-        // Everyone else — including logged-out visitors and ordinary
-        // members — gets the public-only listing regardless of the `all`
-        // query param.
-        const wantsAll = all === '1' && req.user?.role === 'admin';
-        const clubs = wantsAll ? await ClubModel.listAll(opts) : await ClubModel.listPublic(opts);
-        res.json({ clubs });
+        const rows = await ClubModel.listPublic(opts);
+        res.json({
+            clubs: rows.map(toPublicClubPresentation),
+            total: rows[0]?.total_count ?? 0,
+            limit,
+            offset,
+        });
     } catch (err) {
         next(err);
     }
@@ -63,28 +84,37 @@ export async function listClubs(req, res, next) {
 // GET /api/v1/clubs/:clubId
 export async function getClub(req, res, next) {
     try {
-        const club = await ClubModel.findById(req.params.clubId);
+        const club = await PublicClubAccessService.getDirectPresentation(req.params.clubId);
 
         if (!club) {
             return res.status(404).json({ error: 'Club not found.' });
         }
 
         const membership = req.user
-            ? await ClubModel.getMembership(club.id, req.user.id)
+            ? await MembershipModel.find(club.id, req.user.id)
             : null;
-
-        // Only relevant for authenticated non-members — tells the UI whether
-        // "Request to join" should stay disabled after a prior request.
-        const pendingJoinRequest = (req.user && !membership)
-            ? await ClubModel.getPendingJoinRequest(club.id, req.user.id)
+        const activeMembership = membership?.status === 'ACTIVE_MEMBER';
+        const eligibility = evaluateJoinEligibility(membership);
+        const cooldownEndsAt = membership?.status === 'REJECTED'
+            ? rejectionCooldownEndsAt(membership.rejected_at)?.toISOString() ?? null
             : null;
 
         res.json({
             club: {
-                ...club,
-                is_member: Boolean(membership),
-                member_role: membership?.role ?? null,
-                join_request_pending: Boolean(pendingJoinRequest),
+                ...(club.visibility === 'private' && !activeMembership
+                    ? toPrivateClubPresentation(club)
+                    : toPublicClub(club)),
+                is_member: activeMembership,
+                member_role: activeMembership ? membership.role : null,
+                membership: membership ? {
+                    status: membership.status,
+                    role: membership.role,
+                    rejectedAt: membership.rejected_at,
+                    revokedAt: membership.revoked_at,
+                    cooldownEndsAt,
+                } : null,
+                join_request_pending: membership?.status === 'PENDING_APPROVAL',
+                can_request_join: eligibility.allowed,
             },
         });
     } catch (err) {
@@ -95,7 +125,11 @@ export async function getClub(req, res, next) {
 // POST /api/v1/clubs — admin only
 export async function createClub(req, res, next) {
     try {
-        const { name, description, logo, contactInfo, federation, is_public } = req.body;
+        const input = req.validated ?? req.body;
+        const {
+            name, description, logo, contactInfo, federation, is_public,
+            visibility, publicLeaderboard, settings, ratingSettings,
+        } = input;
 
         if (!name) {
             return res.status(400).json({ error: 'Club name is required.' });
@@ -105,12 +139,6 @@ export async function createClub(req, res, next) {
             return res.status(400).json({ error: 'Federation is required.' });
         }
 
-        // Prevent creating a second club for the same user
-        const existing = await ClubModel.findByUserId(req.user.id);
-        if (existing) {
-            return res.status(409).json({ error: 'User already belongs to a club.' });
-        }
-
         const club = await ClubModel.create({
             name,
             federation,
@@ -118,7 +146,10 @@ export async function createClub(req, res, next) {
             description,
             logo,
             contactInfo,
-            is_public: Boolean(is_public),
+            visibility: visibility ?? (is_public ? 'public' : 'private'),
+            publicLeaderboard: publicLeaderboard ?? true,
+            settings,
+            ratingSettings,
         });
 
         // IMPORTANT: ClubModel.create() already inserts the creator into
@@ -132,23 +163,20 @@ export async function createClub(req, res, next) {
         // and ClubPage.jsx's isClubAdmin check, both of which key off this
         // user_clubs.role value).
 
-        // Promote the creator to admin so they can manage the club immediately.
-        const updatedUser = await UserModel.updateRole(req.user.id, 'admin');
-
-        // Issue a fresh token reflecting the new role so the client session
-        // updates without requiring a logout/login cycle.
-        const token = signToken(updatedUser);
+        const user = await UserModel.findById(req.user.id);
+        const token = signAccessToken(user);
+        const createdRatingSettings = await ClubModel.getRatingSettings(club.id);
 
         res.status(201).json({
-            club,
+            club: toClubContextClub(club, createdRatingSettings),
             token,
             user: {
-                id:         updatedUser.id,
-                email:      updatedUser.email,
-                name:       updatedUser.name,
-                role:       updatedUser.role,
-                playerId:   updatedUser.player_id  ?? null,
-                linkStatus: updatedUser.link_status ?? null,
+                id: user.id,
+                email: user.email,
+                name: user.full_name,
+                username: user.username,
+                fullName: user.full_name,
+                role: user.role,
             },
         });
     } catch (err) {
@@ -159,60 +187,23 @@ export async function createClub(req, res, next) {
 // PATCH /api/v1/clubs/:clubId — admin only
 export async function updateClub(req, res, next) {
     try {
-        const { name, description, logo, contactInfo, federation } = req.body;
-        const club = await ClubModel.update(req.params.clubId, {
-            name, description, logo, contactInfo, federation,
-        });
+        const changes = req.validated ?? req.body;
+        const club = await ClubModel.updateManagementSettings(
+            req.params.clubId,
+            req.user.id,
+            changes,
+        );
 
         if (!club) {
             return res.status(404).json({ error: 'Club not found.' });
         }
 
-        res.json({ club });
-    } catch (err) {
-        next(err);
-    }
-}
-
-// POST /api/v1/clubs/:clubId/join
-// Authenticated users request to join a club. If `invite=true` in body/query,
-// the request is treated as an invite acceptance and the user is added immediately.
-export async function requestJoinClub(req, res, next) {
-    try {
-        const { clubId } = req.params;
-        const userId = req.user.id;
-        const { message } = req.body || {};
-
-        const club = await ClubModel.findById(clubId);
-        if (!club) return res.status(404).json({ error: 'Club not found.' });
-
-        if (await ClubModel.getMembership(clubId, userId)) {
-            return res.status(409).json({ error: 'You are already a member of this club.' });
+        for (const category of Object.keys(changes.ratingSettings ?? {})) {
+            scheduleRatingRecalculation(club.id, category);
         }
 
-        // Otherwise create a join request for admin approval
-        const reqRow = await ClubModel.requestJoin(clubId, userId, message || null);
-        res.status(202).json({ request: reqRow });
-    } catch (err) {
-        next(err);
-    }
-}
-
-// POST /api/v1/clubs/join-by-token
-export async function joinByToken(req, res, next) {
-    try {
-        const token = req.body?.token || req.query?.token;
-        if (!token) return res.status(400).json({ error: 'Token is required.' });
-
-        const inv = await ClubModel.verifyInviteToken(token);
-        if (!inv) return res.status(404).json({ error: 'Invite not found or expired.' });
-
-        // If the user is not authenticated, instruct client to register first
-        if (!req.user) return res.status(401).json({ error: 'Authentication required to accept invite.' });
-
-        const accepted = await ClubModel.acceptInviteToken(token, req.user.id);
-        if (!accepted) return res.status(404).json({ error: 'Invite not found or expired.' });
-        res.json({ message: 'Joined via invite token.', clubId: inv.club_id });
+        const ratingSettings = await ClubModel.getRatingSettings(club.id);
+        res.json({ club: toClubContextClub(club, ratingSettings) });
     } catch (err) {
         next(err);
     }
@@ -222,7 +213,7 @@ export async function joinByToken(req, res, next) {
 export async function createInvite(req, res, next) {
     try {
         const { clubId } = req.params;
-        const { expiresAt } = req.body || {};
+        const { expiresAt } = req.validated;
         const expiry = expiresAt ? new Date(expiresAt) : null;
         if (expiry && (Number.isNaN(expiry.valueOf()) || expiry <= new Date())) {
             return res.status(400).json({ error: 'Invite expiration must be a future date.' });
@@ -255,46 +246,18 @@ export async function revokeInvite(req, res, next) {
     }
 }
 
-// GET /api/v1/clubs/:clubId/join-requests — admin only
-export async function getJoinRequests(req, res, next) {
-    try {
-        const rows = await ClubModel.getJoinRequests(req.params.clubId);
-        res.json({ requests: rows });
-    } catch (err) {
-        next(err);
-    }
-}
-
-// PATCH /api/v1/clubs/:clubId/join-requests/:requestId/approve — admin only
-export async function approveJoin(req, res, next) {
-    try {
-        const { clubId, requestId } = req.params;
-        const result = await ClubModel.approveJoinRequest(clubId, requestId);
-        if (!result) return res.status(404).json({ error: 'Join request not found.' });
-        res.json({ message: 'Approved.' });
-    } catch (err) {
-        next(err);
-    }
-}
-
-// PATCH /api/v1/clubs/:clubId/join-requests/:requestId/reject — admin only
-export async function rejectJoin(req, res, next) {
-    try {
-        const { clubId, requestId } = req.params;
-        const row = await ClubModel.rejectJoinRequest(clubId, requestId);
-        if (!row) return res.status(404).json({ error: 'Join request not found.' });
-        res.json({ message: 'Rejected.' });
-    } catch (err) {
-        next(err);
-    }
-}
-
 // GET /api/v1/clubs/:clubId/members — admin only
 export async function getMembers(req, res, next) {
     try {
         const rows = await ClubModel.getMembers(req.params.clubId);
         // Map DB snake_case to client-friendly camelCase and consistent keys
-        const members = rows.map(r => ({ userId: r.id, email: r.email, role: r.club_role, joinedAt: r.joined_at }));
+        const members = rows.map(r => ({
+            userId: r.id,
+            name: r.name,
+            email: r.email,
+            role: r.club_role,
+            joinedAt: r.joined_at,
+        }));
         res.json({ members });
     } catch (err) {
         next(err);
@@ -302,15 +265,11 @@ export async function getMembers(req, res, next) {
 }
 
 // PATCH /api/v1/clubs/:clubId/members/:userId/role — admin only
-// Promotes/demotes a member between 'member' and 'admin'. This is the
-// club-scoped role used by requireClubAdmin (distinct from the global
-// users.role JWT claim used by requireRole('admin') elsewhere). Before
-// this endpoint existed, the only way to become a club admin was to be
-// the club's creator — there was no permission-granting path at all.
+// Promotes/demotes a member between club-scoped 'member' and 'admin'.
 export async function setMemberRole(req, res, next) {
     try {
         const { clubId, userId } = req.params;
-        const { role } = req.body;
+        const { role } = req.validated ?? req.body;
 
         const club = await ClubModel.findById(clubId);
         if (!club) return res.status(404).json({ error: 'Club not found.' });
@@ -333,30 +292,65 @@ export async function setMemberRole(req, res, next) {
     }
 }
 
-// DELETE /api/v1/clubs/:clubId/members/:userId — admin only
-export async function removeMember(req, res, next) {
+export async function transferClubOwnership(req, res, next) {
     try {
-        const { clubId, userId } = req.params;
-
-        // Prevent accidental removal of owner or self
-        const club = await ClubModel.findById(clubId);
-        if (!club) return res.status(404).json({ error: 'Club not found.' });
-
-        if (club.owner_id === userId) {
-            return res.status(400).json({ error: 'Cannot remove the club owner.' });
+        const { newOwnerUserId, previousOwnerRole } = req.validated ?? req.body;
+        const club = await ClubModel.transferOwnership({
+            clubId: req.params.clubId,
+            currentOwnerId: req.user.id,
+            newOwnerUserId,
+            previousOwnerRole,
+        });
+        if (!club) {
+            return res.status(409).json({
+                error: 'Ownership can only be transferred to another active club member.',
+            });
         }
+        const ratingSettings = await ClubModel.getRatingSettings(club.id);
+        res.json({ club: toClubContextClub(club, ratingSettings) });
+    } catch (err) {
+        next(err);
+    }
+}
 
-        if (req.user.id === userId) {
-            return res.status(400).json({ error: 'Cannot remove yourself from the club.' });
+async function changeClubLifecycle(req, res, next, action) {
+    try {
+        const { reason = null } = req.validated ?? req.body;
+        const club = await ClubModel.setLifecycle({
+            clubId: req.params.clubId,
+            ownerId: req.user.id,
+            action,
+            reason,
+        });
+        if (!club) return res.status(409).json({ error: `Club cannot be ${action}d from its current state.` });
+        res.json({ club: toClubContextClub(club) });
+    } catch (err) {
+        next(err);
+    }
+}
+
+export const archiveClub = (req, res, next) => changeClubLifecycle(req, res, next, 'archive');
+export const restoreClub = (req, res, next) => changeClubLifecycle(req, res, next, 'restore');
+export const deleteClub = (req, res, next) => changeClubLifecycle(req, res, next, 'delete');
+
+// GET /api/v1/clubs/:clubId/context
+export async function getClubContext(req, res, next) {
+    try {
+        const { club, membership, linkedPlayer, capabilities } = req.clubContext;
+        if (club.status !== 'active' || club.deleted_at) {
+            return res.status(409).json({ error: 'This club is not active.' });
         }
-
-        const removed = await ClubModel.removeMember(clubId, userId);
-
-        if (!removed) {
-            return res.status(404).json({ error: 'Member not found.' });
-        }
-
-        res.json({ message: 'Member removed.' });
+        const ratingSettings = await ClubModel.getRatingSettings(club.id);
+        res.json({
+            club: toClubContextClub(club, ratingSettings),
+            membership: {
+                role: membership.role,
+                status: membership.status,
+                joinedAt: membership.joined_at,
+            },
+            linkedPlayer,
+            capabilities,
+        });
     } catch (err) {
         next(err);
     }

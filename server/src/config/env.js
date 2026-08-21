@@ -34,6 +34,7 @@ const toNumber = (val) => {
     const n = Number(val);
     return Number.isNaN(n) ? undefined : n;
 };
+const emptyToUndefined = value => value === '' || value === null ? undefined : value;
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -53,10 +54,19 @@ const envSchema = z.object({
         .min(32, 'JWT_SECRET must be at least 32 characters'),
     JWT_EXPIRES_IN: z
         .string()
-        .default('7d'),
+        .default('15m'),
     REFRESH_TOKEN_EXPIRY_DAYS: z
         .preprocess(toNumber, z.number().int().positive())
         .default(30),
+    EMAIL_VERIFICATION_EXPIRY_HOURS: z
+        .preprocess(toNumber, z.number().int().positive())
+        .default(24),
+    PASSWORD_RESET_EXPIRY_MINUTES: z
+        .preprocess(toNumber, z.number().int().positive())
+        .default(30),
+    GOOGLE_CLIENT_ID: z.preprocess(emptyToUndefined, z.string().optional()),
+    GOOGLE_CLIENT_SECRET: z.preprocess(emptyToUndefined, z.string().optional()),
+    GOOGLE_REDIRECT_URI: z.preprocess(emptyToUndefined, z.string().url().optional()),
 
     // CORS — all origins must be supplied via environment, none hardcoded
     CORS_ORIGIN: z

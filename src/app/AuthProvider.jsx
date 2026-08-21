@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
-import { api, getToken, setToken, clearToken } from '../config/api.js';
+import { getToken, setToken, clearToken, refreshAccessToken } from '../config/api.js';
+import { authApi } from '../features/auth/api/authApi.js';
 import { AuthContext } from './contextHooks.js';
 
 export function AuthProvider({ children }) {
@@ -8,32 +9,49 @@ export function AuthProvider({ children }) {
 
     // On mount: validate stored JWT against the server.
     useEffect(() => {
-        const token = getToken();
-        if (!token) { setLoading(false); return; }
-
-        api.get('/auth/me')
-            .then(data => setUser(data.user))
-            .catch(() => clearToken())
-            .finally(() => setLoading(false));
+        let active = true;
+        const hydrate = async () => {
+            try {
+                if (!getToken()) {
+                    const refreshed = await refreshAccessToken();
+                    if (active) setUser(refreshed.user);
+                } else {
+                    const data = await authApi.me();
+                    if (active) setUser(data.user);
+                }
+            } catch {
+                clearToken();
+            } finally {
+                if (active) setLoading(false);
+            }
+        };
+        void hydrate();
+        return () => { active = false; };
     }, []);
 
     const login = useCallback(async ({ email, password }) => {
-        const data = await api.post('/auth/login', { email, password });
-        setToken(data.token);
+        const data = await authApi.login({ email, password });
+        setToken(data.accessToken);
         setUser(data.user);
         return data.user;
     }, []);
 
-    const register = useCallback(async ({ email, name, password }) => {
-        const data = await api.post('/auth/register', { email, name, password });
-        setToken(data.token);
-        setUser(data.user);
-        return data.user;
+    const register = useCallback(async (payload) => {
+        return authApi.register(payload);
     }, []);
 
-    const logout = useCallback(() => {
+    const logout = useCallback(async (revokeServer = true) => {
+        if (revokeServer) {
+            try { await authApi.logout(); } catch { /* local logout still succeeds */ }
+        }
         clearToken();
         setUser(null);
+    }, []);
+
+    const establishSession = useCallback(async () => {
+        const data = await refreshAccessToken();
+        setUser(data.user);
+        return data.user;
     }, []);
 
     // Call this after any server action that returns a new token + user object
@@ -43,11 +61,10 @@ export function AuthProvider({ children }) {
         setUser(freshUser);
     }, []);
 
-    const isAdmin  = user?.role === 'admin';
-    const isLinked = user?.linkStatus === 'approved';
-
     return (
-        <AuthContext.Provider value={{ user, loading, login, register, logout, updateSession, isAdmin, isLinked }}>
+        <AuthContext.Provider value={{
+            user, loading, login, register, logout, updateSession, establishSession,
+        }}>
             {children}
         </AuthContext.Provider>
     );

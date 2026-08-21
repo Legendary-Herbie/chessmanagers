@@ -1,7 +1,9 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { api, endpoints } from '../../config/api.js';
+import { resolveAssetUrl } from '../../config/api.js';
 import { useAuth, useNotifications } from '../../app/contextHooks.js';
+import { clubApi } from '../../features/clubs/api/clubApi.js';
+import { leaderboardApi } from '../../features/leaderboard/api/leaderboardApi.js';
 
 export default function PublicClubPage() {
     const { clubId } = useParams();
@@ -16,6 +18,7 @@ export default function PublicClubPage() {
     const [joinRequests, setJoinRequests] = useState([]);
     const [stats, setStats] = useState(null);
     const [creatingInvite, setCreatingInvite] = useState(false);
+    const [topPlayers, setTopPlayers] = useState([]);
 
     const { user } = useAuth();
     const { notify } = useNotifications();
@@ -32,41 +35,46 @@ export default function PublicClubPage() {
         async function load() {
             setLoading(true);
             try {
-                const res = await api.get(endpoints.clubs.byId(clubId));
-                // server returns { club }
-                const c = res?.club || null;
+                const c = await clubApi.fetchPresentation(clubId);
                 setClub(c);
+
+                if (c?.visibility === 'public' && c.public_leaderboard) {
+                    try {
+                        const leaderboard = await leaderboardApi.fetchPublicLeaderboard(
+                            clubId, { category: 'blitz', limit: 5 }
+                        );
+                        setTopPlayers(leaderboard.entries);
+                    } catch {
+                        setTopPlayers([]);
+                    }
+                }
 
                 // Try to fetch admin-only pieces; if they fail (403), ignore silently
                 if (user) {
                     // members list (admin only)
                     try {
-                        const m = await api.get(`/clubs/${clubId}/members`);
-                        setMembersCount(Array.isArray(m?.members) ? m.members.length : (m?.members?.length ?? m?.length ?? null));
+                        setMembersCount((await clubApi.fetchMembers(clubId)).length);
                     } catch {
                         // not admin — skip
                     }
 
                     // invites (admin only)
                     try {
-                        const inv = await api.get(`/clubs/${clubId}/invites`);
-                        setInvites(inv?.invites || []);
+                        setInvites(await clubApi.fetchInvites(clubId));
                     } catch {
                         // skip
                     }
 
                     // join-requests (admin only)
                     try {
-                        const jr = await api.get(`/clubs/${clubId}/join-requests`);
-                        setJoinRequests(jr?.requests || []);
+                        setJoinRequests(await clubApi.fetchJoinRequests(clubId));
                     } catch {
                         // skip
                     }
 
                     // stats (admin only)
                     try {
-                        const st = await api.get(endpoints.leaderboard.stats(clubId));
-                        setStats(st?.stats || null);
+                        setStats(await leaderboardApi.fetchStats(clubId));
                     } catch {
                         // skip
                     }
@@ -84,9 +92,13 @@ export default function PublicClubPage() {
         if (!user) return; // UI should not show for guests
         setJoining(true);
         try {
-            // POST /clubs/:clubId/join
-            await api.post(endpoints.clubs.join(clubId), {});
-            setClub(current => current ? { ...current, join_request_pending: true } : current);
+            const result = await clubApi.requestJoin(clubId);
+            setClub(current => current ? {
+                ...current,
+                membership: result.membership,
+                join_request_pending: true,
+                can_request_join: false,
+            } : current);
             notify('Join request submitted — club admins will review.', 'success');
         } catch (err) {
             notify(err?.message || 'Failed to request to join', 'error');
@@ -98,8 +110,7 @@ export default function PublicClubPage() {
     async function createInvite() {
         setCreatingInvite(true);
         try {
-            const res = await api.post(endpoints.clubs.invites(clubId), {});
-            const inv = res?.invite;
+            const inv = await clubApi.createInvite(clubId);
             if (inv?.token) {
                 setInvites(prev => [inv, ...prev]);
                 // Copy link to clipboard
@@ -118,7 +129,7 @@ export default function PublicClubPage() {
 
     async function revokeInvite(inviteId) {
         try {
-            await api.delete(endpoints.clubs.invite(clubId, inviteId));
+            await clubApi.revokeInvite(clubId, inviteId);
             setInvites(prev => prev.filter(i => i.id !== inviteId));
             notify('Invite revoked', 'info');
         } catch (err) {
@@ -128,7 +139,7 @@ export default function PublicClubPage() {
 
     async function approveRequest(requestId) {
         try {
-            await api.patch(`/clubs/${clubId}/join-requests/${requestId}/approve`);
+            await clubApi.approveJoinRequest(clubId, requestId);
             setJoinRequests(prev => prev.filter(r => r.id !== requestId));
             notify('Join request approved', 'success');
         } catch (err) {
@@ -138,7 +149,7 @@ export default function PublicClubPage() {
 
     async function rejectRequest(requestId) {
         try {
-            await api.patch(`/clubs/${clubId}/join-requests/${requestId}/reject`);
+            await clubApi.rejectJoinRequest(clubId, requestId);
             setJoinRequests(prev => prev.filter(r => r.id !== requestId));
             notify('Join request rejected', 'info');
         } catch (err) {
@@ -151,12 +162,14 @@ export default function PublicClubPage() {
     if (!club) return <p>Club not found.</p>;
 
     const isMember = club.is_member || false; // server may include this flag via ClubModel.findById
+    const membershipStatus = club.membership?.status || null;
+    const cooldownEndsAt = club.membership?.cooldownEndsAt;
 
     return (
         <div>
             <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
                 {club.logo ? (
-                    <img src={club.logo} alt={`${club.name} logo`} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8 }} />
+                    <img src={resolveAssetUrl(club.logo)} alt={`${club.name} badge`} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8 }} />
                 ) : (
                     <div style={{ width: 96, height: 96, background: 'var(--bg-muted)', borderRadius: 8 }} />
                 )}
@@ -166,16 +179,22 @@ export default function PublicClubPage() {
                     <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>{club.federation || ''}</div>
                     <div style={{ color: 'var(--text-muted)', marginTop: 6 }}>
                         {membersCount !== null ? `${membersCount} members` : null}
-                        {stats ? ` · Avg rating: ${stats.average_rating ?? '—'}` : null}
+                        {stats ? ` · ${stats.rosterPlayers} players · ${stats.totalGames} games` : null}
                     </div>
                 </div>
 
                 <div style={{ marginLeft: 'auto' }}>
                     {isMember ? (
                         <span style={{ color: 'var(--success)' }}>You are a member</span>
+                    ) : membershipStatus === 'PENDING_APPROVAL' ? (
+                        <span className="muted">Join request pending</span>
+                    ) : membershipStatus === 'REJECTED' && !club.can_request_join ? (
+                        <span className="muted">
+                            Reapply after {cooldownEndsAt ? new Date(cooldownEndsAt).toLocaleString() : 'the cooldown'}
+                        </span>
                     ) : user ? (
-                        <button type="button" disabled={joining || club.join_request_pending} onClick={handleRequestJoin} style={{ padding: '8px 12px' }}>
-                            {joining ? 'Requesting…' : 'Request to join'}
+                        <button type="button" disabled={joining || !club.can_request_join} onClick={handleRequestJoin} style={{ padding: '8px 12px' }}>
+                            {joining ? 'Requesting…' : membershipStatus === 'REVOKED' || membershipStatus === 'REJECTED' ? 'Request to rejoin' : 'Request to join'}
                         </button>
                     ) : (
                         <div>
@@ -202,6 +221,14 @@ export default function PublicClubPage() {
                     <Link to="/clubs">← Back to clubs</Link>
                 </div>
             </section>
+
+            {topPlayers.length > 0 && <section style={{ marginTop: 18 }}>
+                <h2>Top Blitz Players</h2>
+                <ol>{topPlayers.map(player => <li key={player.publicPlayerId}>
+                    <Link to={`/clubs/${clubId}/players/${player.publicPlayerId}`}>{player.playerName}</Link>
+                    {' '}— {player.selectedRating}
+                </li>)}</ol>
+            </section>}
 
             {/* Admin area: invites and join requests */}
             {(club.member_role === 'owner' || club.member_role === 'admin') && (

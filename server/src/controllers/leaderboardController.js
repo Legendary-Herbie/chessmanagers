@@ -1,76 +1,93 @@
 import { LeaderboardModel } from '../models/Leaderboard.js';
 import { PlayerModel } from '../models/Player.js';
 
-// GET /api/v1/clubs/:clubId/leaderboard
 export async function getLeaderboard(req, res, next) {
     try {
         const { clubId } = req.params;
-        const { limit, offset } = req.query;
-
-        const players = await LeaderboardModel.getByClub(clubId, {
-            limit:  Number(limit)  || 50,
-            offset: Number(offset) || 0,
+        const { category = 'blitz', limit = 50, offset = 0, q = '' } = req.validatedQuery;
+        const leaderboard = await LeaderboardModel.getByClub(clubId, {
+            category, limit, offset, q,
         });
-
-        res.json({ players });
-    } catch (err) {
-        next(err);
+        // `players` is retained as a deprecated compatibility projection while
+        // first-party clients use the canonical `leaderboard` contract.
+        const players = leaderboard.entries.map(entry => ({
+            id: entry.playerId,
+            name: entry.playerName,
+            selected_category: entry.selectedCategory,
+            rating: entry.selectedRating,
+            peak_rating: entry.peakRating,
+            blitz_rating: entry.blitzRating,
+            rapid_rating: entry.rapidRating,
+            classical_rating: entry.classicalRating,
+            played: entry.categoryGames,
+            wins: entry.categoryWins,
+            draws: entry.categoryDraws,
+            losses: entry.categoryLosses,
+        }));
+        res.json({ leaderboard, players });
+    } catch (error) {
+        next(error);
     }
 }
 
-// GET /api/v1/clubs/:clubId/players/:playerId/rating-history
 export async function getRatingHistory(req, res, next) {
     try {
         const { clubId, playerId } = req.params;
-        const { limit } = req.query;
-
-        const player = await PlayerModel.findById(playerId);
-        if (!player || player.club_id !== clubId) return res.status(404).json({ error: 'Player not found.' });
-        const history = await LeaderboardModel.getRatingHistory(clubId, playerId, {
-            limit: Number(limit) || 30,
-        });
-
+        const { category = 'blitz', limit = 30 } = req.validatedQuery;
+        const player = await PlayerModel.findByClubAndId(clubId, playerId, req.user.id);
+        if (!player) return res.status(404).json({ error: 'Player not found.' });
+        const history = await LeaderboardModel.getRatingHistory(clubId, playerId, { category, limit });
         res.json({ history });
-    } catch (err) {
-        next(err);
+    } catch (error) {
+        next(error);
     }
 }
 
-// GET /api/v1/clubs/:clubId/players/:playerAId/vs/:playerBId/summary
-// Returns a win/draw/loss summary rather than full match list.
+export async function getPlayerStatistics(req, res, next) {
+    try {
+        const { clubId, playerId } = req.params;
+        const player = await PlayerModel.findByClubAndId(clubId, playerId, req.user.id);
+        if (!player) return res.status(404).json({ error: 'Player not found.' });
+        const statistics = await LeaderboardModel.getPlayerStatistics(clubId, playerId);
+        res.json({ statistics });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function getHeadToHeadSummary(req, res, next) {
     try {
         const { clubId, playerAId, playerBId } = req.params;
-        const [playerA, playerB] = await Promise.all([PlayerModel.findById(playerAId), PlayerModel.findById(playerBId)]);
-        if (!playerA || !playerB || playerA.club_id !== clubId || playerB.club_id !== clubId) {
-            return res.status(404).json({ error: 'Player not found.' });
-        }
-        const summary = await LeaderboardModel.getHeadToHead(clubId, playerAId, playerBId);
-        res.json({ summary });
-    } catch (err) {
-        next(err);
+        const [playerA, playerB] = await Promise.all([
+            PlayerModel.findByClubAndId(clubId, playerAId, req.user.id),
+            PlayerModel.findByClubAndId(clubId, playerBId, req.user.id),
+        ]);
+        if (!playerA || !playerB) return res.status(404).json({ error: 'Player not found.' });
+        const headToHead = await LeaderboardModel.getHeadToHead(clubId, playerAId, playerBId);
+        res.json({ headToHead });
+    } catch (error) {
+        next(error);
     }
 }
 
-// GET /api/v1/clubs/:clubId/stats — admin only
-// Dashboard summary cards: total players, matches, tournaments, avg rating.
 export async function getClubStats(req, res, next) {
     try {
         const stats = await LeaderboardModel.getClubStats(req.params.clubId);
         res.json({ stats });
-    } catch (err) {
-        next(err);
+    } catch (error) {
+        next(error);
     }
 }
 
-// GET /api/v1/clubs/:clubId/leaderboard/dashboard — club admin (owner/admin) only
-// Full club dashboard payload: summary counters, games-by-time-control,
-// top players, recent matches, and pending admin action counts.
 export async function getClubDashboard(req, res, next) {
     try {
-        const dashboard = await LeaderboardModel.getDashboardStats(req.params.clubId);
+        const { category = 'blitz' } = req.validatedQuery;
+        const dashboard = await LeaderboardModel.getDashboardStats(req.params.clubId, {
+            category,
+            includeAdmin: req.clubContext.capabilities.canManageMemberships,
+        });
         res.json({ dashboard });
-    } catch (err) {
-        next(err);
+    } catch (error) {
+        next(error);
     }
 }

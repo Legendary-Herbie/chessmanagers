@@ -13,11 +13,13 @@ import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 import '../../styles/players.css';
 
 export default function PlayersPage() {
-    const { user, isAdmin } = useAuth();
-    const { club, loading: clubLoading } = useClub();
+    const { user } = useAuth();
+    const { club, linkedPlayer, capabilities, loading: clubLoading } = useClub();
+    const isAdmin = Boolean(capabilities.canManagePlayers);
 
     const {
         processedPlayers,
+        inactivePlayers,
         stats,
         loading,
         error,
@@ -32,8 +34,9 @@ export default function PlayersPage() {
         refetch,
         claimPlayer,
         unlinkPlayer,
-        deletePlayer,
-    } = usePlayers(club?.id);
+        archivePlayer,
+        restorePlayer,
+    } = usePlayers(club?.id, { includeInactive: isAdmin });
 
     // Inline add form toggle
     const [showInlineAddForm, setShowInlineAddForm] = useState(false);
@@ -80,7 +83,7 @@ export default function PlayersPage() {
             variant: 'warning',
             onConfirm: async () => {
                 try {
-                    await unlinkPlayer(player.id, player.linked_user_id);
+                    await unlinkPlayer(player.id);
                 } catch (err) {
                     alert(err.message || 'Failed to unlink player.');
                 } finally {
@@ -90,18 +93,18 @@ export default function PlayersPage() {
         });
     };
 
-    // Delete Player Handler with ConfirmDialog
+    // Archive removes a player from new match entry and rankings while preserving history.
     const handleDeleteClick = (player) => {
         setConfirmModal({
             isOpen: true,
-            title: 'Delete Player Record',
-            message: `Are you sure you want to PERMANENTLY DELETE player "${player.name}"? This action cannot be undone.`,
-            variant: 'danger',
+            title: 'Archive Player',
+            message: `Archive "${player.name}"? Their match and rating history will be preserved, and an admin can restore them later.`,
+            variant: 'warning',
             onConfirm: async () => {
                 try {
-                    await deletePlayer(player.id);
+                    await archivePlayer(player.id);
                 } catch (err) {
-                    alert(err.message || 'Failed to delete player.');
+                    alert(err.message || 'Failed to archive player.');
                 } finally {
                     closeConfirmModal();
                 }
@@ -296,6 +299,7 @@ export default function PlayersPage() {
                             key={player.id}
                             player={player}
                             currentUser={user}
+                            currentLinkedPlayerId={linkedPlayer?.id}
                             isAdmin={isAdmin}
                             onClaim={handleClaimClick}
                             onEdit={(p) => setEditingPlayer(p)}
@@ -308,7 +312,7 @@ export default function PlayersPage() {
                 /* Table View */
                 <PlayerTable
                     players={processedPlayers}
-                    currentUser={user}
+                    currentLinkedPlayerId={linkedPlayer?.id}
                     isAdmin={isAdmin}
                     onEdit={(p) => setEditingPlayer(p)}
                     onDelete={handleDeleteClick}
@@ -321,8 +325,24 @@ export default function PlayersPage() {
                 onClose={() => setEditingPlayer(null)}
                 clubId={club.id}
                 player={editingPlayer}
+                isAdmin={isAdmin}
                 onPlayerUpdated={refetch}
             />
+
+            {isAdmin && inactivePlayers.length > 0 && (
+                <section className="players-table-wrapper" style={{ marginTop: '24px', padding: '16px' }}>
+                    <h2 style={{ marginTop: 0 }}>Archived players</h2>
+                    <p style={{ color: 'var(--text-muted)' }}>Archived records retain their full match and rating history.</p>
+                    {inactivePlayers.map((archived) => (
+                        <div key={archived.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
+                            <Link to={`/players/${archived.id}`}>{archived.name}</Link>
+                            <button type="button" className="btn-secondary btn-sm" onClick={() => restorePlayer(archived.id)}>
+                                Restore
+                            </button>
+                        </div>
+                    ))}
+                </section>
+            )}
 
             {/* Reusable Confirmation Dialog */}
             <ConfirmDialog

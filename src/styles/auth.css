@@ -352,3 +352,14 @@
     margin: 0;
     opacity: 0.7;
 }
+
+.auth-google {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    background: var(--bg-secondary);
+    color: var(--text);
+    font-weight: 700;
+    cursor: pointer;
+}

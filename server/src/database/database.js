@@ -4,16 +4,21 @@ import pgDb from './pg_database.js';
 // This function now only shapes the result into the { rows, rowCount, first }
 // contract that all models depend on.
 function normaliseRows(rows, rowCount) {
+    const safeRows = rows ?? [];
     return {
-        rows,
-        rowCount: rowCount ?? rows.length,
-        first: rows[0] ?? null,
+        rows: safeRows,
+        rowCount: rowCount ?? safeRows.length,
+        first: safeRows[0] ?? null,
     };
 }
 
 // ─── Shared query executor ──────────────────────────────────────────────
 async function execQuery(client, text, params = []) {
     const res = await client.query(text, params);
+    if (Array.isArray(res)) {
+        const lastResult = res.at(-1);
+        return normaliseRows(lastResult?.rows, lastResult?.rowCount);
+    }
     return normaliseRows(res.rows, res.rowCount);
 }
 

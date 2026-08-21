@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useClub, useTheme } from '../../app/contextHooks.js';
+import { clubApi } from '../../features/clubs/api/clubApi.js';
+import NotificationTray from '../../features/notifications/components/NotificationTray.jsx';
 import '../../styles/layout.css';
 
 const navItems = [
@@ -10,6 +12,7 @@ const navItems = [
     { to: '/matches', label: 'Matches' },
     { to: '/clubs', label: 'Clubs' },
     { to: '/tournaments', label: 'Tournaments' },
+    { to: '/announcements', label: 'Announcements' },
 ];
 
 function navLinkClass({ isActive }) {
@@ -17,13 +20,26 @@ function navLinkClass({ isActive }) {
 }
 
 export default function AppLayout() {
-    const { user, logout, isAdmin } = useAuth();
-    const { club, loading: clubLoading } = useClub();
+    const { user, logout } = useAuth();
+    const {
+        club,
+        clubs,
+        activeClubs,
+        selectedClubId,
+        membership,
+        selectClub,
+        refreshClubs,
+        capabilities,
+        loading: clubLoading,
+    } = useClub();
     const { theme, toggleTheme } = useTheme();
     const location = useLocation();
     const navigate = useNavigate();
     const dropdownRef = useRef(null);
     const [menuOpen, setMenuOpen] = useState(false);
+    const [restoringClubId, setRestoringClubId] = useState(null);
+    const [restoreError, setRestoreError] = useState(null);
+    const [leavingClub, setLeavingClub] = useState(false);
 
     const displayName = user?.name || user?.email || 'Member';
     const initial = displayName.trim().charAt(0).toUpperCase() || 'M';
@@ -59,15 +75,57 @@ export default function AppLayout() {
         };
     }, [menuOpen]);
 
-    const handleLogout = () => {
+    const handleLogout = async () => {
         setMenuOpen(false);
-        logout();
+        await logout();
         navigate('/auth/login', { replace: true });
     };
 
     const handleThemeToggle = () => {
         toggleTheme();
         setMenuOpen(false);
+    };
+
+    const handleClubChange = async (event) => {
+        const selection = selectClub(event.target.value);
+        navigate('/dashboard');
+        await selection;
+    };
+
+    const handleRestoreClub = async (clubId) => {
+        setRestoringClubId(clubId);
+        setRestoreError(null);
+        try {
+            await clubApi.restore(clubId);
+            await refreshClubs(clubId);
+            setMenuOpen(false);
+            navigate('/dashboard');
+        } catch (err) {
+            setRestoreError(err.message || 'Failed to restore club.');
+        } finally {
+            setRestoringClubId(null);
+        }
+    };
+
+    const archivedOwnedClubs = clubs.filter(entry => (
+        entry.club.status === 'archived' && entry.membership.role === 'owner'
+    ));
+
+    const handleLeaveClub = async () => {
+        if (!club || membership?.role === 'owner') return;
+        if (!confirm(`Leave ${club.name}? Your player and match history will be preserved.`)) return;
+        setLeavingClub(true);
+        setRestoreError(null);
+        try {
+            await clubApi.leave(club.id);
+            const nextClubId = await refreshClubs();
+            setMenuOpen(false);
+            navigate(nextClubId ? '/dashboard' : '/clubs');
+        } catch (err) {
+            setRestoreError(err.message || 'Failed to leave club.');
+        } finally {
+            setLeavingClub(false);
+        }
     };
 
     return (
@@ -83,6 +141,24 @@ export default function AppLayout() {
                         <span className="app-nav__brand-name">Chess Managers</span>
                     </NavLink>
 
+                    <label className="app-nav__club-switcher">
+                        <span className="app-nav__club-switcher-label">Active club</span>
+                        <select
+                            value={selectedClubId ?? ''}
+                            onChange={handleClubChange}
+                            disabled={clubLoading || activeClubs.length === 0}
+                            aria-label="Switch active club"
+                        >
+                            {activeClubs.length === 0 ? (
+                                <option value="">No active clubs</option>
+                            ) : activeClubs.map(entry => (
+                                <option key={entry.club.id} value={entry.club.id}>
+                                    {entry.club.name} ({entry.membership.role})
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+
                     <nav className="app-nav__links" aria-label="Primary navigation">
                         {navItems.map(item => (
                             <NavLink
@@ -95,6 +171,8 @@ export default function AppLayout() {
                             </NavLink>
                         ))}
                     </nav>
+
+                    <NotificationTray />
 
                     <div className="app-nav__account" ref={dropdownRef}>
                         <button
@@ -122,11 +200,45 @@ export default function AppLayout() {
                                 <NavLink className="app-nav__dropdown-item" role="menuitem" to="/create-club">
                                     Create club
                                 </NavLink>
+                                <NavLink className="app-nav__dropdown-item" role="menuitem" to="/account">
+                                    Account and sessions
+                                </NavLink>
 
-                                {isAdmin && (
+                                {archivedOwnedClubs.map(entry => (
+                                    <button
+                                        key={entry.club.id}
+                                        type="button"
+                                        className="app-nav__dropdown-item"
+                                        role="menuitem"
+                                        disabled={restoringClubId === entry.club.id}
+                                        onClick={() => handleRestoreClub(entry.club.id)}
+                                    >
+                                        {restoringClubId === entry.club.id
+                                            ? `Restoring ${entry.club.name}...`
+                                            : `Restore ${entry.club.name}`}
+                                    </button>
+                                ))}
+
+                                {restoreError && (
+                                    <div className="app-nav__dropdown-error" role="alert">{restoreError}</div>
+                                )}
+
+                                {capabilities.canManageMemberships && (
                                     <NavLink className="app-nav__dropdown-item" role="menuitem" to="/club">
-                                        Club settings
+                                        {capabilities.canManageClubSettings ? 'Club settings' : 'Club administration'}
                                     </NavLink>
+                                )}
+
+                                {club && membership?.role !== 'owner' && (
+                                    <button
+                                        type="button"
+                                        className="app-nav__dropdown-item app-nav__dropdown-item--danger"
+                                        role="menuitem"
+                                        disabled={leavingClub}
+                                        onClick={handleLeaveClub}
+                                    >
+                                        {leavingClub ? 'Leaving club...' : 'Leave active club'}
+                                    </button>
                                 )}
 
                                 <button

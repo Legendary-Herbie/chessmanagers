@@ -1,0 +1,292 @@
+@import './variables.css';
+
+.announcements-page,
+.announcement-detail {
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-md);
+}
+
+.announcement-page-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: var(--gap-md);
+}
+
+.announcement-page-header h1,
+.announcement-detail h1 {
+    margin: 4px 0;
+    color: var(--text-strong);
+}
+
+.announcement-page-header p,
+.announcement-detail time {
+    margin: 0;
+    color: var(--text-muted);
+}
+
+.announcement-composer {
+    padding: var(--gap-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--gap-sm);
+}
+
+.announcement-composer label,
+.announcement-filters label {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    color: var(--text-strong);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-medium);
+}
+
+.announcement-filters {
+    display: grid;
+    grid-template-columns: minmax(220px, 1fr) minmax(150px, 220px);
+    gap: var(--gap-sm);
+}
+
+.announcement-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(270px, 1fr));
+    gap: var(--gap-sm);
+}
+
+.announcement-card {
+    min-height: 170px;
+    padding: var(--gap-md);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    color: var(--text);
+    text-decoration: none;
+    box-shadow: var(--shadow-sm);
+}
+
+.announcement-card:hover,
+.announcement-card:focus-visible {
+    outline: none;
+    border-color: var(--border-emphasis);
+    box-shadow: var(--shadow);
+}
+
+.announcement-card h2,
+.announcement-card p {
+    margin: 0;
+}
+
+.announcement-card h2 {
+    color: var(--text-strong);
+    font-size: var(--font-size-lg);
+}
+
+.announcement-card p {
+    display: -webkit-box;
+    overflow: hidden;
+    color: var(--text-muted);
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 3;
+}
+
+.announcement-card__meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.announcement-status {
+    width: fit-content;
+    padding: 3px 8px;
+    border-radius: 999px;
+    background: var(--bg-muted);
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-bold);
+    text-transform: capitalize;
+}
+
+.announcement-status--published {
+    background: color-mix(in srgb, var(--accent) 14%, transparent);
+    color: var(--text-green);
+}
+
+.announcement-status--draft {
+    background: color-mix(in srgb, var(--warning) 15%, transparent);
+    color: var(--warning);
+}
+
+.announcement-empty,
+.announcement-error {
+    padding: var(--gap-md);
+    border-radius: var(--radius-lg);
+    background: var(--bg-muted);
+    color: var(--text-muted);
+}
+
+.announcement-error {
+    color: var(--danger);
+}
+
+.rich-editor {
+    overflow: hidden;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+}
+
+.rich-editor:focus-within {
+    box-shadow: var(--focus-ring);
+}
+
+.rich-editor__toolbar {
+    padding: 6px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-muted);
+}
+
+.rich-editor__toolbar button {
+    min-height: 34px;
+    padding: 0 9px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    color: var(--text);
+    cursor: pointer;
+}
+
+.rich-editor__content {
+    min-height: 180px;
+    padding: 14px;
+    color: var(--text);
+    outline: none;
+}
+
+.announcement-detail {
+    max-width: 820px;
+    margin: 0 auto;
+}
+
+.announcement-detail > header {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding-bottom: var(--gap-md);
+    border-bottom: 1px solid var(--border);
+}
+
+.announcement-title-input {
+    font-size: var(--font-size-2xl);
+    font-weight: var(--font-bold);
+}
+
+.announcement-rich-content {
+    min-height: 120px;
+    color: var(--text);
+    line-height: 1.7;
+}
+
+.announcement-rich-content a {
+    color: var(--primary);
+}
+
+.announcement-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.announcement-upload {
+    padding: var(--gap-sm);
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    border: 1px dashed var(--border-emphasis);
+    border-radius: var(--radius-lg);
+    background: var(--bg-muted);
+    color: var(--text-strong);
+    font-weight: var(--font-medium);
+}
+
+.announcement-attachments h2 {
+    color: var(--text-strong);
+    font-size: var(--font-size-lg);
+}
+
+.announcement-attachments ul {
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 8px;
+    list-style: none;
+}
+
+.announcement-attachments li {
+    padding: 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+}
+
+.announcement-attachments img {
+    width: 80px;
+    height: 60px;
+    object-fit: cover;
+    border-radius: var(--radius-md);
+}
+
+.announcement-attachments li > div {
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.announcement-attachments strong {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.announcement-attachments span {
+    color: var(--text-muted);
+    font-size: var(--font-size-xs);
+}
+
+.announcement-attachments button {
+    min-height: 36px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    color: var(--text);
+    cursor: pointer;
+}
+
+@media (max-width: 640px) {
+    .announcement-page-header {
+        flex-direction: column;
+    }
+
+    .announcement-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .announcement-attachments li {
+        align-items: stretch;
+        flex-wrap: wrap;
+    }
+}

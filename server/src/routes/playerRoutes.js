@@ -1,75 +1,84 @@
 import { Router } from 'express';
 import {
-    getPlayers,
-    getPlayer,
+    archivePlayer,
+    claimPlayer,
     createPlayer,
     createPlayersBulk,
-    updatePlayer,
     deletePlayer,
-    claimPlayer,
-    getPendingLinks,
+    getInactivePlayers,
+    getPlayer,
+    getPlayers,
+    restorePlayer,
+    unlinkPlayer,
+    updateOwnPlayerProfile,
+    updatePlayer,
     approveLink,
     rejectLink,
-    unlinkPlayer,
 } from '../controllers/playerController.js';
-import { requireAuth } from '../middleware/auth.js';
-import { requireRole, requireClubMember, requireSelfOrAdmin } from '../middleware/requireRole.js';
+import { getHeadToHead, getPlayerMatches } from '../controllers/matchController.js';
 import {
-    validate,
+    getHeadToHeadSummary,
+    getPlayerStatistics,
+    getRatingHistory,
+} from '../controllers/leaderboardController.js';
+import { requireAuth } from '../middleware/auth.js';
+import { uploadPlayerPhoto } from '../controllers/imageController.js';
+import { uploadSingleImage } from '../middleware/imageUpload.js';
+import {
+    loadClubContext,
+    requireActiveClubMember,
+    requireClubAdmin,
+    requireSelfOrClubAdmin,
+} from '../middleware/requireRole.js';
+import {
+    clubParamsSchema,
+    clubPlayerParamsSchema,
+    clubLinkParamsSchema,
+    clubHeadToHeadParamsSchema,
     createPlayerSchema,
-    updatePlayerSchema,
+    createPlayersBulkSchema,
+    emptyBodySchema,
+    playerUnlinkSchema,
+    playerLinkDecisionSchema,
+    updatePlayerAdminSchema,
+    updatePlayerSelfSchema,
+    validate,
+    validateRequest,
+    playerListQuerySchema,
+    paginationQuerySchema,
+    ratingHistoryQuerySchema,
 } from '../middleware/validate.js';
 
-const router = Router({ mergeParams: true }); // mergeParams to access :clubId from parent
+const router = Router({ mergeParams: true });
 
-// All player routes require authentication and club membership
-router.use(requireAuth, requireClubMember);
+router.use(requireAuth, validateRequest({ params: clubParamsSchema }), loadClubContext, requireActiveClubMember);
 
-// ── Static & Special Routes (MUST be placed before /:playerId to avoid route collision) ──
+router.get('/', validateRequest({ query: playerListQuerySchema }), getPlayers);
+router.post('/', requireClubAdmin, validate(createPlayerSchema), createPlayer);
+router.post('/bulk', requireClubAdmin, validate(createPlayersBulkSchema), createPlayersBulk);
+router.get('/inactive', requireClubAdmin, getInactivePlayers);
 
-// GET /api/v1/clubs/:clubId/players
-router.get('/', getPlayers);
+// Compatibility aliases for clients created before player-link routes were split.
+router.patch('/links/:linkId/approve', validateRequest({ params: clubLinkParamsSchema }), requireClubAdmin, validate(emptyBodySchema), approveLink);
+router.patch('/links/:linkId/reject', validateRequest({ params: clubLinkParamsSchema }), requireClubAdmin, validate(playerLinkDecisionSchema), rejectLink);
 
-// POST /api/v1/clubs/:clubId/players
-router.post('/', requireRole('admin'), validate(createPlayerSchema), createPlayer);
+// Canonical player-history resources. Legacy aliases remain under the match and
+// leaderboard routers so existing external clients do not break.
+router.get('/:playerId/matches', validateRequest({ params: clubPlayerParamsSchema, query: paginationQuerySchema }), getPlayerMatches);
+router.get('/:playerId/rating-history', validateRequest({ params: clubPlayerParamsSchema, query: ratingHistoryQuerySchema }), getRatingHistory);
+router.get('/:playerId/statistics', validateRequest({ params: clubPlayerParamsSchema }), getPlayerStatistics);
+router.get('/:playerAId/vs/:playerBId', validateRequest({ params: clubHeadToHeadParamsSchema }), getHeadToHead);
+router.get('/:playerAId/vs/:playerBId/summary', validateRequest({ params: clubHeadToHeadParamsSchema }), getHeadToHeadSummary);
 
-// POST /api/v1/clubs/:clubId/players/bulk — admin only
-router.post('/bulk', requireRole('admin'), createPlayersBulk);
+router.get('/:playerId', validateRequest({ params: clubPlayerParamsSchema }), getPlayer);
+router.patch('/:playerId', validateRequest({ params: clubPlayerParamsSchema }), requireSelfOrClubAdmin, validate(updatePlayerAdminSchema), updatePlayer);
+router.patch('/:playerId/profile', validateRequest({ params: clubPlayerParamsSchema }), requireSelfOrClubAdmin, validate(updatePlayerSelfSchema), updateOwnPlayerProfile);
+router.patch('/:playerId/archive', validateRequest({ params: clubPlayerParamsSchema }), requireClubAdmin, validate(emptyBodySchema), archivePlayer);
+router.patch('/:playerId/restore', validateRequest({ params: clubPlayerParamsSchema }), requireClubAdmin, validate(emptyBodySchema), restorePlayer);
+router.delete('/:playerId', validateRequest({ params: clubPlayerParamsSchema }), requireClubAdmin, validate(emptyBodySchema), deletePlayer);
 
-// GET /api/v1/clubs/:clubId/players/links/pending — admin only
-router.get('/links/pending', requireRole('admin'), getPendingLinks);
-// Also accept legacy/client variant: /player-links/pending
-router.get('/player-links/pending', requireRole('admin'), getPendingLinks);
-
-// PATCH /api/v1/clubs/:clubId/players/links/:linkId/approve — admin only
-router.patch('/links/:linkId/approve', requireRole('admin'), approveLink);
-// Also accept legacy/client variant: /player-links/:linkId/approve
-router.patch('/player-links/:linkId/approve', requireRole('admin'), approveLink);
-
-// PATCH /api/v1/clubs/:clubId/players/links/:linkId/reject — admin only
-router.patch('/links/:linkId/reject', requireRole('admin'), rejectLink);
-// Also accept legacy/client variant: /player-links/:linkId/reject
-router.patch('/player-links/:linkId/reject', requireRole('admin'), rejectLink);
-
-// ── Parameterized /:playerId Routes ──────────────────────────────────────────
-
-// GET /api/v1/clubs/:clubId/players/:playerId
-router.get('/:playerId', getPlayer);
-
-// PATCH /api/v1/clubs/:clubId/players/:playerId
-// Admin can edit any player; linked player can only edit their own
-router.patch('/:playerId', requireSelfOrAdmin, validate(updatePlayerSchema), updatePlayer);
-
-// DELETE /api/v1/clubs/:clubId/players/:playerId
-router.delete('/:playerId', requireRole('admin'), deletePlayer);
-
-// ── Player link actions on specific player ───────────────────────────────────
-
-// POST /api/v1/clubs/:clubId/players/:playerId/claim
-// Any authenticated club member can request to claim an unlinked player
-router.post('/:playerId/claim', claimPlayer);
-
-// DELETE /api/v1/clubs/:clubId/players/:playerId/unlink — admin only
-router.delete('/:playerId/unlink', requireRole('admin'), unlinkPlayer);
+router.post('/:playerId/claim', validateRequest({ params: clubPlayerParamsSchema }), validate(emptyBodySchema), claimPlayer);
+router.post('/:playerId/photo', validateRequest({ params: clubPlayerParamsSchema }), requireSelfOrClubAdmin, uploadSingleImage, uploadPlayerPhoto);
+router.delete('/:playerId/unlink', validateRequest({ params: clubPlayerParamsSchema }), requireSelfOrClubAdmin, validate(playerUnlinkSchema), unlinkPlayer);
 
 export default router;

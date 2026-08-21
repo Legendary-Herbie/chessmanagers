@@ -17,14 +17,24 @@ export async function requireAuth(req, res, next) {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.type && decoded.type !== 'access') {
+            return res.status(401).json({ error: 'Invalid token.' });
+        }
         const user = await UserModel.findById(decoded.id);
         if (!user) return res.status(401).json({ error: 'User not found.' });
+        if (!user.email_verified) {
+            return res.status(403).json({
+                error: 'Verify your email before continuing.',
+                code: 'EMAIL_VERIFICATION_REQUIRED',
+            });
+        }
+        if (decoded.sv !== undefined && decoded.sv !== user.session_version) {
+            return res.status(401).json({ error: 'Session expired. Please log in again.' });
+        }
         req.user = {
             id: user.id,
             email: user.email,
             role: user.role,
-            playerId: user.player_id ?? null,
-            linkStatus: user.link_status ?? null,
         };
         next();
     } catch (err) {
@@ -49,13 +59,14 @@ export async function optionalAuth(req, res, next) {
 
     try {
         const decoded = jwt.verify(token, JWT_SECRET);
+        if (decoded.type && decoded.type !== 'access') throw new Error('Invalid token type');
         const user = await UserModel.findById(decoded.id);
-        req.user = user ? {
+        const active = user?.email_verified
+            && (decoded.sv === undefined || decoded.sv === user.session_version);
+        req.user = active ? {
             id: user.id,
             email: user.email,
             role: user.role,
-            playerId: user.player_id ?? null,
-            linkStatus: user.link_status ?? null,
         } : null;
     } catch {
         req.user = null;

@@ -10,16 +10,22 @@ import http from 'http';
 
 import env from './src/config/env.js';
 import db from './src/database/database.js';
+import { startRatingRecalculationWorker } from './src/services/RatingService.js';
+import { startNotificationOutboxWorker } from './src/services/NotificationService.js';
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
 import authRoutes        from './src/routes/authRoutes.js';
 import clubRoutes        from './src/routes/clubRoutes.js';
 import playerRoutes      from './src/routes/playerRoutes.js';
+import playerLinkRoutes  from './src/routes/playerLinkRoutes.js';
 import matchRoutes       from './src/routes/matchRoutes.js';
 import tournamentRoutes  from './src/routes/tournamentRoutes.js';
 import leaderboardRoutes from './src/routes/leaderboardRoutes.js';
 import publicRoutes      from './src/routes/publicRoutes.js';
+import notificationRoutes from './src/routes/notificationRoutes.js';
+import announcementRoutes from './src/routes/announcementRoutes.js';
+import dataExportRoutes from './src/routes/dataExportRoutes.js';
 
 // ─── Error Handling Middleware ─────────────────────────────────────────────────
 
@@ -105,13 +111,16 @@ app.get('/health', (req, res) =>
 
 app.use('/api/v1/auth',   authRoutes);
 app.use('/api/v1/public', publicRoutes);
+app.use('/api/v1/notifications', notificationRoutes);
 app.use('/api/v1/clubs',  clubRoutes);
 
 app.use('/api/v1/clubs/:clubId/players',      playerRoutes);
-app.use('/api/v1/clubs/:clubId/player-links', playerRoutes);
+app.use('/api/v1/clubs/:clubId/player-links', playerLinkRoutes);
 app.use('/api/v1/clubs/:clubId/matches',      matchRoutes);
 app.use('/api/v1/clubs/:clubId/tournaments',  tournamentRoutes);
 app.use('/api/v1/clubs/:clubId/leaderboard',  leaderboardRoutes);
+app.use('/api/v1/clubs/:clubId/announcements', announcementRoutes);
+app.use('/api/v1/clubs/:clubId/exports', dataExportRoutes);
 
 // ─── Static Frontend (Production) ─────────────────────────────────────────────
 
@@ -119,6 +128,15 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const distPath = path.join(__dirname, '../dist');
 const distIndexPath = path.join(distPath, 'index.html');
 const shouldServeFrontend = NODE_ENV === 'production' && SERVE_FRONTEND && fs.existsSync(distIndexPath);
+
+app.use('/uploads/images', (_req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+}, express.static(path.join(__dirname, 'uploads/images'), {
+    fallthrough: false,
+    immutable: true,
+    maxAge: '1y',
+}));
 
 if (NODE_ENV === 'production' && SERVE_FRONTEND && !shouldServeFrontend) {
     console.warn('[WARN] SERVE_FRONTEND=true but dist/index.html not found; running in API-only mode.');
@@ -158,6 +176,8 @@ export default app;
 if (NODE_ENV !== 'test') {
     db.init()
         .then(() => {
+            startRatingRecalculationWorker();
+            startNotificationOutboxWorker();
             console.log(`[INFO] Allowed CORS origins: ${CORS_ORIGIN.join(', ')}`);
             const server = http.createServer({ maxHeaderSize: 64 * 1024 }, app);
             server.listen(PORT, () => {

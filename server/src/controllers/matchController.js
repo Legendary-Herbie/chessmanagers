@@ -1,41 +1,55 @@
 import { MatchModel } from '../models/Match.js';
 import { PlayerModel } from '../models/Player.js';
-import { TournamentModel } from '../models/Tournament.js';
-import { recalculateRatingsForClub } from '../utils/recalculation.js';
-import db from '../database/database.js';
+import {
+    createMatch as createMatchRecord,
+    updateMatch as updateMatchRecord,
+    voidMatch as voidMatchRecord,
+    deleteMatch as deleteMatchRecord,
+} from '../services/MatchService.js';
+import { toMatchDto } from '../utils/matchDtos.js';
 
-const VALID_RESULTS = ['white', 'black', 'draw'];
-const VALID_TYPES = ['casual', 'rated', 'tournament'];
-const RATED_TYPES = new Set(['rated', 'tournament']);
+const FAILURES = {
+    MATCH_NOT_FOUND: [404, 'Match not found.'],
+    MATCH_NOT_ACTIVE: [409, 'Only an active match can be changed.'],
+    SAME_PLAYER: [400, 'White and black must be different players.'],
+    PLAYERS_NOT_ACTIVE_IN_CLUB: [404, 'Both players must be active players in this club.'],
+    TOURNAMENT_NOT_FOUND: [404, 'Tournament not found in this club.'],
+    TOURNAMENT_ROSTER_MISMATCH: [400, 'Both players must be on the tournament roster.'],
+    TOURNAMENT_RATING_MISMATCH: [400, 'The match rating category and rated setting must match the tournament.'],
+    TOURNAMENT_PAIRING_NOT_FOUND: [404, 'Tournament pairing not found.'],
+    TOURNAMENT_PAIRING_MISMATCH: [409, 'The match does not match its tournament pairing.'],
+    TOURNAMENT_PAIRING_ALREADY_COMPLETED: [409, 'This tournament pairing already has a result.'],
+};
 
-function pagination(value, fallback, maximum) {
-    const number = Number(value);
-    return Number.isInteger(number) && number >= 0 ? Math.min(number, maximum) : fallback;
-}
-
-async function validateTournamentMatch({ clubId, tournamentId, whitePlayerId, blackPlayerId }) {
-    if (!tournamentId) return null;
-    const tournament = await TournamentModel.findById(tournamentId, clubId);
-    if (!tournament) return null;
-    const participants = await TournamentModel.getPlayers(tournamentId, clubId);
-    const participantIds = new Set(participants.map(player => player.id));
-    return participantIds.has(whitePlayerId) && participantIds.has(blackPlayerId) ? tournament : false;
+function sendFailure(res, result) {
+    if (result.code === 'POSSIBLE_DUPLICATE_MATCH') {
+        return res.status(409).json({
+            error: 'A possible duplicate match was found. Confirm to save it anyway.',
+            code: result.code,
+            requiresConfirmation: true,
+            duplicate: result.duplicate,
+        });
+    }
+    const [status, message] = FAILURES[result.code] ?? [400, 'The match operation could not be completed.'];
+    return res.status(status).json({ error: message, code: result.code });
 }
 
 export async function getMatches(req, res, next) {
     try {
-        const { clubId } = req.params;
-        const { type, tournamentId, playerId, limit, offset } = req.query;
-        const matches = await MatchModel.findByClub(clubId, {
-            type,
-            tournamentId,
-            playerId,
-            limit: pagination(limit, 50, 100),
-            offset: pagination(offset, 0, 100_000),
+        const result = await MatchModel.findByClub(req.params.clubId, req.validatedQuery);
+        const { limit = 50, offset = 0 } = req.validatedQuery;
+        res.json({
+            matches: result.matches.map(match => {
+                const row = { ...match };
+                delete row.total_count;
+                return toMatchDto(row);
+            }),
+            total: result.total,
+            limit,
+            offset,
         });
-        res.json({ matches });
-    } catch (err) {
-        next(err);
+    } catch (error) {
+        next(error);
     }
 }
 
@@ -43,99 +57,72 @@ export async function getMatch(req, res, next) {
     try {
         const match = await MatchModel.findById(req.params.matchId, req.params.clubId);
         if (!match) return res.status(404).json({ error: 'Match not found.' });
-        res.json({ match });
-    } catch (err) {
-        next(err);
+        res.json({ match: toMatchDto(match) });
+    } catch (error) {
+        next(error);
     }
 }
 
 export async function createMatch(req, res, next) {
     try {
-        const { clubId } = req.params;
-        const input = req.validated ?? req.body;
-        const {
-            whitePlayerId, blackPlayerId, result, type = 'casual', tournamentId,
-            notes, timeControl = 'blitz', playedAt,
-        } = input;
-
-        if (!whitePlayerId || !blackPlayerId || whitePlayerId === blackPlayerId) {
-            return res.status(400).json({ error: 'Two different players are required.' });
-        }
-        if (!VALID_RESULTS.includes(result) || !VALID_TYPES.includes(type)) {
-            return res.status(400).json({ error: 'Invalid match result or type.' });
-        }
-        if ((type === 'tournament') !== Boolean(tournamentId)) {
-            return res.status(400).json({ error: 'Tournament matches require a tournament; other matches must not include one.' });
-        }
-
-        const [white, black] = await Promise.all([
-            PlayerModel.findById(whitePlayerId),
-            PlayerModel.findById(blackPlayerId),
-        ]);
-        if (!white || !black || white.club_id !== clubId || black.club_id !== clubId) {
-            return res.status(404).json({ error: 'Both players must belong to this club.' });
-        }
-        if (tournamentId) {
-            const tournament = await validateTournamentMatch({ clubId, tournamentId, whitePlayerId, blackPlayerId });
-            if (tournament === null) return res.status(404).json({ error: 'Tournament not found in this club.' });
-            if (tournament === false) return res.status(400).json({ error: 'Both players must be in the tournament roster.' });
-        }
-
-        const { match } = await db.transaction(async (trx) => {
-            const match = await MatchModel.create({
-                clubId, whitePlayerId, blackPlayerId, result, type, tournamentId: tournamentId || null,
-                notes: notes || null, timeControl, playedAt: playedAt || null,
-            }, trx);
-            if (RATED_TYPES.has(type)) await recalculateRatingsForClub(clubId, timeControl, trx);
-            return { match };
+        const result = await createMatchRecord({
+            clubId: req.params.clubId,
+            actorUserId: req.user.id,
+            ...req.validated,
         });
-        res.status(201).json({ match });
-    } catch (err) {
-        next(err);
+        if (!result.ok) return sendFailure(res, result);
+        res.status(201).json({
+            match: toMatchDto(result.match),
+            ratingStatus: result.ratingStatus,
+            ratingResult: result.ratingResult,
+        });
+    } catch (error) {
+        next(error);
     }
 }
 
 export async function updateMatch(req, res, next) {
     try {
-        const { clubId, matchId } = req.params;
-        const existing = await MatchModel.findById(matchId, clubId);
-        if (!existing) return res.status(404).json({ error: 'Match not found.' });
-        const input = req.validated ?? req.body;
-        if (input.result && !VALID_RESULTS.includes(input.result)) {
-            return res.status(400).json({ error: 'Invalid match result.' });
-        }
-        const match = await db.transaction(async (trx) => {
-            const updated = await MatchModel.updateResult(matchId, clubId, input, trx);
-            if (!updated) return null;
-            if (RATED_TYPES.has(existing.type)) {
-                await recalculateRatingsForClub(clubId, existing.time_control, trx);
-                if (updated.time_control !== existing.time_control) {
-                    await recalculateRatingsForClub(clubId, updated.time_control, trx);
-                }
-            }
-            return updated;
+        const result = await updateMatchRecord({
+            clubId: req.params.clubId,
+            matchId: req.params.matchId,
+            actorUserId: req.user.id,
+            changes: req.validated,
         });
-        if (!match) return res.status(404).json({ error: 'Match not found.' });
-        res.json({ match });
-    } catch (err) {
-        next(err);
+        if (!result.ok) return sendFailure(res, result);
+        res.json({ match: toMatchDto(result.match), ratingStatus: result.ratingStatus });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function voidMatch(req, res, next) {
+    try {
+        const result = await voidMatchRecord({
+            clubId: req.params.clubId,
+            matchId: req.params.matchId,
+            actorUserId: req.user.id,
+            reason: req.validated.reason,
+        });
+        if (!result.ok) return sendFailure(res, result);
+        res.json({ match: toMatchDto(result.match), ratingStatus: result.ratingStatus });
+    } catch (error) {
+        next(error);
     }
 }
 
 export async function deleteMatch(req, res, next) {
     try {
-        const { clubId, matchId } = req.params;
-        const existing = await MatchModel.findById(matchId, clubId);
-        if (!existing) return res.status(404).json({ error: 'Match not found.' });
-        await db.transaction(async (trx) => {
-            await MatchModel.delete(matchId, clubId, trx);
-            if (RATED_TYPES.has(existing.type)) {
-                await recalculateRatingsForClub(clubId, existing.time_control, trx);
-            }
+        const result = await deleteMatchRecord({
+            clubId: req.params.clubId,
+            matchId: req.params.matchId,
+            actorUserId: req.user.id,
+            reason: req.validated.reason ?? null,
         });
-        res.json({ message: 'Match deleted.' });
-    } catch (err) {
-        next(err);
+        if (!result.ok) return sendFailure(res, result);
+        res.json({ match: toMatchDto(result.match), ratingStatus: result.ratingStatus });
+    } catch (error) {
+        next(error);
     }
 }
 
@@ -144,26 +131,26 @@ export async function getPlayerMatches(req, res, next) {
         const { clubId, playerId } = req.params;
         const player = await PlayerModel.findById(playerId);
         if (!player || player.club_id !== clubId) return res.status(404).json({ error: 'Player not found.' });
-        const matches = await MatchModel.findByPlayer(clubId, playerId, {
-            limit: pagination(req.query.limit, 20, 100),
-            offset: pagination(req.query.offset, 0, 100_000),
-        });
-        res.json({ matches });
-    } catch (err) {
-        next(err);
+        const matches = await MatchModel.findByPlayer(clubId, playerId, req.validatedQuery);
+        res.json({ matches: matches.map(toMatchDto) });
+    } catch (error) {
+        next(error);
     }
 }
 
 export async function getHeadToHead(req, res, next) {
     try {
         const { clubId, playerAId, playerBId } = req.params;
-        const [playerA, playerB] = await Promise.all([PlayerModel.findById(playerAId), PlayerModel.findById(playerBId)]);
+        const [playerA, playerB] = await Promise.all([
+            PlayerModel.findById(playerAId),
+            PlayerModel.findById(playerBId),
+        ]);
         if (!playerA || !playerB || playerA.club_id !== clubId || playerB.club_id !== clubId) {
             return res.status(404).json({ error: 'Player not found.' });
         }
         const matches = await MatchModel.findHeadToHead(clubId, playerAId, playerBId);
-        res.json({ matches });
-    } catch (err) {
-        next(err);
+        res.json({ matches: matches.map(toMatchDto) });
+    } catch (error) {
+        next(error);
     }
 }

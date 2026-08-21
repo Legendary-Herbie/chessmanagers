@@ -33,9 +33,9 @@ export function usePlayerLinks(clubId) {
         setPendingLinks((prev) => prev.filter((l) => l.id !== linkId));
     };
 
-    const rejectLink = async (linkId) => {
+    const rejectLink = async (linkId, reason = null) => {
         if (!clubId) return;
-        await playerApi.rejectLink(clubId, linkId);
+        await playerApi.rejectLink(clubId, linkId, reason);
         setPendingLinks((prev) => prev.filter((l) => l.id !== linkId));
     };
 

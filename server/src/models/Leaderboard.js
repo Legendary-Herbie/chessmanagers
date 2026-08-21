@@ -1,152 +1,233 @@
 import db from '../database/database.js';
 
+const CATEGORIES = ['blitz', 'rapid', 'classical'];
+const emptyStats = () => ({
+    games: 0, wins: 0, draws: 0, losses: 0, weightedWinRate: 0,
+    currentRating: null, peakRating: null, currentWinStreak: 0, currentLossStreak: 0,
+});
+function withoutTotalCount(row) {
+    const entry = { ...row };
+    delete entry.totalCount;
+    return entry;
+}
+
 export const LeaderboardModel = {
-
-    // Club leaderboard — all players ranked by current rating.
-    // Delegates win/draw/loss aggregation to the v_club_leaderboard VIEW.
-    getByClub: async (clubId, { limit = 50, offset = 0 } = {}) => {
-        return db.query(
-            `SELECT
-                id,
-                name,
-                rating,
-                played,
-                wins,
-                draws,
-                losses,
-                last_active,
-                link_status,
-                points
-             FROM v_club_leaderboard
-             WHERE club_id = $1
-             ORDER BY rating DESC
-             LIMIT $2 OFFSET $3`,
-            [clubId, limit, offset]
-        ).then(r => r.rows);
+    // Eligibility and rank are calculated before pagination. Account linking is
+    // deliberately absent: linked and unlinked roster players rank identically.
+    getByClub: async (clubId, { category = 'blitz', limit = 50, offset = 0, q = '' } = {}) => {
+        const result = await db.query(
+            `WITH eligible AS (
+                SELECT player.id AS "playerId", player.public_id AS "publicPlayerId", player.name AS "playerName",
+                    $2::TEXT AS "selectedCategory",
+                    ROUND(selected.current_rating)::INTEGER AS "selectedRating",
+                    selected.current_rating AS "rawSelectedRating",
+                    selected.peak_rating AS "peakRating",
+                    blitz.current_rating AS "blitzRating",
+                    rapid.current_rating AS "rapidRating",
+                    classical.current_rating AS "classicalRating",
+                    selected_stats.games AS "categoryGames",
+                    selected_stats.wins AS "categoryWins",
+                    selected_stats.draws AS "categoryDraws",
+                    selected_stats.losses AS "categoryLosses",
+                    selected_stats.weighted_win_rate AS "weightedWinRate",
+                    all_stats.total_games AS "totalGames"
+                FROM players player
+                JOIN player_rating_state selected ON selected.player_id = player.id
+                    AND selected.club_id = player.club_id AND selected.category = $2
+                JOIN player_rating_state blitz ON blitz.player_id = player.id
+                    AND blitz.club_id = player.club_id AND blitz.category = 'blitz'
+                JOIN player_rating_state rapid ON rapid.player_id = player.id
+                    AND rapid.club_id = player.club_id AND rapid.category = 'rapid'
+                JOIN player_rating_state classical ON classical.player_id = player.id
+                    AND classical.club_id = player.club_id AND classical.category = 'classical'
+                JOIN LATERAL (
+                    SELECT COUNT(*)::INTEGER AS games,
+                        COUNT(*) FILTER (WHERE
+                            (match.white_player_id = player.id AND match.result = 'white') OR
+                            (match.black_player_id = player.id AND match.result = 'black'))::INTEGER AS wins,
+                        COUNT(*) FILTER (WHERE match.result = 'draw')::INTEGER AS draws,
+                        COUNT(*) FILTER (WHERE
+                            (match.white_player_id = player.id AND match.result = 'black') OR
+                            (match.black_player_id = player.id AND match.result = 'white'))::INTEGER AS losses,
+                        ((COUNT(*) FILTER (WHERE
+                            (match.white_player_id = player.id AND match.result = 'white') OR
+                            (match.black_player_id = player.id AND match.result = 'black'))
+                          + 0.5 * COUNT(*) FILTER (WHERE match.result = 'draw')) / NULLIF(COUNT(*), 0))::DOUBLE PRECISION
+                            AS weighted_win_rate
+                    FROM matches match
+                    WHERE match.club_id = player.club_id AND match.rating_category = $2
+                      AND match.is_rated = TRUE AND match.status = 'active'
+                      AND (match.white_player_id = player.id OR match.black_player_id = player.id)
+                ) selected_stats ON selected_stats.games > 0
+                JOIN LATERAL (
+                    SELECT COUNT(*)::INTEGER AS total_games FROM matches match
+                    WHERE match.club_id = player.club_id AND match.status = 'active'
+                      AND (match.white_player_id = player.id OR match.black_player_id = player.id)
+                ) all_stats ON TRUE
+                WHERE player.club_id = $1 AND player.status = 'active' AND player.deleted_at IS NULL
+                  AND ($5 = '' OR player.name ILIKE '%' || $5 || '%')
+            ), ranked AS (
+                SELECT eligible.*,
+                    ROW_NUMBER() OVER (ORDER BY "selectedRating" DESC, "rawSelectedRating" DESC,
+                        "weightedWinRate" DESC, "categoryGames" DESC, "playerName" ASC) AS row_rank,
+                    COUNT(*) OVER () AS total_count
+                FROM eligible
+            )
+            SELECT row_rank::INTEGER AS rank,
+                "playerId", "publicPlayerId", "playerName", "selectedCategory", "selectedRating", "peakRating",
+                "blitzRating", "rapidRating", "classicalRating", "categoryGames", "categoryWins",
+                "categoryDraws", "categoryLosses", "weightedWinRate", "totalGames",
+                total_count::INTEGER AS "totalCount"
+            FROM ranked ORDER BY row_rank LIMIT $3 OFFSET $4`,
+            [clubId, category, limit, offset, q]
+        );
+        return {
+            entries: result.rows.map(withoutTotalCount),
+            total: result.rows[0]?.totalCount ?? 0,
+            limit, offset, category,
+        };
     },
 
-    // Rating history for a single player over time — used for sparklines and graphs.
-    getRatingHistory: async (clubId, playerId, { limit = 30 } = {}) => {
-        return db.query(
-            `SELECT played_at, rating
-             FROM (
-                SELECT m.played_at, rh.rating_after AS rating
-                FROM rating_history rh
-                JOIN matches m ON m.id = rh.match_id
-                WHERE rh.player_id = $1 AND m.club_id = $2
-                ORDER BY m.played_at DESC, m.created_at DESC, m.id DESC
-                LIMIT $3
-             ) latest
-             ORDER BY played_at ASC`,
-            [playerId, clubId, limit]
-        ).then(r => r.rows);
+    getRatingHistory: async (clubId, playerId, { category = 'blitz', limit = 30 } = {}) => db.query(
+        `SELECT played_at AS "playedAt", rating_before AS "ratingBefore",
+                rating_after AS "ratingAfter", match_id AS "matchId", category,
+                played_at, rating_before, rating_after AS rating, match_id
+         FROM (SELECT played_at, rating_before, rating_after, match_id, category
+               FROM rating_history WHERE player_id = $1 AND club_id = $2 AND category = $3
+               ORDER BY played_at DESC, match_id DESC LIMIT $4) latest
+         ORDER BY played_at ASC, match_id ASC`,
+        [playerId, clubId, category, limit]
+    ).then(result => result.rows),
+
+    getPlayerStatistics: async (clubId, playerId) => {
+        const result = await db.query(
+            `WITH outcomes AS (
+                SELECT match.rating_category AS category, match.played_at, match.id,
+                    CASE WHEN (match.white_player_id = $2 AND match.result = 'white')
+                              OR (match.black_player_id = $2 AND match.result = 'black') THEN 'win'
+                         WHEN match.result = 'draw' THEN 'draw' ELSE 'loss' END AS outcome
+                FROM matches match WHERE match.club_id = $1 AND match.is_rated = TRUE
+                  AND match.status = 'active'
+                  AND (match.white_player_id = $2 OR match.black_player_id = $2)
+            ), ordered AS (
+                SELECT outcomes.*,
+                    COUNT(*) FILTER (WHERE outcome <> 'win') OVER (PARTITION BY category
+                        ORDER BY played_at DESC, id DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS win_breaks,
+                    COUNT(*) FILTER (WHERE outcome <> 'loss') OVER (PARTITION BY category
+                        ORDER BY played_at DESC, id DESC ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS loss_breaks
+                FROM outcomes
+            ), aggregates AS (
+                SELECT category, COUNT(*)::INTEGER AS games,
+                    COUNT(*) FILTER (WHERE outcome = 'win')::INTEGER AS wins,
+                    COUNT(*) FILTER (WHERE outcome = 'draw')::INTEGER AS draws,
+                    COUNT(*) FILTER (WHERE outcome = 'loss')::INTEGER AS losses,
+                    COUNT(*) FILTER (WHERE outcome = 'win' AND win_breaks = 0)::INTEGER AS win_streak,
+                    COUNT(*) FILTER (WHERE outcome = 'loss' AND loss_breaks = 0)::INTEGER AS loss_streak
+                FROM ordered GROUP BY category
+            )
+            SELECT state.category, state.current_rating AS "currentRating", state.peak_rating AS "peakRating",
+                COALESCE(aggregates.games, 0) AS games, COALESCE(aggregates.wins, 0) AS wins,
+                COALESCE(aggregates.draws, 0) AS draws, COALESCE(aggregates.losses, 0) AS losses,
+                COALESCE(aggregates.win_streak, 0) AS "currentWinStreak",
+                COALESCE(aggregates.loss_streak, 0) AS "currentLossStreak"
+            FROM player_rating_state state LEFT JOIN aggregates ON aggregates.category = state.category
+            WHERE state.club_id = $1 AND state.player_id = $2`,
+            [clubId, playerId]
+        );
+        const categories = Object.fromEntries(CATEGORIES.map(category => [category, emptyStats()]));
+        for (const row of result.rows) categories[row.category] = {
+            games: row.games, wins: row.wins, draws: row.draws, losses: row.losses,
+            weightedWinRate: row.games ? (row.wins + row.draws * 0.5) / row.games : 0,
+            currentRating: row.currentRating, peakRating: row.peakRating,
+            currentWinStreak: row.currentWinStreak, currentLossStreak: row.currentLossStreak,
+        };
+        return { playerId, categories };
     },
 
-    // Head-to-head summary between two players.
     getHeadToHead: async (clubId, playerAId, playerBId) => {
-        return db.query(
-            `SELECT
-                SUM(CASE
-                    WHEN white_player_id = $2 AND result = 'white' THEN 1
-                    WHEN black_player_id = $2 AND result = 'black' THEN 1
-                    ELSE 0
-                END)                                    AS player_a_wins,
-                SUM(CASE
-                    WHEN white_player_id = $3 AND result = 'white' THEN 1
-                    WHEN black_player_id = $3 AND result = 'black' THEN 1
-                    ELSE 0
-                END)                                    AS player_b_wins,
-                SUM(CASE WHEN result = 'draw' THEN 1 ELSE 0 END) AS draws,
-                COUNT(*)                                AS total
-             FROM matches
-             WHERE club_id = $1 AND (
-                (white_player_id = $2 AND black_player_id = $3)
-                OR
-                (white_player_id = $3 AND black_player_id = $2))`,
+        const rows = await db.query(
+            `SELECT rating_category AS category, COUNT(*)::INTEGER AS games,
+                COUNT(*) FILTER (WHERE (white_player_id = $2 AND result = 'white')
+                    OR (black_player_id = $2 AND result = 'black'))::INTEGER AS "playerAWins",
+                COUNT(*) FILTER (WHERE (white_player_id = $3 AND result = 'white')
+                    OR (black_player_id = $3 AND result = 'black'))::INTEGER AS "playerBWins",
+                COUNT(*) FILTER (WHERE result = 'draw')::INTEGER AS draws
+             FROM matches WHERE club_id = $1 AND status = 'active' AND is_rated = TRUE
+               AND ((white_player_id = $2 AND black_player_id = $3)
+                 OR (white_player_id = $3 AND black_player_id = $2))
+             GROUP BY rating_category`,
             [clubId, playerAId, playerBId]
-        ).then(r => r.first);
+        ).then(result => result.rows);
+        const categories = Object.fromEntries(CATEGORIES.map(category => [category,
+            { games: 0, playerAWins: 0, playerBWins: 0, draws: 0 }]));
+        for (const { category, ...summary } of rows) categories[category] = summary;
+        const overall = Object.values(categories).reduce((sum, value) => ({
+            games: sum.games + value.games, playerAWins: sum.playerAWins + value.playerAWins,
+            playerBWins: sum.playerBWins + value.playerBWins, draws: sum.draws + value.draws,
+        }), { games: 0, playerAWins: 0, playerBWins: 0, draws: 0 });
+        return { overall, categories };
     },
 
-    // Club-wide analytics for the admin dashboard.
-    getClubStats: async (clubId) => {
-        return db.query(
-            `SELECT
-                (SELECT COUNT(*) FROM players WHERE club_id = $1) AS total_players,
-                (SELECT COUNT(*) FROM matches WHERE club_id = $1) AS total_matches,
-                (SELECT COUNT(*) FROM tournaments WHERE club_id = $1) AS total_tournaments,
-                (SELECT ROUND(AVG(rating), 0) FROM players WHERE club_id = $1) AS average_rating,
-                (SELECT MAX(rating) FROM players WHERE club_id = $1) AS highest_rating,
-                (SELECT MIN(rating) FROM players WHERE club_id = $1) AS lowest_rating`,
-            [clubId]
-        ).then(r => r.first);
-    },
+    getClubStats: async (clubId) => db.query(
+        `SELECT
+            (SELECT COUNT(*)::INTEGER FROM players WHERE club_id = $1 AND status = 'active' AND deleted_at IS NULL) AS "rosterPlayers",
+            (SELECT COUNT(*)::INTEGER FROM matches WHERE club_id = $1 AND status = 'active') AS "totalGames",
+            (SELECT COUNT(*)::INTEGER FROM matches WHERE club_id = $1 AND status = 'active' AND is_rated = TRUE) AS "ratedGames",
+            (SELECT COUNT(*)::INTEGER FROM tournaments WHERE club_id = $1) AS "totalTournaments"`, [clubId]
+    ).then(result => result.first),
 
-    // Full club dashboard payload — everything ClubDashboard.jsx needs in one
-    // round trip: summary counters, games-by-time-control breakdown, a top
-    // players snapshot, and the most recent matches. Kept as one model
-    // method (rather than several controller-level calls) so all the
-    // sub-queries can run in parallel via Promise.all.
-    getDashboardStats: async (clubId) => {
-        const [summary, recentMatches, topPlayers, gamesByCategoryRows] = await Promise.all([
+    // All dashboard metrics use the all-time period. Active players are active
+    // roster players with at least one active (non-voided/non-deleted) game.
+    getDashboardStats: async (clubId, { category = 'blitz', includeAdmin = false } = {}) => {
+        const [metrics, recentMatches, leaderboard, breakdown] = await Promise.all([
             db.query(
                 `SELECT
-                    (SELECT COUNT(*) FROM user_clubs WHERE club_id = $1)                          AS total_members,
-                    (SELECT COUNT(*) FROM players WHERE club_id = $1)                              AS total_players,
-                    (SELECT COUNT(*) FROM players WHERE club_id = $1 AND games > 0)                AS active_players,
-                    (SELECT COUNT(*) FROM matches WHERE club_id = $1)                               AS total_matches,
-                    (SELECT COUNT(*) FROM tournaments WHERE club_id = $1)                           AS total_tournaments,
-                    (SELECT ROUND(AVG(rating), 0) FROM players WHERE club_id = $1)                  AS average_rating,
-                    (SELECT MAX(rating) FROM players WHERE club_id = $1)                            AS highest_rating,
-                    (SELECT MIN(rating) FROM players WHERE club_id = $1)                            AS lowest_rating,
-                    (SELECT COUNT(*) FROM club_join_requests WHERE club_id = $1 AND status = 'pending') AS pending_join_requests,
-                    (SELECT COUNT(*) FROM player_links pl
-                        JOIN players p ON p.id = pl.player_id
-                        WHERE p.club_id = $1 AND pl.status = 'pending')                              AS pending_player_links`,
-                [clubId]
-            ).then(r => r.first),
-
+                    (SELECT COUNT(*)::INTEGER FROM user_clubs WHERE club_id = $1 AND status = 'ACTIVE_MEMBER') AS "activeMembers",
+                    (SELECT COUNT(*)::INTEGER FROM players WHERE club_id = $1 AND status = 'active' AND deleted_at IS NULL) AS "rosterPlayers",
+                    (SELECT COUNT(*)::INTEGER FROM players player WHERE player.club_id = $1
+                        AND player.status = 'active' AND player.deleted_at IS NULL
+                        AND EXISTS (SELECT 1 FROM matches match WHERE match.club_id = $1 AND match.status = 'active'
+                            AND (match.white_player_id = player.id OR match.black_player_id = player.id))) AS "activePlayers",
+                    (SELECT COUNT(*)::INTEGER FROM matches WHERE club_id = $1 AND status = 'active') AS "totalGames",
+                    (SELECT COUNT(*)::INTEGER FROM matches WHERE club_id = $1 AND status = 'active' AND is_rated = TRUE) AS "ratedGames",
+                    (SELECT COUNT(*)::INTEGER FROM tournaments WHERE club_id = $1) AS "totalTournaments"`, [clubId]
+            ).then(result => result.first),
             db.query(
-                `SELECT m.id, m.result, m.type, m.time_control, m.played_at,
-                        wp.name AS white_name, bp.name AS black_name
-                 FROM matches m
-                 JOIN players wp ON wp.id = m.white_player_id
-                 JOIN players bp ON bp.id = m.black_player_id
-                 WHERE m.club_id = $1
-                 ORDER BY m.played_at DESC, m.created_at DESC
-                 LIMIT 5`,
-                [clubId]
-            ).then(r => r.rows),
-
-            db.query(
-                `SELECT id, name, rating, games, wins, draws, losses
-                 FROM players
-                 WHERE club_id = $1
-                 ORDER BY rating DESC, name ASC
-                 LIMIT 5`,
-                [clubId]
-            ).then(r => r.rows),
-
-            db.query(
-                `SELECT time_control, COUNT(*)::int AS count
-                 FROM matches
-                 WHERE club_id = $1
-                 GROUP BY time_control`,
-                [clubId]
-            ).then(r => r.rows),
+                `SELECT match.id, match.result, match.rating_category AS "ratingCategory",
+                    match.is_rated AS "isRated", match.played_at AS "playedAt",
+                    white_player.id AS "whitePlayerId", white_player.name AS "whitePlayerName",
+                    black_player.id AS "blackPlayerId", black_player.name AS "blackPlayerName"
+                 FROM matches match
+                 JOIN players white_player ON white_player.id = match.white_player_id AND white_player.club_id = match.club_id
+                 JOIN players black_player ON black_player.id = match.black_player_id AND black_player.club_id = match.club_id
+                 WHERE match.club_id = $1 AND match.status = 'active'
+                 ORDER BY match.played_at DESC, match.id DESC LIMIT 5`, [clubId]
+            ).then(result => result.rows),
+            LeaderboardModel.getByClub(clubId, { category, limit: 5, offset: 0 }),
+            db.query(`SELECT rating_category AS category, COUNT(*)::INTEGER AS count
+                FROM matches WHERE club_id = $1 AND status = 'active' GROUP BY rating_category`, [clubId]
+            ).then(result => result.rows),
         ]);
-
-        const games_by_category = { blitz: 0, rapid: 0, classical: 0 };
-        for (const row of gamesByCategoryRows) {
-            if (row.time_control in games_by_category) {
-                games_by_category[row.time_control] = row.count;
-            }
-        }
-
+        const gamesByCategory = { blitz: 0, rapid: 0, classical: 0 };
+        for (const row of breakdown) gamesByCategory[row.category] = row.count;
+        let admin;
+        if (includeAdmin) admin = await db.query(
+            `SELECT
+                (SELECT COUNT(*)::INTEGER FROM club_join_requests WHERE club_id = $1 AND status = 'pending') AS "pendingJoinRequests",
+                (SELECT COUNT(*)::INTEGER FROM player_links link JOIN players player
+                    ON player.id = link.player_id AND player.club_id = link.club_id
+                    WHERE link.club_id = $1 AND link.status = 'pending') AS "pendingPlayerLinks"`, [clubId]
+        ).then(result => result.first);
         return {
-            ...summary,
-            games_by_category,
-            top_players: topPlayers,
-            recent_matches: recentMatches,
+            period: 'allTime', selectedCategory: category,
+            definitions: {
+                activeMembers: 'Current club memberships with ACTIVE_MEMBER status.',
+                activePlayers: 'Active roster players with at least one active game.',
+                totalGames: 'All active games; voided and deleted games are excluded.',
+                ratedGames: 'Active games that affect ratings.',
+            },
+            metrics: { ...metrics, gamesByCategory }, topPlayers: leaderboard.entries, recentMatches,
+            ...(admin ? { admin } : {}),
         };
     },
 };

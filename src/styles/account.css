@@ -1,0 +1,7 @@
+.account-page { padding: 24px; max-width: 900px; margin: 0 auto; }
+.account-page .page-header { margin-bottom: 1rem; }
+.account-page section { margin: 1rem 0; padding: 1.25rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--bg-secondary); }
+.account-page section h2 { margin-top: 0; }
+.account-page .modal-body { max-width: 560px; }
+.account-page .danger-zone { border-color: rgba(239, 68, 68, 0.4); }
+@media (max-width: 700px) { .account-page { padding: 16px; } }

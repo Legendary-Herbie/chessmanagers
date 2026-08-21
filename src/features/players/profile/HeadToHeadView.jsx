@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { api, endpoints } from '../../../config/api.js';
+import { playerApi } from '../api/playerApi.js';
+import { matchResultLabel } from '../../matches/matchPresentation.js';
 
 export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
     const [selectedPlayerBId, setSelectedPlayerBId] = useState('');
     const [summary, setSummary] = useState(null);
+    const [category, setCategory] = useState('overall');
     const [matches, setMatches] = useState([]);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
     const opponentOptions = allPlayers.filter(p => p.id !== playerA?.id);
 
-    const fetchHeadToHead = useCallback(async () => {
+    const fetchHeadToHead = useCallback(async (signal) => {
         if (!clubId || !playerA?.id || !selectedPlayerBId) {
             setSummary(null);
             setMatches([]);
@@ -21,29 +23,30 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
         setError(null);
 
         try {
-            const summaryEndpoint = endpoints.leaderboard.headToHead(clubId, playerA.id, selectedPlayerBId);
-            const matchesEndpoint = endpoints.players.headToHead(clubId, playerA.id, selectedPlayerBId);
-
-            const [summaryRes, matchesRes] = await Promise.all([
-                api.get(summaryEndpoint).catch(() => null),
-                api.get(matchesEndpoint).catch(() => null),
+            const [summaryResult, matchResult] = await Promise.all([
+                playerApi.fetchHeadToHead(clubId, playerA.id, selectedPlayerBId, { signal }),
+                playerApi.fetchHeadToHeadMatches(clubId, playerA.id, selectedPlayerBId, { signal }),
             ]);
-
-            setSummary(summaryRes?.summary || summaryRes || null);
-            setMatches(matchesRes?.matches || []);
+            if (signal?.aborted) return;
+            setSummary(summaryResult);
+            setMatches(matchResult);
         } catch (err) {
+            if (signal?.aborted) return;
             console.error('Failed to fetch head to head data:', err);
             setError(err.message || 'Could not load head-to-head history.');
         } finally {
-            setLoading(false);
+            if (!signal?.aborted) setLoading(false);
         }
     }, [clubId, playerA, selectedPlayerBId]);
 
     useEffect(() => {
-        fetchHeadToHead();
+        const controller = new AbortController();
+        fetchHeadToHead(controller.signal);
+        return () => controller.abort();
     }, [fetchHeadToHead]);
 
     const playerB = allPlayers.find(p => p.id === selectedPlayerBId);
+    const selectedSummary = category === 'overall' ? summary?.overall : summary?.categories?.[category];
 
     return (
         <div className="chart-card">
@@ -93,6 +96,12 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
 
             {!loading && selectedPlayerBId && summary && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
+                    <div className="category-switcher" role="group" aria-label="Head-to-head category">
+                        {['overall', 'blitz', 'rapid', 'classical'].map(value => (
+                            <button type="button" key={value} className={category === value ? 'active' : ''}
+                                onClick={() => setCategory(value)}>{value[0].toUpperCase() + value.slice(1)}</button>
+                        ))}
+                    </div>
                     {/* Scoreboard */}
                     <div
                         style={{
@@ -109,7 +118,7 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                         <div>
                             <strong style={{ display: 'block', fontSize: '1.1rem', color: 'var(--text-strong)' }}>{playerA?.name}</strong>
                             <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>
-                                {summary.playerA_wins ?? summary.winsA ?? 0}
+                                {selectedSummary.playerAWins}
                             </span>
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -117,16 +126,16 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                                 Total Played
                             </span>
                             <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-strong)' }}>
-                                {summary.total_matches ?? summary.totalMatches ?? matches.length}
+                                {selectedSummary.games}
                             </span>
                             <span style={{ fontSize: '0.75rem', color: 'var(--warning)' }}>
-                                {summary.draws ?? 0} Draw(s)
+                                {selectedSummary.draws} Draw(s)
                             </span>
                         </div>
                         <div>
                             <strong style={{ display: 'block', fontSize: '1.1rem', color: 'var(--text-strong)' }}>{playerB?.name}</strong>
                             <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent)' }}>
-                                {summary.playerB_wins ?? summary.winsB ?? 0}
+                                {selectedSummary.playerBWins}
                             </span>
                         </div>
                     </div>
@@ -147,15 +156,15 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                                 <tbody>
                                     {matches.map((m) => (
                                         <tr key={m.id}>
-                                            <td>{new Date(m.played_at || m.created_at).toLocaleDateString()}</td>
+                                            <td>{new Date(m.playedAt).toLocaleDateString()}</td>
                                             <td>
-                                                <strong style={{ color: m.white_player_id === playerA?.id ? 'var(--primary)' : 'var(--text)' }}>
-                                                    {m.white_name || (m.white_player_id === playerA?.id ? playerA.name : playerB?.name)}
+                                                <strong style={{ color: m.whitePlayerId === playerA?.id ? 'var(--primary)' : 'var(--text)' }}>
+                                                    {m.whitePlayerName}
                                                 </strong>
                                             </td>
                                             <td>
-                                                <strong style={{ color: m.black_player_id === playerA?.id ? 'var(--primary)' : 'var(--text)' }}>
-                                                    {m.black_name || (m.black_player_id === playerA?.id ? playerA.name : playerB?.name)}
+                                                <strong style={{ color: m.blackPlayerId === playerA?.id ? 'var(--primary)' : 'var(--text)' }}>
+                                                    {m.blackPlayerName}
                                                 </strong>
                                             </td>
                                             <td>
@@ -163,17 +172,17 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                                                     style={{
                                                         fontWeight: 700,
                                                         color: m.result === 'draw' ? 'var(--warning)' : (
-                                                            (m.result === 'white' && m.white_player_id === playerA?.id) ||
-                                                            (m.result === 'black' && m.black_player_id === playerA?.id)
+                                                            (m.result === 'white' && m.whitePlayerId === playerA?.id) ||
+                                                            (m.result === 'black' && m.blackPlayerId === playerA?.id)
                                                                 ? 'var(--accent)'
                                                                 : 'var(--danger)'
                                                         )
                                                     }}
                                                 >
-                                                    {m.result.toUpperCase()}
+                                                    {matchResultLabel(m.result)}
                                                 </span>
                                             </td>
-                                            <td style={{ textTransform: 'capitalize' }}>{m.type}</td>
+                                            <td style={{ textTransform: 'capitalize' }}>{m.ratingCategory}</td>
                                         </tr>
                                     ))}
                                 </tbody>

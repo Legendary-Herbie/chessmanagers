@@ -12,7 +12,7 @@ function AuthLogoutListener() {
     useEffect(() => {
         const handle = () => {
             clearToken();
-            logout();
+            logout(false);
         };
         window.addEventListener('auth:logout', handle);
         return () => window.removeEventListener('auth:logout', handle);

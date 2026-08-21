@@ -1,13 +1,21 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../app/contextHooks.js';
 import Button from '../../shared/common/Button.jsx';
+import { authApi } from '../../features/auth/api/authApi.js';
 
 export default function LoginView() {
     const { login }   = useAuth();
     const navigate    = useNavigate();
     const [searchParams] = useSearchParams();
     const inviteToken = searchParams.get('inviteToken');
+    const joinCode = searchParams.get('joinCode');
+    const continuation = inviteToken
+        ? `?inviteToken=${encodeURIComponent(inviteToken)}`
+        : joinCode ? `?joinCode=${encodeURIComponent(joinCode)}` : '';
+    const destination = inviteToken
+        ? `/clubs/join?token=${encodeURIComponent(inviteToken)}`
+        : joinCode ? `/clubs/join?code=${encodeURIComponent(joinCode)}` : '/dashboard';
 
     const [fields, setFields] = useState({ email: '', password: '' });
     const [error,  setError]  = useState('');
@@ -28,8 +36,12 @@ export default function LoginView() {
         setBusy(true);
         try {
             await login(fields);
-            navigate(inviteToken ? `/clubs/join?token=${encodeURIComponent(inviteToken)}` : '/dashboard');
+            navigate(destination);
         } catch (err) {
+            if (err.code === 'EMAIL_VERIFICATION_REQUIRED') {
+                navigate(`/auth/verification-pending?email=${encodeURIComponent(fields.email)}${continuation ? `&${continuation.slice(1)}` : ''}`);
+                return;
+            }
             setError(err.message || 'Login failed. Please try again.');
         } finally {
             setBusy(false);
@@ -95,11 +107,17 @@ export default function LoginView() {
                 >
                     Sign in
                 </Button>
+                <button type="button" className="auth-google"
+                    onClick={() => window.location.assign(authApi.googleStartUrl(destination))}>
+                    Continue with Google
+                </button>
             </form>
+
+            <p className="auth-switch"><Link to={`/auth/forgot-password${continuation}`} className="auth-link">Forgot your password?</Link></p>
 
             <p className="auth-switch">
                 Don't have an account?{' '}
-                <Link to={inviteToken ? `/auth/register?inviteToken=${encodeURIComponent(inviteToken)}` : '/auth/register'} className="auth-link">Create one</Link>
+                <Link to={`/auth/register${continuation}`} className="auth-link">Create one</Link>
             </p>
         </div>
     );

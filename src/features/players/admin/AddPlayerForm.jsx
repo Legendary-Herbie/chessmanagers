@@ -10,7 +10,7 @@ export default function AddPlayerForm({
 }) {
     const [tab, setTab] = useState('single'); // 'single' | 'bulk'
     const [name, setName] = useState('');
-    const [rating, setRating] = useState('1200');
+    const [rating, setRating] = useState('');
     const [bio, setBio] = useState('');
     
     // Bulk state
@@ -48,15 +48,16 @@ export default function AddPlayerForm({
         setError(null);
 
         try {
+            const parsedRating = rating.trim() ? Number.parseInt(rating, 10) : null;
             await playerApi.createPlayer(clubId, {
                 name: name.trim(),
-                rating: parseInt(rating, 10) || 1200,
+                ...(Number.isInteger(parsedRating) ? { rating: parsedRating } : {}),
                 bio: bio.trim() || undefined,
             });
 
             // Reset form
             setName('');
-            setRating('1200');
+            setRating('');
             setBio('');
             if (onPlayerAdded) onPlayerAdded();
             if (onClose) onClose();
@@ -77,18 +78,16 @@ export default function AddPlayerForm({
             if (!line) continue;
 
             const parts = line.split(',');
-            if (parts.length >= 2 && !isNaN(parseInt(parts[1].trim(), 10))) {
-                parsed.push({
-                    name: parts[0].trim(),
-                    rating: parseInt(parts[1].trim(), 10) || 1200,
-                    bio: parts.slice(2).join(',').trim() || undefined,
-                });
-            } else {
-                parsed.push({
-                    name: line,
-                    rating: 1200,
-                });
-            }
+            const parsedRating = parts[1]?.trim()
+                ? Number.parseInt(parts[1].trim(), 10)
+                : null;
+            parsed.push({
+                name: parts[0].trim(),
+                ...(Number.isInteger(parsedRating) ? { rating: parsedRating } : {}),
+                ...(parts.length > 2
+                    ? { bio: parts.slice(2).join(',').trim() || undefined }
+                    : {}),
+            });
         }
         return parsed;
     };
@@ -148,7 +147,7 @@ export default function AddPlayerForm({
                     className={`form-tab ${tab === 'bulk' ? 'form-tab--active' : ''}`}
                     onClick={() => { setTab('bulk'); setError(null); }}
                 >
-                    Bulk Add / Import
+                    Bulk roster entry
                 </button>
             </div>
 
@@ -179,11 +178,11 @@ export default function AddPlayerForm({
                             className="form-input"
                             value={rating}
                             onChange={(e) => setRating(e.target.value)}
-                            placeholder="1200"
+                            placeholder="Use club default"
                             min="100"
                             max="3500"
                         />
-                        <span className="form-helper">Default starting rating is 1200.</span>
+                        <span className="form-helper">Leave blank to use this club's configured category ratings.</span>
                     </div>
 
                     <div className="form-group">
@@ -230,7 +229,7 @@ export default function AddPlayerForm({
                             <ul style={{ margin: '6px 0 0 0', paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text)' }}>
                                 {bulkPreview.slice(0, 5).map((p, idx) => (
                                     <li key={idx}>
-                                        <strong>{p.name}</strong> — Rating: {p.rating} {p.bio ? `(${p.bio})` : ''}
+                                        <strong>{p.name}</strong> — Rating: {p.rating ?? 'club defaults'} {p.bio ? `(${p.bio})` : ''}
                                     </li>
                                 ))}
                                 {bulkPreview.length > 5 && (
@@ -247,7 +246,7 @@ export default function AddPlayerForm({
                             </button>
                         )}
                         <button type="submit" className="btn-primary" disabled={loading || bulkPreview.length === 0}>
-                            {loading ? `Creating ${bulkPreview.length} Players...` : `Import ${bulkPreview.length} Player(s)`}
+                            {loading ? `Creating ${bulkPreview.length} Players...` : `Add ${bulkPreview.length} Player(s)`}
                         </button>
                     </div>
                 </form>

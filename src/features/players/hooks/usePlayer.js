@@ -1,61 +1,70 @@
 import { useState, useEffect, useCallback } from 'react';
 import { playerApi } from '../api/playerApi.js';
+import { isCancelledError } from '../../../config/api.js';
 
-export function usePlayer(clubId, playerId) {
+export function usePlayer(clubId, playerId, ratingCategory = 'blitz') {
     const [player, setPlayer] = useState(null);
     const [allPlayers, setAllPlayers] = useState([]);
     const [matches, setMatches] = useState([]);
     const [ratingHistory, setRatingHistory] = useState([]);
+    const [statistics, setStatistics] = useState(null);
 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
-    const fetchPlayerData = useCallback(async () => {
-        if (!clubId || !playerId) return;
+    const fetchPlayerData = useCallback(async (signal) => {
+        if (!clubId || !playerId) {
+            setLoading(false);
+            return;
+        }
         setLoading(true);
 
         try {
-            const [playerRes, matchesRes, ratingRes, allPlayersRes] = await Promise.all([
-                playerApi.fetchPlayer(clubId, playerId),
-                playerApi.fetchMatches(clubId, playerId).catch(() => []),
-                playerApi.fetchRatingHistory(clubId, playerId).catch(() => []),
-                playerApi.fetchPlayers(clubId).catch(() => []),
+            const [playerRes, matchesRes, ratingRes, statisticsRes, allPlayersRes] = await Promise.all([
+                playerApi.fetchPlayer(clubId, playerId, { signal }),
+                playerApi.fetchMatches(clubId, playerId, { signal }),
+                playerApi.fetchRatingHistory(clubId, playerId, ratingCategory, { signal }),
+                playerApi.fetchStatistics(clubId, playerId, { signal }),
+                playerApi.fetchPlayers(clubId, { signal }),
             ]);
 
+            if (signal?.aborted) return;
             setPlayer(playerRes);
             setMatches(matchesRes);
             setRatingHistory(ratingRes);
+            setStatistics(statisticsRes);
             setAllPlayers(allPlayersRes);
             setError(null);
         } catch (err) {
+            if (signal?.aborted || isCancelledError(err)) return;
             console.error('Failed to load player details:', err);
             setError(err.message || 'Player not found or unable to fetch profile.');
         } finally {
-            setLoading(false);
+            if (!signal?.aborted) setLoading(false);
         }
-    }, [clubId, playerId]);
+    }, [clubId, playerId, ratingCategory]);
 
     useEffect(() => {
-        if (clubId && playerId) {
-            fetchPlayerData();
-        }
+        const controller = new AbortController();
+        fetchPlayerData(controller.signal);
+        return () => controller.abort();
     }, [clubId, playerId, fetchPlayerData]);
 
     const claimPlayer = async () => {
         if (!clubId || !player) return;
         await playerApi.claimPlayer(clubId, player.id);
-        fetchPlayerData();
+        await fetchPlayerData();
     };
 
     const unlinkPlayer = async () => {
-        if (!clubId || !player || !player.linked_user_id) return;
-        await playerApi.unlinkPlayer(clubId, player.id, player.linked_user_id);
-        fetchPlayerData();
+        if (!clubId || !player || player.link_status !== 'approved') return;
+        await playerApi.unlinkPlayer(clubId, player.id);
+        await fetchPlayerData();
     };
 
-    const deletePlayer = async () => {
+    const archivePlayer = async () => {
         if (!clubId || !player) return;
-        await playerApi.deletePlayer(clubId, player.id);
+        await playerApi.archivePlayer(clubId, player.id);
     };
 
     return {
@@ -63,11 +72,12 @@ export function usePlayer(clubId, playerId) {
         allPlayers,
         matches,
         ratingHistory,
+        statistics,
         loading,
         error,
         refetch: fetchPlayerData,
         claimPlayer,
         unlinkPlayer,
-        deletePlayer,
+        archivePlayer,
     };
 }

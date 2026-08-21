@@ -1,3 +1,4 @@
+import React from 'react';
 import '../../styles/common.css';
 
 export default function Button({

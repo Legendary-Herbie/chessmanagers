@@ -1,254 +1,218 @@
 import { PlayerModel } from '../models/Player.js';
 import { PlayerLinkModel } from '../models/PlayerLink.js';
-import { UserModel } from '../models/User.js';
 
-// GET /api/v1/clubs/:clubId/players
+const MESSAGES = {
+    PLAYER_NOT_FOUND: [404, 'Player not found in this club.'],
+    LINK_NOT_FOUND: [404, 'Link request not found in this club.'],
+    PLAYER_DELETED: [409, 'Deleted players cannot be changed.'],
+    PLAYER_NOT_ACTIVE: [409, 'Only active players can be claimed or linked.'],
+    INVALID_PLAYER_STATUS: [409, 'Player is not in the required lifecycle state.'],
+    LINK_NOT_PENDING: [409, 'This claim request is no longer pending.'],
+    CLAIM_CONFLICT: [409, 'The member or player already has a pending or approved claim in this club.'],
+    NOT_ACTIVE_MEMBER: [403, 'An active club membership is required.'],
+    NOT_LINKED_PLAYER: [403, 'You can only edit your own linked player profile.'],
+    NOT_LINK_OWNER: [403, 'You can only unlink your own player profile.'],
+    CLUB_NOT_ACTIVE: [409, 'This club is not active.'],
+    NO_CHANGES: [400, 'At least one field must be provided.'],
+};
+
+function sendFailure(res, result) {
+    const [status, message] = MESSAGES[result.code] ?? [400, 'The requested operation could not be completed.'];
+    return res.status(status).json({ error: message, code: result.code });
+}
+
 export async function getPlayers(req, res, next) {
     try {
-        const players = await PlayerModel.findByClub(req.params.clubId);
-        res.json({ players });
-    } catch (err) {
-        next(err);
+        const { q = '', limit = 50, offset = 0 } = req.validatedQuery;
+        const result = await PlayerModel.findByClub(req.params.clubId, req.user.id, { q, limit, offset });
+        res.json({ players: result.players, total: result.total, limit, offset });
+    } catch (error) {
+        next(error);
     }
 }
 
-// GET /api/v1/clubs/:clubId/players/:playerId
+export async function getInactivePlayers(req, res, next) {
+    try {
+        const players = await PlayerModel.findInactiveByClub(req.params.clubId);
+        res.json({ players });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function getPlayer(req, res, next) {
     try {
-        const player = await PlayerModel.findById(req.params.playerId);
-
-        if (!player || player.club_id !== req.params.clubId) {
-            return res.status(404).json({ error: 'Player not found in this club.' });
-        }
-
+        const player = await PlayerModel.findByClubAndId(req.params.clubId, req.params.playerId, req.user.id);
+        if (!player) return res.status(404).json({ error: 'Player not found in this club.' });
         res.json({ player });
-    } catch (err) {
-        next(err);
+    } catch (error) {
+        next(error);
     }
 }
 
-// POST /api/v1/clubs/:clubId/players — admin only
 export async function createPlayer(req, res, next) {
     try {
-        const { name, rating, bio } = req.body;
-
-        if (!name) {
-            return res.status(400).json({ error: 'Player name is required.' });
-        }
-
         const player = await PlayerModel.create({
             clubId: req.params.clubId,
-            name,
-            rating: rating ? parseInt(rating, 10) : 1200,
-            bio,
+            actorUserId: req.user.id,
+            ...req.validated,
         });
-
         res.status(201).json({ player });
-    } catch (err) {
-        next(err);
+    } catch (error) {
+        next(error);
     }
 }
 
-// POST /api/v1/clubs/:clubId/players/bulk — admin only
 export async function createPlayersBulk(req, res, next) {
     try {
-        const { players } = req.body;
-
-        if (!Array.isArray(players) || players.length === 0) {
-            return res.status(400).json({ error: 'players array is required and must not be empty.' });
-        }
-
-        for (const p of players) {
-            if (!p.name || typeof p.name !== 'string' || !p.name.trim()) {
-                return res.status(400).json({ error: 'All players must have a valid name.' });
-            }
-        }
-
         const created = await PlayerModel.createBulk({
             clubId: req.params.clubId,
-            players,
+            actorUserId: req.user.id,
+            players: req.validated.players,
         });
-
         res.status(201).json({ players: created, count: created.length });
-    } catch (err) {
-        next(err);
+    } catch (error) {
+        next(error);
     }
 }
 
-// PATCH /api/v1/clubs/:clubId/players/:playerId
-// Admin can update any player.
-// Linked players can only update their own — enforced via requireRole & requireSelfOrAdmin middleware.
 export async function updatePlayer(req, res, next) {
     try {
-        const existing = await PlayerModel.findById(req.params.playerId);
-        if (!existing || existing.club_id !== req.params.clubId) {
-            return res.status(404).json({ error: 'Player not found in this club.' });
+        if (!req.clubContext.capabilities.canManagePlayers) {
+            const officialFields = ['name', 'dateOfBirth', 'federationId'];
+            if (officialFields.some(field => Object.prototype.hasOwnProperty.call(req.validated, field))) {
+                return res.status(403).json({ error: 'Only club admins may change official player identity fields.' });
+            }
+            const selfChanges = {};
+            if (Object.prototype.hasOwnProperty.call(req.validated, 'bio')) selfChanges.bio = req.validated.bio;
+            const selfResult = await PlayerModel.updateSelfProfile({
+                clubId: req.params.clubId,
+                playerId: req.params.playerId,
+                userId: req.user.id,
+                changes: selfChanges,
+            });
+            if (!selfResult.ok) return sendFailure(res, selfResult);
+            return res.json({ player: selfResult.player });
         }
-
-        const { name, bio } = req.body;
-        const player = await PlayerModel.update(req.params.playerId, { name, bio });
-
-        res.json({ player });
-    } catch (err) {
-        next(err);
+        const result = await PlayerModel.updateAdmin({
+            clubId: req.params.clubId,
+            playerId: req.params.playerId,
+            actorUserId: req.user.id,
+            changes: req.validated,
+        });
+        if (!result.ok) return sendFailure(res, result);
+        return res.json({ player: result.player });
+    } catch (error) {
+        next(error);
     }
 }
 
-// DELETE /api/v1/clubs/:clubId/players/:playerId — admin only
-export async function deletePlayer(req, res, next) {
+export async function updateOwnPlayerProfile(req, res, next) {
     try {
-        const existing = await PlayerModel.findById(req.params.playerId);
-        if (!existing || existing.club_id !== req.params.clubId) {
-            return res.status(404).json({ error: 'Player not found in this club.' });
-        }
-
-        await PlayerModel.delete(req.params.playerId);
-        res.json({ message: 'Player deleted.' });
-    } catch (err) {
-        next(err);
+        const result = await PlayerModel.updateSelfProfile({
+            clubId: req.params.clubId,
+            playerId: req.params.playerId,
+            userId: req.user.id,
+            changes: req.validated,
+        });
+        if (!result.ok) return sendFailure(res, result);
+        res.json({ player: result.player });
+    } catch (error) {
+        next(error);
     }
 }
 
-// ── Player link management ─────────────────────────────────────────────────────
+async function changePlayerStatus(req, res, next, transition) {
+    try {
+        const result = await PlayerModel.setStatus({
+            clubId: req.params.clubId,
+            playerId: req.params.playerId,
+            actorUserId: req.user.id,
+            ...transition,
+        });
+        if (!result.ok) return sendFailure(res, result);
+        res.json({ player: result.player });
+    } catch (error) {
+        next(error);
+    }
+}
 
-// POST /api/v1/clubs/:clubId/players/:playerId/claim
-// Authenticated user requests to link their account to this player.
+export const archivePlayer = (req, res, next) => changePlayerStatus(req, res, next, {
+    fromStatus: 'active', toStatus: 'inactive', eventType: 'player.archived',
+});
+
+export const restorePlayer = (req, res, next) => changePlayerStatus(req, res, next, {
+    fromStatus: 'inactive', toStatus: 'active', eventType: 'player.restored',
+});
+
+export const deletePlayer = (req, res, next) => changePlayerStatus(req, res, next, {
+    fromStatus: 'inactive', toStatus: 'deleted', eventType: 'player.deleted',
+});
+
 export async function claimPlayer(req, res, next) {
     try {
-        const { playerId, clubId } = req.params;
-        const userId = req.user.id;
-
-        const player = await PlayerModel.findById(playerId);
-        if (!player || player.club_id !== clubId) {
-            return res.status(404).json({ error: 'Player not found in this club.' });
-        }
-
-        // Prevent duplicate claim requests
-        const existing = await PlayerLinkModel.findByUser(userId);
-        if (existing) {
-            return res.status(409).json({
-                error: 'You already have a pending or approved link request.',
-            });
-        }
-
-        const link = await PlayerLinkModel.requestLink(userId, playerId);
-        res.status(201).json({ link });
-    } catch (err) {
-        next(err);
+        const result = await PlayerLinkModel.requestClaim({
+            clubId: req.params.clubId,
+            playerId: req.params.playerId,
+            userId: req.user.id,
+        });
+        if (!result.ok) return sendFailure(res, result);
+        res.status(201).json({ link: result.link });
+    } catch (error) {
+        next(error);
     }
 }
 
-// GET /api/v1/clubs/:clubId/links/pending or /player-links/pending — admin only
 export async function getPendingLinks(req, res, next) {
     try {
         const links = await PlayerLinkModel.findPendingByClub(req.params.clubId);
         res.json({ links });
-    } catch (err) {
-        next(err);
+    } catch (error) {
+        next(error);
     }
 }
 
-// PATCH /api/v1/clubs/:clubId/links/:linkId/approve — admin only
 export async function approveLink(req, res, next) {
     try {
-        const linkInfo = await PlayerLinkModel.findById(req.params.linkId);
-        if (!linkInfo || linkInfo.club_id !== req.params.clubId) {
-            return res.status(404).json({ error: 'Link request not found in this club.' });
-        }
-
-        const link = await PlayerLinkModel.approve(req.params.linkId);
-
-        if (!link) {
-            return res.status(404).json({ error: 'Link request not found.' });
-        }
-
-        // Grant the user the `linked_player` role if not already admin
-        try {
-            const user = await UserModel.findById(link.user_id);
-            if (user && user.role !== 'admin') {
-                await UserModel.updateRole(link.user_id, 'linked_player');
-            }
-        } catch (e) {
-            console.error('[WARN] Failed to update user role on link approval:', e);
-        }
-
-        res.json({ link });
-    } catch (err) {
-        next(err);
+        const result = await PlayerLinkModel.approve({
+            clubId: req.params.clubId,
+            linkId: req.params.linkId,
+            actorUserId: req.user.id,
+        });
+        if (!result.ok) return sendFailure(res, result);
+        res.json({ link: result.link });
+    } catch (error) {
+        next(error);
     }
 }
 
-// PATCH /api/v1/clubs/:clubId/links/:linkId/reject — admin only
 export async function rejectLink(req, res, next) {
     try {
-        const linkInfo = await PlayerLinkModel.findById(req.params.linkId);
-        if (!linkInfo || linkInfo.club_id !== req.params.clubId) {
-            return res.status(404).json({ error: 'Link request not found in this club.' });
-        }
-
-        const link = await PlayerLinkModel.reject(req.params.linkId);
-
-        if (!link) {
-            return res.status(404).json({ error: 'Link request not found.' });
-        }
-
-        // Check if user has any other approved links, if 0 revert role to member
-        try {
-            const count = await PlayerLinkModel.countApprovedByUser(link.user_id);
-            const user = await UserModel.findById(link.user_id);
-            if (count === 0 && user && user.role === 'linked_player') {
-                await UserModel.updateRole(link.user_id, 'member');
-            }
-        } catch (e) {
-            console.error('[WARN] Failed to check/revert user role on link rejection:', e);
-        }
-
-        res.json({ link });
-    } catch (err) {
-        next(err);
+        const result = await PlayerLinkModel.reject({
+            clubId: req.params.clubId,
+            linkId: req.params.linkId,
+            actorUserId: req.user.id,
+            reason: req.validated.reason ?? null,
+        });
+        if (!result.ok) return sendFailure(res, result);
+        res.json({ link: result.link });
+    } catch (error) {
+        next(error);
     }
 }
 
-// DELETE /api/v1/clubs/:clubId/players/:playerId/unlink — admin only
 export async function unlinkPlayer(req, res, next) {
     try {
-        const { playerId, clubId } = req.params;
-        const userId = req.body?.userId || req.query?.userId;
-
-        const player = await PlayerModel.findById(playerId);
-        if (!player || player.club_id !== clubId) {
-            return res.status(404).json({ error: 'Player not found in this club.' });
-        }
-
-        // If userId is omitted, find the linked user for this player
-        let targetUserId = userId;
-        if (!targetUserId && player.linked_user_id) {
-            targetUserId = player.linked_user_id;
-        }
-
-        if (!targetUserId) {
-            return res.status(400).json({ error: 'userId is required to unlink player.' });
-        }
-
-        const removed = await PlayerLinkModel.unlink(targetUserId, playerId);
-
-        if (!removed) {
-            return res.status(404).json({ error: 'No active link found for this player.' });
-        }
-
-        // Check remaining approved links for target user, if 0 revert role to member
-        try {
-            const count = await PlayerLinkModel.countApprovedByUser(targetUserId);
-            const user = await UserModel.findById(targetUserId);
-            if (count === 0 && user && user.role === 'linked_player') {
-                await UserModel.updateRole(targetUserId, 'member');
-            }
-        } catch (e) {
-            console.error('[WARN] Failed to check/revert user role on unlinking:', e);
-        }
-
-        res.json({ message: 'Player unlinked.' });
-    } catch (err) {
-        next(err);
+        const result = await PlayerLinkModel.unlink({
+            clubId: req.params.clubId,
+            playerId: req.params.playerId,
+            actorUserId: req.user.id,
+            actorIsAdmin: req.clubContext.capabilities.canManagePlayers,
+            reason: req.validated.reason ?? null,
+        });
+        if (!result.ok) return sendFailure(res, result);
+        res.json({ message: 'Player account link removed.' });
+    } catch (error) {
+        next(error);
     }
 }

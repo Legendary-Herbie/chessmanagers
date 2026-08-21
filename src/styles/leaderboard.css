@@ -28,6 +28,29 @@
     gap: 0.5rem;
     color: var(--text-muted);
 }
+.category-switcher {
+    display: inline-flex;
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+    overflow: hidden;
+}
+.category-switcher button {
+    border: 0;
+    border-right: 1px solid var(--border);
+    padding: 0.65rem 0.8rem;
+    background: var(--bg-secondary);
+    color: var(--text-muted);
+    cursor: pointer;
+}
+.category-switcher button:last-child { border-right: 0; }
+.category-switcher button.active {
+    background: var(--primary);
+    color: white;
+}
+.selected-rating {
+    color: var(--primary);
+    font-weight: 700;
+}
 .leaderboard-table th,
 .leaderboard-table td {
     padding: 0.85rem 1rem;
@@ -91,4 +114,33 @@
     justify-content: space-between;
     gap: 1rem;
     align-items: center;
+}
+.leaderboard-cards { display: none; }
+.leaderboard-pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1rem;
+    margin-top: 1.25rem;
+}
+.leaderboard-card {
+    width: 100%;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.4rem 0.75rem;
+    padding: 1rem;
+    text-align: left;
+    color: var(--text);
+    background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: 0.75rem;
+}
+.leaderboard-card__rank { grid-row: span 3; font-weight: 800; color: var(--primary); }
+@media (max-width: 700px) {
+    .leaderboard-page { padding: 16px; }
+    .leaderboard-table { display: none; }
+    .leaderboard-cards { display: grid; gap: 0.75rem; }
+    .controls, .input { width: 100%; }
+    .category-switcher { width: 100%; }
+    .category-switcher button { flex: 1; }
 }

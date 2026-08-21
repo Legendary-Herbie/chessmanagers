@@ -1,82 +1,63 @@
 import db from '../database/database.js';
 
-// Represents a user account. A user may optionally have an approved
-// `player_links` row; models and controllers often want the linked
-// `player_id` and the `link_status` alongside the user record.
+const queryFor = trx => trx ? trx.query.bind(trx) : db.query.bind(db);
+
 export const UserModel = {
+    create: async ({ email, username, fullName, name, passwordHash = null,
+        role = 'member', emailVerified = false }, trx = null) => queryFor(trx)(
+        `INSERT INTO users (
+            email, name, username, full_name, password_hash, role,
+            email_verified, email_verified_at
+         ) VALUES (LOWER($1), $3, $2, $3, $4, $5, $6, CASE WHEN $6 THEN NOW() END)
+         RETURNING *`,
+        [email, username ?? name, fullName ?? name, passwordHash, role, emailVerified]
+    ).then(result => result.first),
 
-    // ── Create ────────────────────────────────────────────────────────────────
+    findById: async (id, { includeDeleted = false, forUpdate = false, trx = null } = {}) => queryFor(trx)(
+        `SELECT * FROM users WHERE id = $1 AND ($2::BOOLEAN OR deleted_at IS NULL)
+         ${forUpdate ? 'FOR UPDATE' : ''}`,
+        [id, includeDeleted]
+    ).then(result => result.first),
 
-    create: async ({ email, name, passwordHash, role = 'member' }) => {
-        return db.query(
-            `INSERT INTO users (email, name, password_hash, role)
-             VALUES ($1, $2, $3, $4)
-             RETURNING *`,
-            [email, name, passwordHash, role]
-        ).then(r => r.first);
-    },
+    findByEmail: async (email, { includeDeleted = false, trx = null } = {}) => queryFor(trx)(
+        `SELECT * FROM users WHERE LOWER(email) = LOWER($1)
+           AND ($2::BOOLEAN OR deleted_at IS NULL)`,
+        [email, includeDeleted]
+    ).then(result => result.first),
 
-    // ── Read ──────────────────────────────────────────────────────────────────
+    findByUsername: async (username, { includeDeleted = false, trx = null } = {}) => queryFor(trx)(
+        `SELECT * FROM users WHERE LOWER(username) = LOWER($1)
+           AND ($2::BOOLEAN OR deleted_at IS NULL)`,
+        [username, includeDeleted]
+    ).then(result => result.first),
 
-    // Note: read helpers include a LEFT JOIN to the `player_links` table
-    // to surface any approved link for this user as `player_id` and
-    // `link_status`. Only one active link per user is enforced by the DB.
-    findById: async (id) => {
-        return db.query(
-            `SELECT u.*, pl.player_id AS player_id, pl.status AS link_status
-             FROM users u
-             LEFT JOIN player_links pl ON pl.user_id = u.id AND pl.status = 'approved'
-             WHERE u.id = $1`,
-            [id]
-        ).then(r => r.first);
-    },
+    findByName: async name => UserModel.findByUsername(name),
 
-    findByEmail: async (email) => {
-        return db.query(
-            `SELECT u.*, pl.player_id AS player_id, pl.status AS link_status
-             FROM users u
-             LEFT JOIN player_links pl ON pl.user_id = u.id AND pl.status = 'approved'
-             WHERE u.email = $1`,
-            [email]
-        ).then(r => r.first);
-    },
+    updatePassword: async (id, passwordHash, trx = null) => queryFor(trx)(
+        `UPDATE users SET password_hash = $1, session_version = session_version + 1,
+                updated_at = NOW()
+         WHERE id = $2 AND deleted_at IS NULL RETURNING *`,
+        [passwordHash, id]
+    ).then(result => result.first),
 
-    findByName: async (name) => {
-        return db.query(
-            `SELECT u.*, pl.player_id AS player_id, pl.status AS link_status
-             FROM users u
-             LEFT JOIN player_links pl ON pl.user_id = u.id AND pl.status = 'approved'
-             WHERE u.name = $1`,
-            [name]
-        ).then(r => r.first);
-    },
+    updateRole: async (id, role) => db.query(
+        `UPDATE users SET role = $1, updated_at = NOW() WHERE id = $2 RETURNING *`,
+        [role, id]
+    ).then(result => result.first),
 
-    // ── Update ────────────────────────────────────────────────────────────────
+    verifyEmail: async (id, trx = null) => queryFor(trx)(
+        `UPDATE users SET email_verified = TRUE, email_verified_at = COALESCE(email_verified_at, NOW()),
+                updated_at = NOW()
+         WHERE id = $1 AND deleted_at IS NULL RETURNING *`,
+        [id]
+    ).then(result => result.first),
 
-    updatePassword: async (id, passwordHash) => {
-        return db.query(
-            `UPDATE users SET password_hash = $1, updated_at = NOW()
-             WHERE id = $2
-             RETURNING *`,
-            [passwordHash, id]
-        ).then(r => r.first);
-    },
+    softDelete: async (id, reason, trx = null) => queryFor(trx)(
+        `UPDATE users SET deleted_at = NOW(), deletion_reason = $2,
+                session_version = session_version + 1, updated_at = NOW()
+         WHERE id = $1 AND deleted_at IS NULL RETURNING *`,
+        [id, reason]
+    ).then(result => result.first),
 
-    updateRole: async (id, role) => {
-        return db.query(
-            `UPDATE users SET role = $1, updated_at = NOW()
-             WHERE id = $2
-             RETURNING *`,
-            [role, id]
-        ).then(r => r.first);
-    },
-
-    // ── Delete ────────────────────────────────────────────────────────────────
-
-    delete: async (id) => {
-        return db.query(
-            `DELETE FROM users WHERE id = $1 RETURNING id`,
-            [id]
-        ).then(r => r.first);
-    },
+    delete: async id => UserModel.softDelete(id, null),
 };

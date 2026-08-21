@@ -4,14 +4,16 @@ import { usePlayerLinks } from '../hooks/usePlayerLinks.js';
 export default function PendingLinksList({ clubId, onActionComplete }) {
     const { pendingLinks, loading, error, approveLink, rejectLink } = usePlayerLinks(clubId);
     const [actionId, setActionId] = useState(null);
+    const [actionError, setActionError] = useState(null);
 
     const handleApprove = async (linkId) => {
         setActionId(linkId);
+        setActionError(null);
         try {
             await approveLink(linkId);
             if (onActionComplete) onActionComplete();
         } catch (err) {
-            console.error('Failed to approve link:', err);
+            setActionError(err.message || 'This claim could not be approved. Refresh the queue and try again.');
         } finally {
             setActionId(null);
         }
@@ -19,11 +21,12 @@ export default function PendingLinksList({ clubId, onActionComplete }) {
 
     const handleReject = async (linkId) => {
         setActionId(linkId);
+        setActionError(null);
         try {
             await rejectLink(linkId);
             if (onActionComplete) onActionComplete();
         } catch (err) {
-            console.error('Failed to reject link:', err);
+            setActionError(err.message || 'This claim could not be rejected. Refresh the queue and try again.');
         } finally {
             setActionId(null);
         }
@@ -43,6 +46,7 @@ export default function PendingLinksList({ clubId, onActionComplete }) {
 
     return (
         <div className="pending-banner">
+            {actionError && <div className="error-box" style={{ width: '100%' }}>{actionError}</div>}
             <div className="pending-banner__info">
                 <span className="pending-badge">{pendingLinks.length}</span>
                 <div>

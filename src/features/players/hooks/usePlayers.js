@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { playerApi } from '../api/playerApi.js';
+import { isCancelledError } from '../../../config/api.js';
 
-export function usePlayers(clubId) {
+export function usePlayers(clubId, { includeInactive = false } = {}) {
     const [players, setPlayers] = useState([]);
+    const [inactivePlayers, setInactivePlayers] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -12,25 +14,36 @@ export function usePlayers(clubId) {
     const [sortBy, setSortBy] = useState('rating_desc');     // 'rating_desc' | 'rating_asc' | 'name_asc' | 'games_desc' | 'winrate_desc'
     const [viewMode, setViewMode] = useState('grid');       // 'grid' | 'table'
 
-    const fetchPlayers = useCallback(async () => {
-        if (!clubId) return;
+    const fetchPlayers = useCallback(async (signal) => {
+        if (!clubId) {
+            setPlayers([]);
+            setInactivePlayers([]);
+            setLoading(false);
+            return;
+        }
         setLoading(true);
         try {
-            const data = await playerApi.fetchPlayers(clubId);
+            const [data, inactive] = await Promise.all([
+                playerApi.fetchPlayers(clubId, { q: searchTerm, limit: 100, signal }),
+                includeInactive ? playerApi.fetchInactivePlayers(clubId, { signal }) : Promise.resolve([]),
+            ]);
+            if (signal?.aborted) return;
             setPlayers(data);
+            setInactivePlayers(inactive);
             setError(null);
         } catch (err) {
+            if (signal?.aborted || isCancelledError(err)) return;
             console.error('Failed to fetch players:', err);
             setError(err.message || 'Unable to load players roster.');
         } finally {
-            setLoading(false);
+            if (!signal?.aborted) setLoading(false);
         }
-    }, [clubId]);
+    }, [clubId, includeInactive, searchTerm]);
 
     useEffect(() => {
-        if (clubId) {
-            fetchPlayers();
-        }
+        const controller = new AbortController();
+        fetchPlayers(controller.signal);
+        return () => controller.abort();
     }, [clubId, fetchPlayers]);
 
     // Single Add Player
@@ -59,11 +72,17 @@ export function usePlayers(clubId) {
         return updated;
     };
 
-    // Delete Player
-    const deletePlayer = async (playerId) => {
+    const archivePlayer = async (playerId) => {
         if (!clubId) return;
-        await playerApi.deletePlayer(clubId, playerId);
+        const archived = await playerApi.archivePlayer(clubId, playerId);
         setPlayers((prev) => prev.filter((p) => p.id !== playerId));
+        setInactivePlayers((prev) => [...prev, archived].sort((a, b) => a.name.localeCompare(b.name)));
+    };
+
+    const restorePlayer = async (playerId) => {
+        if (!clubId) return;
+        await playerApi.restorePlayer(clubId, playerId);
+        await fetchPlayers();
     };
 
     // Claim Player Profile
@@ -74,24 +93,15 @@ export function usePlayers(clubId) {
     };
 
     // Unlink Player
-    const unlinkPlayer = async (playerId, userId) => {
+    const unlinkPlayer = async (playerId) => {
         if (!clubId) return;
-        await playerApi.unlinkPlayer(clubId, playerId, userId);
+        await playerApi.unlinkPlayer(clubId, playerId);
         fetchPlayers();
     };
 
     // Process Search, Filtering, and Sorting
     const processedPlayers = useMemo(() => {
         let result = [...players];
-
-        if (searchTerm.trim()) {
-            const term = searchTerm.toLowerCase();
-            result = result.filter(
-                (p) =>
-                    p.name?.toLowerCase().includes(term) ||
-                    p.bio?.toLowerCase().includes(term)
-            );
-        }
 
         if (statusFilter === 'claimed') {
             result = result.filter((p) => p.link_status === 'approved');
@@ -102,8 +112,8 @@ export function usePlayers(clubId) {
         }
 
         result.sort((a, b) => {
-            if (sortBy === 'rating_desc') return (b.rating || 1200) - (a.rating || 1200);
-            if (sortBy === 'rating_asc') return (a.rating || 1200) - (b.rating || 1200);
+            if (sortBy === 'rating_desc') return (b.rating || 1500) - (a.rating || 1500);
+            if (sortBy === 'rating_asc') return (a.rating || 1500) - (b.rating || 1500);
             if (sortBy === 'name_asc') return (a.name || '').localeCompare(b.name || '');
             if (sortBy === 'games_desc') return (b.games || 0) - (a.games || 0);
             if (sortBy === 'winrate_desc') {
@@ -115,14 +125,14 @@ export function usePlayers(clubId) {
         });
 
         return result;
-    }, [players, searchTerm, statusFilter, sortBy]);
+    }, [players, statusFilter, sortBy]);
 
     // Derived Statistics
     const stats = useMemo(() => {
         const totalPlayers = players.length;
         const avgRating = totalPlayers > 0
-            ? Math.round(players.reduce((sum, p) => sum + (p.rating || 1200), 0) / totalPlayers)
-            : 1200;
+            ? Math.round(players.reduce((sum, p) => sum + (p.rating || 1500), 0) / totalPlayers)
+            : 1500;
         const activePlayers = players.filter((p) => (p.games || 0) > 0).length;
         const pendingClaimsCount = players.filter((p) => p.link_status === 'pending').length;
 
@@ -136,6 +146,7 @@ export function usePlayers(clubId) {
 
     return {
         players,
+        inactivePlayers,
         processedPlayers,
         stats,
         loading,
@@ -152,7 +163,8 @@ export function usePlayers(clubId) {
         addPlayer,
         addPlayersBulk,
         updatePlayer,
-        deletePlayer,
+        archivePlayer,
+        restorePlayer,
         claimPlayer,
         unlinkPlayer,
     };

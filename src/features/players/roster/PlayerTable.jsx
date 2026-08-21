@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 
 export default function PlayerTable({
     players = [],
-    currentUser,
+    currentLinkedPlayerId,
     isAdmin,
     onEdit,
     onDelete,
@@ -29,19 +29,18 @@ export default function PlayerTable({
                         const {
                             id,
                             name,
-                            rating = 1200,
+                            rating = 1500,
                             games = 0,
                             wins = 0,
                             draws = 0,
                             losses = 0,
                             link_status,
-                            linked_user_id,
                         } = player;
 
                         const winRate = games > 0 ? Math.round(((wins + draws * 0.5) / games) * 100) : 0;
                         const isLinked = link_status === 'approved';
                         const isPending = link_status === 'pending';
-                        const isSelf = currentUser && linked_user_id === currentUser.id;
+                        const isSelf = currentLinkedPlayerId === id;
                         const canEdit = isAdmin || isSelf;
 
                         return (
@@ -86,7 +85,7 @@ export default function PlayerTable({
                                                 className="btn-danger btn-sm"
                                                 onClick={() => onDelete && onDelete(player)}
                                             >
-                                                Delete
+                                                Archive
                                             </button>
                                         )}
                                     </div>

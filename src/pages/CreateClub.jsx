@@ -1,47 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { api, endpoints, getFieldErrors, isValidationError } from '../config/api.js';
-import { useAuth } from '../app/contextHooks.js';
+import { getFieldErrors, isValidationError } from '../config/api.js';
+import { useAuth, useClub } from '../app/contextHooks.js';
+import { clubApi } from '../features/clubs/api/clubApi.js';
 import '../styles/create-club.css';
 
 export default function CreateClub() {
   const navigate = useNavigate();
   const { updateSession } = useAuth();
+  const { refreshClubs } = useClub();
   const [step, setStep] = useState(1);
 
   // Core identity
   const [name, setName] = useState('');
   const [federation, setFederation] = useState('');
   const [isPublic, setIsPublic] = useState(true);
-  const [emblemFile, setEmblemFile] = useState(null);
-  const [emblemPreview, setEmblemPreview] = useState(null);
+  const [badgeFile, setBadgeFile] = useState(null);
 
   // Rating parameters
-  const [ratingSystem, setRatingSystem] = useState('elo');
-  const [initialRating, setInitialRating] = useState(1200);
+  const [initialRating, setInitialRating] = useState(1500);
+  const [ratingFloor, setRatingFloor] = useState(500);
   const [kFactor, setKFactor] = useState(32);
+  const [provisionalKFactor, setProvisionalKFactor] = useState(40);
+  const [provisionalGames, setProvisionalGames] = useState(10);
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
   const [message, setMessage] = useState(null);
-
-  useEffect(() => {
-    if (!emblemFile) {
-      setEmblemPreview(null);
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (e) => setEmblemPreview(e.target.result);
-    reader.readAsDataURL(emblemFile);
-    return () => reader.abort && reader.abort();
-  }, [emblemFile]);
-
-  function handleFileChange(e) {
-    const f = e.target.files?.[0] || null;
-    setEmblemFile(f);
-    setErrors((s) => ({ ...s, emblem: null }));
-  }
 
   function validateStep1() {
     const errs = {};
@@ -53,7 +38,10 @@ export default function CreateClub() {
   function validateStep2() {
     const errs = {};
     if (!Number.isFinite(Number(initialRating))) errs.initialRating = 'Initial rating must be a number.';
+    if (!Number.isFinite(Number(ratingFloor)) || Number(ratingFloor) > Number(initialRating)) errs.ratingFloor = 'Rating floor must not exceed the initial rating.';
     if (!Number.isFinite(Number(kFactor))) errs.kFactor = 'K-factor must be a number.';
+    if (!Number.isFinite(Number(provisionalKFactor))) errs.provisionalKFactor = 'Provisional K-factor must be a number.';
+    if (!Number.isFinite(Number(provisionalGames))) errs.provisionalGames = 'Provisional games must be a number.';
     return errs;
   }
 
@@ -83,57 +71,39 @@ export default function CreateClub() {
     const payload = {
       name: name.trim(),
       federation: federation.trim(),
-      is_public: !!isPublic,
-      rating: {
-        system: ratingSystem,
-        initial_rating: Number(initialRating) || 0,
-        k_factor: Number(kFactor) || 0,
-      },
+      visibility: isPublic ? 'public' : 'private',
+      publicLeaderboard: true,
+      ratingSettings: Object.fromEntries(['blitz', 'rapid', 'classical'].map(category => [category, {
+        initialRating: Number(initialRating),
+        ratingFloor: Number(ratingFloor),
+        establishedKFactor: Number(kFactor),
+        provisionalKFactor: Number(provisionalKFactor),
+        provisionalGames: Number(provisionalGames),
+      }])),
     };
 
-    // If an emblem file was selected, convert to a data URL and include as `logo`.
-    async function fileToDataUrl(file) {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.onload = () => resolve(reader.result);
-        reader.readAsDataURL(file);
-      });
-    }
-
     try {
-      if (emblemFile) {
-        try {
-          payload.logo = await fileToDataUrl(emblemFile);
-        } catch (err) {
-          console.warn('Failed to convert emblem to data URL:', err);
-        }
+      const data = await clubApi.create(payload);
+
+      // Refresh the account session returned alongside the new club. Club
+      // permissions remain scoped to the membership loaded by ClubProvider.
+      if (data.token && data.user) {
+        updateSession(data.token, data.user);
       }
 
-      try {
-        const data = await api.post(endpoints.clubs.create(), payload);
+      if (badgeFile) {
+        await clubApi.uploadBadge(data.club.id, badgeFile);
+      }
 
-        // The server returns a fresh token that carries the admin role.
-        // Store it so every subsequent API call and the auth context reflects
-        // the promotion immediately — no logout/login required.
-        if (data.token && data.user) {
-          updateSession(data.token, data.user);
-        }
+      await refreshClubs(data.club.id);
 
-        // Small delay so the success message is visible, then navigate to
-        // the new owner's dashboard. This previously navigated to '/', which
-        // renders the public marketing Landing page — an authenticated user
-        // who just created a club would land back on a "Get Started" button
-        // for the app they're already inside of, instead of seeing their
-        // new club.
-        setMessage('Club created! Redirecting…');
-        setTimeout(() => navigate('/dashboard'), 1200);
-      } catch (apiErr) {
-        if (isValidationError(apiErr)) {
-          setErrors(getFieldErrors(apiErr));
-        } else {
-          setMessage(apiErr.message || 'Failed to create club.');
-        }
+      setMessage('Club created! Redirecting…');
+      setTimeout(() => navigate('/dashboard'), 1200);
+    } catch (apiErr) {
+      if (isValidationError(apiErr)) {
+        setErrors(getFieldErrors(apiErr));
+      } else {
+        setMessage(apiErr.message || 'Failed to create club.');
       }
     } finally {
       setLoading(false);
@@ -162,14 +132,11 @@ export default function CreateClub() {
             <input placeholder="e.g. USCF" value={federation} onChange={(e) => setFederation(e.target.value)} />
             {errors.federation && <div className="error">{errors.federation}</div>}
 
-            <label style={{ marginTop: 12 }}>Emblem / Logo</label>
-            <input type="file" accept="image/*" onChange={handleFileChange} />
-            {emblemPreview && (
-              <div className="emblem-preview" style={{ marginTop: 8 }}>
-                <img src={emblemPreview} alt="emblem preview" />
-              </div>
-            )}
-            {errors.emblem && <div className="error">{errors.emblem}</div>}
+            <label style={{ marginTop: 12 }}>Club badge</label>
+            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setBadgeFile(e.target.files?.[0] || null)} />
+            <div className="form-helper" style={{ marginTop: 4, fontSize: 13, color: '#6b7280' }}>
+              {badgeFile ? `${badgeFile.name} selected` : 'JPEG, PNG, or WebP; maximum 5 MB.'}
+            </div>
 
             <label style={{ marginTop: 12 }}>Visibility</label>
             <select value={isPublic ? 'public' : 'private'} onChange={(e) => setIsPublic(e.target.value === 'public')}>
@@ -195,10 +162,7 @@ export default function CreateClub() {
             <div className="form-row">
               <div>
                 <label>Rating system</label>
-                <select value={ratingSystem} onChange={(e) => setRatingSystem(e.target.value)}>
-                  <option value="elo">Elo</option>
-                  <option value="glicko2">Glicko-2</option>
-                </select>
+                <input value="Elo" disabled />
               </div>
 
               <div>
@@ -211,6 +175,18 @@ export default function CreateClub() {
             <label style={{ marginTop: 12 }}>K-factor</label>
             <input type="number" value={kFactor} onChange={(e) => setKFactor(e.target.value)} />
             {errors.kFactor && <div className="error">{errors.kFactor}</div>}
+
+            <label style={{ marginTop: 12 }}>Rating floor</label>
+            <input type="number" value={ratingFloor} onChange={(e) => setRatingFloor(e.target.value)} />
+            {errors.ratingFloor && <div className="error">{errors.ratingFloor}</div>}
+
+            <label style={{ marginTop: 12 }}>Provisional K-factor</label>
+            <input type="number" value={provisionalKFactor} onChange={(e) => setProvisionalKFactor(e.target.value)} />
+            {errors.provisionalKFactor && <div className="error">{errors.provisionalKFactor}</div>}
+
+            <label style={{ marginTop: 12 }}>Provisional games</label>
+            <input type="number" value={provisionalGames} onChange={(e) => setProvisionalGames(e.target.value)} />
+            {errors.provisionalGames && <div className="error">{errors.provisionalGames}</div>}
 
             <div className="controls">
               <button type="button" className="btn btn-secondary" onClick={handleBack}>Back</button>
