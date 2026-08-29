@@ -30,12 +30,22 @@ export default function ClubInviteHandler() {
         acceptMembership();
     }, [code, token, user, navigate, notify, refreshClubs]);
 
-    if (!token && !code) return <p>Invite token or join code missing.</p>;
+    if (!token && !code) return <section className="public-panel public-state public-state--error" role="alert">
+        <h1>Invitation unavailable</h1><p>An invite token or six-digit join code is required.</p>
+        <Link className="public-back-link" to="/clubs">Find clubs</Link>
+    </section>;
     if (!user) {
         const continuation = token
             ? `inviteToken=${encodeURIComponent(token)}`
             : `joinCode=${encodeURIComponent(code)}`;
-        return <div><h1>Join a chess club</h1><p>Create an account or sign in to continue.</p><Link to={`/auth/register?${continuation}`}>Create an account</Link>{' · '}<Link to={`/auth/login?${continuation}`}>Sign in</Link></div>;
+        return <section className="public-panel public-state"><h1>Join a chess club</h1>
+            <p>Create an account or sign in to continue with this invitation.</p>
+            <div className="public-club-hero__actions">
+                <Link className="public-link-button" to={`/auth/register?${continuation}`}>Create an account</Link>
+                <Link className="public-link-button public-button--secondary" to={`/auth/login?${continuation}`}>Sign in</Link>
+            </div>
+        </section>;
     }
-    return <p>Processing membership…</p>;
+    return <section className="public-panel public-state" role="status"><h1>Joining club…</h1>
+        <p>We’re processing your membership.</p></section>;
 }

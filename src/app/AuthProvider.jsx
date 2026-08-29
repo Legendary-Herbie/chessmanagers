@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getToken, setToken, clearToken, refreshAccessToken } from '../config/api.js';
+import { getToken, setToken, setCsrfToken, clearToken, refreshAccessToken } from '../config/api.js';
 import { authApi } from '../features/auth/api/authApi.js';
 import { AuthContext } from './contextHooks.js';
 
@@ -32,6 +32,7 @@ export function AuthProvider({ children }) {
     const login = useCallback(async ({ email, password }) => {
         const data = await authApi.login({ email, password });
         setToken(data.accessToken);
+        setCsrfToken(data.csrfToken);
         setUser(data.user);
         return data.user;
     }, []);

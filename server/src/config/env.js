@@ -67,6 +67,10 @@ const envSchema = z.object({
     GOOGLE_CLIENT_ID: z.preprocess(emptyToUndefined, z.string().optional()),
     GOOGLE_CLIENT_SECRET: z.preprocess(emptyToUndefined, z.string().optional()),
     GOOGLE_REDIRECT_URI: z.preprocess(emptyToUndefined, z.string().url().optional()),
+    COOKIE_SAME_SITE: z
+        .preprocess(value => typeof value === 'string' ? value.toLowerCase() : value,
+            z.enum(['lax', 'strict', 'none']))
+        .default('lax'),
 
     // CORS — all origins must be supplied via environment, none hardcoded
     CORS_ORIGIN: z
@@ -115,6 +119,8 @@ const envSchema = z.object({
 const envInput = {
     ...process.env,
     CORS_ORIGIN: buildCorsOriginInput(),
+    FRONTEND_URL: process.env.FRONTEND_URL
+        || parseCsvList(process.env.CORS_ORIGIN || '').find(origin => !origin.includes('*')),
 };
 
 const result = envSchema.safeParse(envInput);

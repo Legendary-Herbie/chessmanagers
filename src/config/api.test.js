@@ -4,6 +4,7 @@ import {
     clearToken,
     ERROR_TYPES,
     normaliseError,
+    refreshAccessToken,
 } from './api.js';
 
 describe('API request lifecycle', () => {
@@ -56,5 +57,30 @@ describe('API request lifecycle', () => {
             headers: { 'Content-Type': 'application/json' },
         }));
         await expect(api.get('/fast-resource', { timeoutMs: 5 })).resolves.toEqual({ value: 42 });
+    });
+
+    it('bootstraps CSRF before refreshing a cross-origin cookie session', async () => {
+        fetch
+            .mockResolvedValueOnce(new Response(JSON.stringify({ csrfToken: 'csrf-from-api' }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            }))
+            .mockResolvedValueOnce(new Response(JSON.stringify({
+                accessToken: 'fresh-access-token',
+                csrfToken: 'rotated-csrf-token',
+                user: { id: 'user_1' },
+            }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            }));
+
+        await expect(refreshAccessToken()).resolves.toMatchObject({
+            accessToken: 'fresh-access-token',
+            user: { id: 'user_1' },
+        });
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(fetch.mock.calls[0][0]).toBe('/api/v1/auth/csrf');
+        expect(fetch.mock.calls[1][1].headers['x-csrf-token']).toBe('csrf-from-api');
+        expect(fetch.mock.calls[1][1].credentials).toBe('include');
     });
 });

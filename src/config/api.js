@@ -20,6 +20,7 @@ if (!import.meta.env.VITE_API_URL) {
 const browserStorage = typeof localStorage !== 'undefined'
     && typeof localStorage.getItem === 'function' ? localStorage : null;
 let accessToken = browserStorage?.getItem('cm_token') ?? null;
+let csrfToken = null;
 
 export const getToken = () => accessToken;
 export const setToken = (token) => {
@@ -28,6 +29,7 @@ export const setToken = (token) => {
 };
 export const clearToken = () => {
     accessToken = null;
+    csrfToken = null;
     browserStorage?.removeItem('cm_token');
 };
 
@@ -37,6 +39,11 @@ function cookieValue(name) {
     const entry = document.cookie.split('; ').find(value => value.startsWith(prefix));
     return entry ? decodeURIComponent(entry.slice(prefix.length)) : null;
 }
+
+export const getCsrfToken = () => csrfToken || cookieValue('cm_csrf');
+export const setCsrfToken = (token) => {
+    csrfToken = token || null;
+};
 
 export const API_TIMEOUT_MS = 15_000;
 
@@ -71,12 +78,24 @@ function createRequestAbort(externalSignal, timeoutMs = API_TIMEOUT_MS) {
 async function requestSessionRefresh() {
     const requestAbort = createRequestAbort();
     try {
+        let refreshCsrfToken = getCsrfToken();
+        if (!refreshCsrfToken) {
+            const csrfResponse = await fetch(`${API_BASE}/auth/csrf`, {
+                method: 'GET',
+                credentials: 'include',
+                signal: requestAbort.signal,
+            });
+            if (!csrfResponse.ok) throw new Error('Session refresh failed.');
+            const csrfData = await csrfResponse.json();
+            setCsrfToken(csrfData.csrfToken);
+            refreshCsrfToken = csrfData.csrfToken;
+        }
         const response = await fetch(`${API_BASE}/auth/refresh`, {
             method: 'POST',
             credentials: 'include',
             headers: {
                 'Content-Type': 'application/json',
-                'x-csrf-token': cookieValue('cm_csrf') || '',
+                'x-csrf-token': refreshCsrfToken || '',
             },
             body: '{}',
             signal: requestAbort.signal,
@@ -84,6 +103,7 @@ async function requestSessionRefresh() {
         if (!response.ok) throw new Error('Session refresh failed.');
         const data = await response.json();
         setToken(data.accessToken);
+        setCsrfToken(data.csrfToken);
         return data;
     } catch (error) {
         if (requestAbort.didTimeout()) {
@@ -224,8 +244,8 @@ export async function api(endpoint, options = {}) {
     const headers = {
         ...(!isFormData ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...(cookieValue('cm_csrf') && !['GET', 'HEAD'].includes(fetchOptions.method || 'GET')
-            ? { 'x-csrf-token': cookieValue('cm_csrf') } : {}),
+        ...(getCsrfToken() && !['GET', 'HEAD'].includes(fetchOptions.method || 'GET')
+            ? { 'x-csrf-token': getCsrfToken() } : {}),
         ...fetchOptions.headers,
     };
 
@@ -279,6 +299,9 @@ export async function api(endpoint, options = {}) {
         }
         throw normaliseError(body, res.status);
     }
+
+
+    if (body?.csrfToken) setCsrfToken(body.csrfToken);
 
     return body;
 }

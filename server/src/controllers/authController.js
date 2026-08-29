@@ -19,6 +19,7 @@ import {
 } from '../services/GoogleAuthService.js';
 import {
     clearSessionCookies,
+    CSRF_COOKIE,
     REFRESH_COOKIE,
     revokeRefreshToken,
     rotateRefreshSession,
@@ -30,7 +31,8 @@ const FAILURES = {
     USERNAME_ALREADY_EXISTS: [409, 'An account with that username already exists.'],
     INVALID_CREDENTIALS: [401, 'Invalid email or password.'],
     EMAIL_VERIFICATION_REQUIRED: [403, 'Verify your email before signing in.'],
-    VERIFICATION_TOKEN_INVALID: [400, 'This verification link is invalid or expired.'],
+    VERIFICATION_TOKEN_INVALID: [400, 'Invalid verification link'],
+    VERIFICATION_TOKEN_EXPIRED: [400, 'Verification link expired'],
     PASSWORD_RESET_TOKEN_INVALID: [400, 'This password reset link is invalid or expired.'],
     CURRENT_PASSWORD_INVALID: [401, 'Current password is incorrect.'],
     ACCOUNT_NOT_FOUND: [404, 'Account not found.'],
@@ -51,7 +53,20 @@ function sendFailure(res, result) {
 
 function sessionResponse(res, result, status = 200) {
     setSessionCookies(res, result.session);
-    return res.status(status).json({ accessToken: result.accessToken, user: toAuthUser(result.user) });
+    return res.status(status).json({
+        accessToken: result.accessToken,
+        csrfToken: result.session.csrfToken,
+        user: toAuthUser(result.user),
+    });
+}
+
+export function getCsrfToken(req, res) {
+    const csrfToken = req.cookies?.[CSRF_COOKIE];
+    if (!req.cookies?.[REFRESH_COOKIE] || !csrfToken) {
+        return res.status(401).json({ error: 'Session cookie is unavailable.', code: 'REFRESH_REQUIRED' });
+    }
+    res.set('Cache-Control', 'no-store');
+    return res.json({ csrfToken });
 }
 
 export async function register(req, res, next) {
@@ -77,7 +92,12 @@ export async function verifyEmail(req, res, next) {
     try {
         const result = await verifyEmailToken(req.validated.token);
         if (!result.ok) return sendFailure(res, result);
-        res.json({ message: 'Email verified. You can now sign in.' });
+        const alreadyVerified = Boolean(result.alreadyVerified);
+        res.json({
+            ok: true,
+            alreadyVerified,
+            message: alreadyVerified ? 'Email already verified' : 'Email verified successfully',
+        });
     } catch (error) { next(error); }
 }
 
@@ -173,12 +193,20 @@ export async function softDeleteAccount(req, res, next) {
 
 const oauthCookie = {
     httpOnly: true,
-    secure: env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: env.NODE_ENV === 'production' || env.COOKIE_SAME_SITE === 'none',
+    sameSite: env.COOKIE_SAME_SITE,
     path: '/api/v1/auth/google/callback',
     maxAge: 10 * 60 * 1000,
 };
 const { maxAge: _oauthMaxAge, ...oauthClearCookie } = oauthCookie;
+
+function oauthFrontendRedirect(params) {
+    const frontend = env.FRONTEND_URL || env.CORS_ORIGIN.find(origin => !origin.includes('*'));
+    if (!frontend) throw Object.assign(new Error('FRONTEND_URL is required for Google OAuth.'), { status: 503 });
+    const url = new URL('/auth/oauth/callback', frontend);
+    for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
+    return url.toString();
+}
 
 export async function googleStart(req, res, next) {
     try {
@@ -190,12 +218,11 @@ export async function googleStart(req, res, next) {
 }
 
 export async function googleCallback(req, res, next) {
-    const frontend = env.FRONTEND_URL || env.CORS_ORIGIN[0];
     try {
         if (req.validatedQuery.error || !req.cookies?.cm_oauth_state
             || req.cookies.cm_oauth_state !== req.validatedQuery.state) {
             res.clearCookie('cm_oauth_state', oauthClearCookie);
-            return res.redirect(302, `${frontend}/auth/oauth/callback?error=oauth_cancelled`);
+            return res.redirect(302, oauthFrontendRedirect({ error: 'oauth_cancelled' }));
         }
         const result = await completeGoogleOAuth({
             code: req.validatedQuery.code,
@@ -204,10 +231,14 @@ export async function googleCallback(req, res, next) {
         });
         res.clearCookie('cm_oauth_state', oauthClearCookie);
         if (!result.ok) {
-            return res.redirect(302, `${frontend}/auth/oauth/callback?error=${encodeURIComponent(result.code)}`);
+            return res.redirect(302, oauthFrontendRedirect({ error: result.code }));
         }
         setSessionCookies(res, result.session);
-        const params = new URLSearchParams({ continuation: safeContinuation(result.continuation) });
-        return res.redirect(302, `${frontend}/auth/oauth/callback?${params}`);
-    } catch (error) { next(error); }
+        return res.redirect(302, oauthFrontendRedirect({
+            continuation: safeContinuation(result.continuation),
+        }));
+    } catch (error) {
+        res.clearCookie('cm_oauth_state', oauthClearCookie);
+        next(error);
+    }
 }

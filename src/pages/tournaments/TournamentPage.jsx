@@ -5,6 +5,7 @@ import { useClub } from '../../app/contextHooks.js';
 import { tournamentApi } from '../../features/tournaments/api/tournamentApi.js';
 import { playerApi } from '../../features/players/api/playerApi.js';
 import Button from '../../shared/common/Button.jsx';
+import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 
 function localDateTime(value = new Date()) {
     const date = new Date(value);
@@ -35,6 +36,7 @@ export default function TournamentPage() {
     const [error, setError] = useState('');
     const [notice, setNotice] = useState('');
     const [resultPairing, setResultPairing] = useState(null);
+    const [duplicateConfirmation, setDuplicateConfirmation] = useState(false);
     const [resultForm, setResultForm] = useState({ result: 'white', playedAt: localDateTime(), notes: '' });
 
     const load = useCallback(async () => {
@@ -70,6 +72,7 @@ export default function TournamentPage() {
     async function runAction(action, successMessage) {
         setSaving(true);
         setError('');
+        setDuplicateConfirmation(false);
         try {
             await action();
             setNotice(successMessage);
@@ -115,6 +118,7 @@ export default function TournamentPage() {
                     confirmDuplicate,
                 }
             );
+            setDuplicateConfirmation(false);
             setResultPairing(null);
             setNotice(response.ratingStatus === 'recalculation_pending'
                 ? 'Result saved. Ratings are being recalculated.'
@@ -122,7 +126,7 @@ export default function TournamentPage() {
             await load();
         } catch (requestError) {
             if (requestError.code === 'POSSIBLE_DUPLICATE_MATCH' && !confirmDuplicate) {
-                await saveResult(true);
+                setDuplicateConfirmation(true);
                 return;
             }
             setError(requestError.message || 'Unable to save result.');
@@ -216,8 +220,15 @@ export default function TournamentPage() {
                     <label className="form-row"><span className="label">Played at</span><input className="input" type="datetime-local" value={resultForm.playedAt} onChange={event => setResultForm({ ...resultForm, playedAt: event.target.value })} /></label>
                     <label className="form-row"><span className="label">Notes (optional)</span><textarea className="input" value={resultForm.notes} onChange={event => setResultForm({ ...resultForm, notes: event.target.value })} /></label>
                 </div>
-                <div className="modal-footer"><Button variant="secondary" onClick={() => setResultPairing(null)}>Cancel</Button><Button loading={saving} onClick={() => saveResult(false)}>Save result</Button></div>
+                <div className="modal-footer"><Button variant="secondary" disabled={saving}
+                    onClick={() => { setResultPairing(null); setDuplicateConfirmation(false); }}>Cancel</Button>
+                    <Button loading={saving} disabled={saving} onClick={() => saveResult(false)}>Save result</Button></div>
             </div></div>}
+
+            <ConfirmDialog isOpen={duplicateConfirmation} title="Possible duplicate result"
+                message="A matching result already exists within five minutes. Save this result anyway?"
+                confirmLabel="Save anyway" variant="warning" loading={saving}
+                onClose={() => setDuplicateConfirmation(false)} onConfirm={() => saveResult(true)} />
         </div>
     );
 }

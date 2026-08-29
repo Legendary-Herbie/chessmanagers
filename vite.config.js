@@ -17,13 +17,14 @@ export default defineConfig(({ mode }) => {
         '/api/v1': {
           target: API_TARGET,
           changeOrigin: true,
-          followRedirects: true,
+          // Preserve OAuth 302 responses so the browser navigates to Google.
+          followRedirects: false,
           ws: false,
         },
         '/uploads': {
           target: ASSET_TARGET,
           changeOrigin: true,
-          followRedirects: true,
+          followRedirects: false,
         },
       },
     },

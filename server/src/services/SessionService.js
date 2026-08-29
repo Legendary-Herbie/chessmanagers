@@ -113,13 +113,14 @@ export async function revokeAllUserSessions(userId, reason, trx = null) {
     );
 }
 
-const secure = env.NODE_ENV === 'production';
+const sameSite = env.COOKIE_SAME_SITE;
+const secure = env.NODE_ENV === 'production' || sameSite === 'none';
 const refreshCookieOptions = {
-    httpOnly: true, secure, sameSite: 'lax', path: '/api/v1/auth',
+    httpOnly: true, secure, sameSite, path: '/api/v1/auth',
     maxAge: env.REFRESH_TOKEN_EXPIRY_DAYS * 86_400_000,
 };
 const csrfCookieOptions = {
-    httpOnly: false, secure, sameSite: 'lax', path: '/api/v1/auth',
+    httpOnly: false, secure, sameSite, path: '/api/v1/auth',
     maxAge: env.REFRESH_TOKEN_EXPIRY_DAYS * 86_400_000,
 };
 

@@ -47,6 +47,9 @@ const paginationFields = {
     limit: z.coerce.number().int().min(1).max(100).optional(),
     offset: z.coerce.number().int().min(0).max(100_000).optional(),
 };
+const continuationSchema = z.string().trim().max(1000).refine(value => (
+    value === '' || (value.startsWith('/') && !value.startsWith('//') && !value.includes('\\'))
+), 'Continuation must be a same-site relative path.').optional();
 
 export const emptyQuerySchema = z.object({}).strict();
 export const clubParamsSchema = z.object({ clubId: idSchema }).strict();
@@ -117,7 +120,7 @@ export const registerSchema = z.object({
     fullName: z.string().trim().min(1).max(100).optional(),
     name: z.string().trim().min(1, 'Name is required.').max(100).optional(),
     password: z.string().min(8, 'Password must be at least 8 characters.').max(200),
-    continuation: z.string().trim().max(1000).optional(),
+    continuation: continuationSchema,
 }).strict().superRefine((value, context) => {
     if (!value.username && !value.name) context.addIssue({ code: 'custom', path: ['name'], message: 'Username is required.' });
     if (!value.fullName && !value.name) context.addIssue({ code: 'custom', path: ['fullName'], message: 'Full name is required.' });
@@ -218,7 +221,7 @@ export const verificationTokenSchema = z.object({
 }).strict();
 export const resendVerificationSchema = z.object({
     email: z.string().trim().email().max(320),
-    continuation: z.string().trim().max(1000).optional(),
+    continuation: continuationSchema,
 }).strict();
 export const passwordResetRequestSchema = resendVerificationSchema;
 export const passwordResetCompleteSchema = z.object({
@@ -231,13 +234,15 @@ export const deleteAccountSchema = z.object({
     reason: z.string().trim().max(500).optional().nullable(),
 }).strict();
 export const oauthStartQuerySchema = z.object({
-    continuation: z.string().trim().max(1000).optional(),
+    continuation: continuationSchema,
 }).strict();
 export const oauthCallbackQuerySchema = z.object({
     code: z.string().trim().min(1).max(4000).optional(),
     state: z.string().trim().min(1).max(500).optional(),
     error: z.string().trim().max(500).optional(),
-}).strict().refine(value => value.error || (value.code && value.state), {
+// Google adds informational callback fields such as iss, scope, authuser, and
+// prompt. Strip them while validating only the fields that drive our flow.
+}).strip().refine(value => value.error || (value.code && value.state), {
     message: 'OAuth callback requires code and state.',
 });
 

@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import '../styles/landing.css';
+import BrandLogo from '../shared/common/BrandLogo.jsx';
 
 const features = [
     ['Independent ratings', 'Track Blitz, Rapid, and Classical Elo separately for every club.'],
@@ -12,8 +13,7 @@ export default function Landing() {
         <main className="landing-page">
             <header className="landing-nav">
                 <Link className="landing-brand" to="/" aria-label="Chess Managers home">
-                    <span className="landing-brand__mark" aria-hidden="true">♟</span>
-                    <span>Chess Managers</span>
+                    <BrandLogo className="landing-brand__logo" collapse="phone" />
                 </Link>
                 <nav aria-label="Public navigation">
                     <Link to="/clubs">Find clubs</Link>

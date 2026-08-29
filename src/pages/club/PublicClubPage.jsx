@@ -157,102 +157,101 @@ export default function PublicClubPage() {
         }
     }
 
-    if (loading) return <p>Loading club…</p>;
-    if (error) return <p style={{ color: 'var(--danger)' }}>Error: {error}</p>;
-    if (!club) return <p>Club not found.</p>;
+    if (loading) return <section className="public-panel public-state" role="status">
+        <h1>Loading club…</h1><p>Retrieving the club’s public information.</p>
+    </section>;
+    if (error) return <section className="public-panel public-state public-state--error" role="alert">
+        <h1>Club could not be loaded</h1><p>{error}</p><Link className="public-back-link" to="/clubs">Back to clubs</Link>
+    </section>;
+    if (!club) return <section className="public-panel public-state">
+        <h1>Club not found</h1><p>This club is unavailable or is not public.</p><Link className="public-back-link" to="/clubs">Back to clubs</Link>
+    </section>;
 
     const isMember = club.is_member || false; // server may include this flag via ClubModel.findById
     const membershipStatus = club.membership?.status || null;
     const cooldownEndsAt = club.membership?.cooldownEndsAt;
+    const returnTo = `/clubs/${clubId}`;
+    const authQuery = `?returnTo=${encodeURIComponent(returnTo)}`;
 
     return (
-        <div>
-            <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
+        <div className="public-page">
+            <header className="public-card public-club-hero">
                 {club.logo ? (
-                    <img src={resolveAssetUrl(club.logo)} alt={`${club.name} badge`} style={{ width: 96, height: 96, objectFit: 'cover', borderRadius: 8 }} />
+                    <img className="public-club-hero__logo" src={resolveAssetUrl(club.logo)} alt={`${club.name} badge`} />
                 ) : (
-                    <div style={{ width: 96, height: 96, background: 'var(--bg-muted)', borderRadius: 8 }} />
+                    <div className="public-club-hero__placeholder" aria-hidden="true" />
                 )}
 
                 <div>
-                    <h1 style={{ margin: 0 }}>{club.name}</h1>
-                    <div style={{ color: 'var(--text-muted)', marginTop: 4 }}>{club.federation || ''}</div>
-                    <div style={{ color: 'var(--text-muted)', marginTop: 6 }}>
+                    <h1>{club.name}</h1>
+                    <p>{club.federation || 'Independent club'}</p>
+                    <p>
                         {membersCount !== null ? `${membersCount} members` : null}
                         {stats ? ` · ${stats.rosterPlayers} players · ${stats.totalGames} games` : null}
-                    </div>
+                    </p>
                 </div>
 
-                <div style={{ marginLeft: 'auto' }}>
+                <div className="public-club-hero__actions">
                     {isMember ? (
-                        <span style={{ color: 'var(--success)' }}>You are a member</span>
+                        <span className="public-membership-state public-membership-state--success">You are a member</span>
                     ) : membershipStatus === 'PENDING_APPROVAL' ? (
-                        <span className="muted">Join request pending</span>
+                        <span className="public-membership-state">Join request pending</span>
                     ) : membershipStatus === 'REJECTED' && !club.can_request_join ? (
-                        <span className="muted">
+                        <span className="public-membership-state">
                             Reapply after {cooldownEndsAt ? new Date(cooldownEndsAt).toLocaleString() : 'the cooldown'}
                         </span>
                     ) : user ? (
-                        <button type="button" disabled={joining || !club.can_request_join} onClick={handleRequestJoin} style={{ padding: '8px 12px' }}>
+                        <button className="public-button" type="button" disabled={joining || !club.can_request_join} onClick={handleRequestJoin}>
                             {joining ? 'Requesting…' : membershipStatus === 'REVOKED' || membershipStatus === 'REJECTED' ? 'Request to rejoin' : 'Request to join'}
                         </button>
                     ) : (
-                        <div>
-                            <Link to={`/auth/login`}>Sign in</Link>
-                            {' '}or{' '}
-                            <Link to={`/auth/register`}>Register to join</Link>
-                        </div>
+                        <><Link className="public-link-button public-button--secondary" to={`/auth/login${authQuery}`}>Sign in</Link>
+                            <Link className="public-link-button" to={`/auth/register${authQuery}`}>Register to join</Link></>
                     )}
                 </div>
+            </header>
+
+            <div className="public-content-grid">
+                <section className="public-card public-section">
+                    <h2>About</h2>
+                    <p>{club.description || 'This club has not added a description yet.'}</p>
+
+                    {club.contact_info && <div><h3>Contact</h3><p>{club.contact_info}</p></div>}
+
+                    <Link className="public-back-link" to="/clubs">← Back to clubs</Link>
+                </section>
+
+                <section className="public-card public-section">
+                    <h2>Top Blitz players</h2>
+                    {topPlayers.length > 0 ? <ol className="public-leaderboard">{topPlayers.map(player => <li key={player.publicPlayerId}>
+                        <Link to={`/clubs/${clubId}/players/${player.publicPlayerId}`}>{player.playerName}</Link>
+                        <strong>{player.selectedRating}</strong>
+                    </li>)}</ol> : <p>No eligible players yet.</p>}
+                </section>
             </div>
-
-            <section style={{ marginTop: 18 }}>
-                <h2>About</h2>
-                <p>{club.description || 'No description provided.'}</p>
-
-                {club.contact_info && (
-                    <div>
-                        <h3>Contact</h3>
-                        <div>{club.contact_info}</div>
-                    </div>
-                )}
-
-                <div style={{ marginTop: 12 }}>
-                    <Link to="/clubs">← Back to clubs</Link>
-                </div>
-            </section>
-
-            {topPlayers.length > 0 && <section style={{ marginTop: 18 }}>
-                <h2>Top Blitz Players</h2>
-                <ol>{topPlayers.map(player => <li key={player.publicPlayerId}>
-                    <Link to={`/clubs/${clubId}/players/${player.publicPlayerId}`}>{player.playerName}</Link>
-                    {' '}— {player.selectedRating}
-                </li>)}</ol>
-            </section>}
 
             {/* Admin area: invites and join requests */}
             {(club.member_role === 'owner' || club.member_role === 'admin') && (
-                <section style={{ marginTop: 20, borderTop: '1px solid var(--border)', paddingTop: 12 }}>
-                    <h3>Administration</h3>
+                <section className="public-card public-section">
+                    <h2>Administration</h2>
 
-                    <div style={{ marginBottom: 12 }}>
-                        <button type="button" disabled={creatingInvite} onClick={createInvite} style={{ padding: '6px 10px' }}>
+                    <div>
+                        <button className="public-button" type="button" disabled={creatingInvite} onClick={createInvite}>
                             {creatingInvite ? 'Creating…' : 'Create invite'}
                         </button>
                     </div>
 
-                    <div style={{ marginBottom: 12 }}>
-                        <strong>Active invites</strong>
+                    <div><h3>Active invites</h3>
                         {invites.length === 0 ? (
-                            <div>No active invites.</div>
+                            <p>No active invites.</p>
                         ) : (
-                            <ul>
+                            <ul className="public-admin-list">
                                 {invites.map(i => (
-                                    <li key={i.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                                        <div style={{ fontSize: 12 }}>{i.token}</div>
-                                        <div style={{ marginLeft: 'auto' }}>
-                                            <button type="button" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/clubs/join?token=${i.token}`)}>Copy</button>
-                                            <button type="button" onClick={() => revokeInvite(i.id)} style={{ marginLeft: 8 }}>Revoke</button>
+                                    <li key={i.id}>
+                                        <code>{i.token}</code>
+                                        <div className="public-admin-actions">
+                                            <button className="public-button public-button--secondary" type="button" onClick={() => navigator.clipboard.writeText(`${window.location.origin}/clubs/join?token=${i.token}`)}>Copy</button>
+                                            <button className="public-button public-button--danger" type="button" onClick={() => revokeInvite(i.id)}>Revoke</button>
                                         </div>
                                     </li>
                                 ))}
@@ -260,28 +259,26 @@ export default function PublicClubPage() {
                         )}
                     </div>
 
-                    <div>
-                        <strong>Join requests</strong>
+                    <div><h3>Join requests</h3>
                         {joinRequests.length === 0 ? (
-                            <div>No pending requests.</div>
+                            <p>No pending requests.</p>
                         ) : (
-                            <ul>
+                            <ul className="public-admin-list">
                                 {joinRequests.map(r => (
-                                    <li key={r.id} style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                                    <li key={r.id}>
                                         <div>
                                             <div><strong>{r.name || r.email}</strong></div>
-                                            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{r.message || ''}</div>
+                                            <div>{r.message || ''}</div>
                                         </div>
-                                        <div style={{ marginLeft: 'auto' }}>
-                                            <button onClick={() => approveRequest(r.id)}>Approve</button>
-                                            <button onClick={() => rejectRequest(r.id)} style={{ marginLeft: 8 }}>Reject</button>
+                                        <div className="public-admin-actions">
+                                            <button className="public-button" type="button" onClick={() => approveRequest(r.id)}>Approve</button>
+                                            <button className="public-button public-button--secondary" type="button" onClick={() => rejectRequest(r.id)}>Reject</button>
                                         </div>
                                     </li>
                                 ))}
                             </ul>
                         )}
                     </div>
-
                 </section>
             )}
         </div>

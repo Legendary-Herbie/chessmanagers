@@ -1,8 +1,9 @@
-import { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useClub, useTheme } from '../../app/contextHooks.js';
 import { clubApi } from '../../features/clubs/api/clubApi.js';
 import NotificationTray from '../../features/notifications/components/NotificationTray.jsx';
+import BrandLogo from '../common/BrandLogo.jsx';
 import '../../styles/layout.css';
 
 const navItems = [
@@ -133,12 +134,7 @@ export default function AppLayout() {
             <header className="app-nav">
                 <div className="app-nav__inner">
                     <NavLink className="app-nav__brand" to="/dashboard" aria-label="Chess Managers dashboard">
-                        <span className="app-nav__brand-mark" aria-hidden="true">
-                            <span />
-                            <span />
-                            <span />
-                        </span>
-                        <span className="app-nav__brand-name">Chess Managers</span>
+                        <BrandLogo className="app-nav__brand-logo" collapse="phone" />
                     </NavLink>
 
                     <label className="app-nav__club-switcher">

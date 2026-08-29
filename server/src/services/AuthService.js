@@ -86,13 +86,30 @@ export async function verifyEmailToken(rawToken) {
             `SELECT * FROM email_verification_tokens WHERE token_hash = $1 FOR UPDATE`,
             [hashToken(rawToken)]
         ).then(result => result.first);
-        if (!token || token.used_at || new Date(token.expires_at) <= new Date()) {
+        if (!token) {
             return failure('VERIFICATION_TOKEN_INVALID');
         }
-        const user = await UserModel.verifyEmail(token.user_id, trx);
-        if (!user) return failure('VERIFICATION_TOKEN_INVALID');
+
+        const user = await UserModel.findById(token.user_id, { trx, forUpdate: true });
+        if (!user || user.deleted_at) {
+            return failure('VERIFICATION_TOKEN_INVALID');
+        }
+
+        if (user.email_verified) {
+            return { ok: true, alreadyVerified: true };
+        }
+
+        if (token.used_at) {
+            return failure('VERIFICATION_TOKEN_INVALID');
+        }
+
+        if (new Date(token.expires_at) <= new Date()) {
+            return failure('VERIFICATION_TOKEN_EXPIRED');
+        }
+
+        await UserModel.verifyEmail(user.id, trx);
         await trx.query('UPDATE email_verification_tokens SET used_at = NOW() WHERE id = $1', [token.id]);
-        return { ok: true, user };
+        return { ok: true, alreadyVerified: false };
     });
 }
 

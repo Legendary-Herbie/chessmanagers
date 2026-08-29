@@ -14,8 +14,9 @@ function client() {
 export const googleOAuthConfigured = () => Boolean(client());
 
 export function safeContinuation(value) {
-    if (!value || !value.startsWith('/') || value.startsWith('//')) return '/dashboard';
-    return value.slice(0, 1000);
+    if (!value || value.length > 1000 || !value.startsWith('/')
+        || value.startsWith('//') || value.includes('\\')) return '/dashboard';
+    return value;
 }
 
 export async function startGoogleOAuth(continuation, meta = {}) {
@@ -33,6 +34,7 @@ export async function startGoogleOAuth(continuation, meta = {}) {
         scope: ['openid', 'email', 'profile'],
         state,
         prompt: 'select_account',
+        include_granted_scopes: true,
     });
     return { ok: true, state, url };
 }
@@ -83,6 +85,9 @@ export async function linkGoogleIdentity({ payload, state, meta = {} }) {
         }
         await trx.query('UPDATE oauth_states SET used_at = NOW() WHERE id = $1', [stateRow.id]);
         await trx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [`google:${payload.sub}`]);
+        await trx.query('SELECT pg_advisory_xact_lock(hashtext($1))', [
+            `google-email:${payload.email.toLowerCase()}`,
+        ]);
 
         let user = await trx.query(
             `SELECT account.* FROM oauth_identities identity

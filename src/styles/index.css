@@ -24,3 +24,33 @@ textarea,
 select {
     font: inherit;
 }
+
+.brand-logo {
+    display: inline-grid;
+    align-items: center;
+    flex: 0 0 auto;
+}
+
+.brand-logo__lockup,
+.brand-logo__icon {
+    grid-area: 1 / 1;
+    display: block;
+    width: auto;
+    height: 38px;
+    object-fit: contain;
+}
+
+.brand-logo__icon { display: none; }
+.brand-logo__lockup--dark-theme { display: none; }
+[data-theme='dark'] .brand-logo--auto .brand-logo__lockup--light-theme { display: none; }
+[data-theme='dark'] .brand-logo--auto .brand-logo__lockup--dark-theme { display: block; }
+
+@media (max-width: 760px) {
+    .brand-logo--collapse-mobile .brand-logo__lockup { display: none; }
+    .brand-logo--collapse-mobile .brand-logo__icon { display: block; }
+}
+
+@media (max-width: 480px) {
+    .brand-logo--collapse-phone .brand-logo__lockup { display: none; }
+    .brand-logo--collapse-phone .brand-logo__icon { display: block; }
+}

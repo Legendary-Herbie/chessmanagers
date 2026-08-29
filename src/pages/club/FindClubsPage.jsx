@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { resolveAssetUrl } from '../../config/api.js';
+import { isCancelledError, resolveAssetUrl } from '../../config/api.js';
 import { useAuth, useClub, useNotifications } from '../../app/contextHooks.js';
 import { clubApi } from '../../features/clubs/api/clubApi.js';
 
@@ -15,6 +15,7 @@ export default function FindClubsPage() {
     const [joiningByCode, setJoiningByCode] = useState(false);
     const [searchParams, setSearchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
+    const [draftQuery, setDraftQuery] = useState(query);
     const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1);
     const { user } = useAuth();
     const { refreshClubs } = useClub();
@@ -22,26 +23,40 @@ export default function FindClubsPage() {
     const navigate = useNavigate();
 
     useEffect(() => {
-        let active = true;
+        const controller = new AbortController();
         setLoading(true);
-        clubApi.listPublic({ q: query, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE })
+        clubApi.listPublic(
+            { q: query, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE },
+            { signal: controller.signal },
+        )
             .then(data => {
-                if (!active) return;
                 setClubs(data.clubs || []);
                 setTotal(data.total || 0);
                 setError(null);
             })
-            .catch(requestError => active && setError(requestError.message || 'Failed to load clubs'))
-            .finally(() => active && setLoading(false));
-        return () => { active = false; };
+            .catch(requestError => {
+                if (!isCancelledError(requestError)) {
+                    setError(requestError.message || 'Failed to load clubs');
+                }
+            })
+            .finally(() => {
+                if (!controller.signal.aborted) setLoading(false);
+            });
+        return () => controller.abort();
     }, [query, page]);
 
-    function updateSearch(value) {
-        const next = new URLSearchParams(searchParams);
-        if (value) next.set('q', value); else next.delete('q');
-        next.delete('page');
-        setSearchParams(next, { replace: true });
-    }
+    useEffect(() => setDraftQuery(query), [query]);
+
+    useEffect(() => {
+        if (draftQuery === query) return undefined;
+        const timer = window.setTimeout(() => {
+            const next = new URLSearchParams();
+            const trimmedQuery = draftQuery.trim();
+            if (trimmedQuery) next.set('q', trimmedQuery);
+            setSearchParams(next, { replace: true });
+        }, 300);
+        return () => window.clearTimeout(timer);
+    }, [draftQuery, query, setSearchParams]);
 
     async function handleJoinCode(event) {
         event.preventDefault();
@@ -71,41 +86,60 @@ export default function FindClubsPage() {
         ...(query ? { q: query } : {}), page: String(nextPage),
     }, { replace: true });
 
-    return <div>
-        <h1>Find Clubs</h1>
-        <p className="muted">Public clubs are searchable here. Private clubs require an invite or join code.</p>
-        <input aria-label="Search public clubs" placeholder="Search clubs or federations"
-            value={query} onChange={event => updateSearch(event.target.value)} />
+    return <div className="public-page">
+        <header className="public-page__header">
+            <h1>Find clubs</h1>
+            <p>Discover public chess clubs, or use a six-digit code to join a private club.</p>
+        </header>
 
-        <form onSubmit={handleJoinCode} style={{ display: 'flex', gap: 8, alignItems: 'end', margin: '18px 0' }}>
-            <label><span style={{ display: 'block', marginBottom: 4 }}>Join a private club</span>
-                <input aria-label="Six-digit join code" inputMode="numeric" autoComplete="one-time-code"
-                    pattern="[0-9]{6}" maxLength={6} value={joinCode}
-                    onChange={event => setJoinCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
-                    placeholder="000000" />
-            </label>
-            <button type="submit" disabled={joiningByCode || joinCode.length !== 6}>
-                {joiningByCode ? 'Joining…' : 'Join with code'}
-            </button>
-        </form>
+        <div className="public-discovery-tools">
+            <section className="public-panel" aria-labelledby="club-search-heading">
+                <label className="public-field">
+                    <span id="club-search-heading">Search public clubs</span>
+                    <input className="public-input" type="search" aria-label="Search public clubs"
+                        placeholder="Search clubs or federations" value={draftQuery}
+                        onChange={event => setDraftQuery(event.target.value)} />
+                </label>
+            </section>
+            <form className="public-panel public-join-form" onSubmit={handleJoinCode}>
+                <label className="public-field"><span>Join a private club</span>
+                    <input className="public-input" aria-label="Six-digit join code" inputMode="numeric"
+                        autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={joinCode}
+                        onChange={event => setJoinCode(event.target.value.replace(/\D/g, '').slice(0, 6))}
+                        placeholder="000000" />
+                </label>
+                <button className="public-button" type="submit" disabled={joiningByCode || joinCode.length !== 6}>
+                    {joiningByCode ? 'Joining…' : 'Join with code'}
+                </button>
+            </form>
+        </div>
 
-        {loading && <p>Loading clubs…</p>}
-        {error && <p style={{ color: 'var(--danger)' }}>Error: {error}</p>}
-        {!loading && !error && (clubs.length ? <>
-            <ul style={{ listStyle: 'none', padding: 0 }}>{clubs.map(club => <li key={club.id} style={{ marginBottom: 12 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    {club.logo ? <img src={resolveAssetUrl(club.logo)} alt={`${club.name} logo`}
-                        style={{ width: 40, height: 40, objectFit: 'cover', borderRadius: 8 }} />
-                        : <div style={{ width: 40, height: 40, background: 'var(--bg-muted)', borderRadius: 8 }} />}
-                    <div><strong>{club.name}</strong><div className="muted">{club.federation || ''}</div></div>
-                    <div style={{ marginLeft: 'auto' }}><Link to={`/clubs/${club.id}`}>View</Link></div>
+        <div className="public-results-status" role="status" aria-live="polite">
+            {loading ? (clubs.length ? 'Updating results…' : 'Loading clubs…') : null}
+        </div>
+        {error && <section className="public-panel public-state public-state--error" role="alert">
+            <h2>Clubs could not be loaded</h2><p>{error}</p>
+        </section>}
+        {!error && clubs.length > 0 && <div className="public-club-grid" aria-busy={loading}>
+            {clubs.map(club => <article className="public-card public-club-card" key={club.id}>
+                {club.logo ? <img className="public-club-card__logo" src={resolveAssetUrl(club.logo)} alt="" />
+                    : <div className="public-club-card__placeholder" aria-hidden="true" />}
+                <div className="public-club-card__body"><h2>{club.name}</h2>
+                    <p>{club.federation || 'Independent club'}</p></div>
+                <div className="public-club-card__action">
+                    <Link className="public-link-button" to={`/clubs/${club.id}`}>View club</Link>
                 </div>
-            </li>)}</ul>
-            {totalPages > 1 && <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <button type="button" disabled={page === 1} onClick={() => goToPage(page - 1)}>Previous</button>
-                <span>Page {page} of {totalPages}</span>
-                <button type="button" disabled={page >= totalPages} onClick={() => goToPage(page + 1)}>Next</button>
-            </div>}
-        </> : <p>No public clubs found.</p>)}
+            </article>)}
+        </div>}
+        {!loading && !error && clubs.length === 0 && <section className="public-panel public-state">
+            <h2>No public clubs found</h2><p>Try a different club or federation name.</p>
+        </section>}
+        {!error && totalPages > 1 && <nav className="public-pagination" aria-label="Club search pages">
+            <button className="public-button public-button--secondary" type="button" disabled={page === 1 || loading}
+                onClick={() => goToPage(page - 1)}>Previous</button>
+            <span>Page {page} of {totalPages}</span>
+            <button className="public-button public-button--secondary" type="button" disabled={page >= totalPages || loading}
+                onClick={() => goToPage(page + 1)}>Next</button>
+        </nav>}
     </div>;
 }

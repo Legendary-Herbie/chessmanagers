@@ -95,15 +95,16 @@ Navigate to http://localhost:3000
 Located at project root. Used by Vite during build and dev.
 
 ```bash
-# Required for API connectivity
-VITE_API_URL = http://localhost:3000/api/v1
+# Leave empty in development. Vite proxies /api/v1 to the API server.
+VITE_API_URL=
 ```
 
 **Development defaults:**
 - API server runs on same origin with `/api/v1` proxy (see `vite.config.js`)
 
 **Production:**
-- Update `VITE_API_URL` to your deployed API endpoint
+- Keep `VITE_API_URL` empty when Express serves the frontend from the same origin
+- Set `VITE_API_URL` only when the frontend and API are deployed separately
 - Example: `VITE_API_URL = https://api.example.com/api/v1`
 
 ---
@@ -116,7 +117,7 @@ Core settings for Express server and database.
 
 ```bash
 # Server Configuration
-PORT=3000                                    # Port to run server on (default: 3000)
+PORT=5000                                    # API port used by the local Vite proxy
 NODE_ENV=development                        # 'development' or 'production'
 JWT_SECRET=your-secret-key-min-32-chars    # Must be ≥32 characters; use strong secret in production
 
@@ -140,7 +141,13 @@ MAX_CLUBS_PER_USER=2                        # Max clubs a user can own (default:
 
 # Frontend Serving (production only)
 SERVE_FRONTEND=false                        # Set true to serve built frontend from server
-FRONTEND_URL_PROD=https://example.com       # Production frontend URL for CORS
+FRONTEND_URL=https://example.com            # Browser-facing frontend URL
+COOKIE_SAME_SITE=lax                        # Use none for a truly cross-site frontend/API pair
+
+# Google OAuth (callback must exactly match Google Cloud Console)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+GOOGLE_REDIRECT_URI=http://localhost:3000/api/v1/auth/google/callback
 
 # Email/SMTP (optional - features disabled if not configured)
 SMTP_HOST=smtp.gmail.com                    # SMTP server
@@ -225,8 +232,10 @@ Update `server/.env`:
 ```bash
 NODE_ENV=production
 SERVE_FRONTEND=true                  # Enable serving frontend from server
-VITE_API_URL=https://api.example.com/api/v1  # Public API URL (update in .env too)
+VITE_API_URL=                        # Same-origin API when Express serves the frontend
 CORS_ORIGIN=https://example.com      # Your production domain
+FRONTEND_URL=https://example.com     # OAuth returns here after the callback
+GOOGLE_REDIRECT_URI=https://example.com/api/v1/auth/google/callback
 JWT_SECRET=your-strong-production-secret      # Must be 32+ chars
 DATABASE_URL=postgresql://user:pass@db-host:5432/chess_managers
 ```
@@ -465,13 +474,13 @@ psql -U postgres -c "SELECT version();"
 
 1. **Verify server is running:**
    ```bash
-   curl http://localhost:3000/api/v1/health
+   curl http://localhost:5000/health
    ```
 
 2. **Check VITE_API_URL in `.env`:**
    ```bash
    cat .env | grep VITE_API_URL
-   # Should be: http://localhost:3000/api/v1 (dev) or https://api.example.com/api/v1 (prod)
+   # Should be empty in dev, or an absolute API URL for a separate production API
    ```
 
 3. **Clear browser cache:**

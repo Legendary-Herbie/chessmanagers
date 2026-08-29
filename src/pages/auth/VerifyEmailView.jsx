@@ -1,25 +1,61 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { authApi } from '../../features/auth/api/authApi.js';
-import { isCancelledError } from '../../config/api.js';
+import { continuationFromParams, continuationQuery } from '../../features/auth/continuation.js';
 
 export default function VerifyEmailView() {
     const [params] = useSearchParams();
-    const [state, setState] = useState({ loading: true, error: '' });
+    const [state, setState] = useState({ loading: true, message: '', isError: false });
+
+    const token = params.get('token');
+    const continuation = continuationFromParams(params);
+    const loginTarget = `/auth/login${continuationQuery(continuation)}`;
+
     useEffect(() => {
-        const token = params.get('token');
-        if (!token) { setState({ loading: false, error: 'Verification token is missing.' }); return; }
-        const controller = new AbortController();
-        authApi.verifyEmail(token, { signal: controller.signal })
-            .then(() => setState({ loading: false, error: '' }))
+        if (!token) {
+            setState({ loading: false, message: 'Invalid verification link', isError: true });
+            return;
+        }
+
+        let active = true;
+
+        authApi.verifyEmail(token)
+            .then(response => {
+                if (!active) return;
+                const message = response?.alreadyVerified
+                    ? 'Email already verified'
+                    : 'Email verified successfully';
+                setState({ loading: false, message, isError: false });
+            })
             .catch(error => {
-                if (!isCancelledError(error)) setState({ loading: false, error: error.message });
+                if (!active) return;
+                setState({
+                    loading: false,
+                    message: error?.message || 'Invalid verification link',
+                    isError: true,
+                });
             });
-        return () => controller.abort();
-    }, [params]);
-    return <div className="auth-form-wrapper">
-        <div className="auth-form-header"><h1 className="auth-form-title">Email verification</h1>
-            <p className="auth-form-subtitle">{state.loading ? 'Verifying your email…' : state.error || 'Your email is verified.'}</p></div>
-        {!state.loading && <p className="auth-switch"><Link className="auth-link" to="/auth/login">Continue to sign in</Link></p>}
-    </div>;
+
+        return () => {
+            active = false;
+        };
+    }, [token]);
+
+    return (
+        <div className="auth-form-wrapper">
+            <div className="auth-form-header">
+                <h1 className="auth-form-title">Email verification</h1>
+                <p className="auth-form-subtitle">
+                    {state.loading ? 'Verifying your email…' : state.message}
+                </p>
+            </div>
+            {!state.loading && (
+                <p className="auth-switch">
+                    <Link className="auth-link" to={loginTarget}>
+                        {state.isError ? 'Back to sign in' : 'Continue to sign in'}
+                    </Link>
+                </p>
+            )}
+        </div>
+    );
 }

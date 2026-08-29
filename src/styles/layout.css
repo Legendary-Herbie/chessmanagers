@@ -31,11 +31,12 @@
     min-height: var(--min-tap-size);
     display: inline-flex;
     align-items: center;
-    gap: 10px;
-    color: var(--text-strong);
     text-decoration: none;
     flex: 0 0 auto;
 }
+
+.app-nav__brand-logo .brand-logo__lockup { height: 48px; }
+.app-nav__brand-logo .brand-logo__icon { height: 32px; }
 
 .app-nav__brand-mark {
     width: 30px;

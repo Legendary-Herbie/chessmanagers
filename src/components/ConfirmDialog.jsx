@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
+import { useFocusTrap } from '../shared/hooks/useFocusTrap.jsx';
 
 export default function ConfirmDialog({
     isOpen = false,
@@ -12,19 +13,24 @@ export default function ConfirmDialog({
     onClose,
     children = null,
 }) {
+    const dialogRef = useRef(null);
+    const titleId = useId();
+    const descriptionId = useId();
+    useFocusTrap(dialogRef, isOpen);
+
     // Scroll lock & Escape key
     useEffect(() => {
         if (!isOpen) return;
         document.body.style.overflow = 'hidden';
         const handleEscape = (e) => {
-            if (e.key === 'Escape' && onClose) onClose();
+            if (e.key === 'Escape' && !loading && onClose) onClose();
         };
         window.addEventListener('keydown', handleEscape);
         return () => {
             document.body.style.overflow = '';
             window.removeEventListener('keydown', handleEscape);
         };
-    }, [isOpen, onClose]);
+    }, [isOpen, loading, onClose]);
 
     if (!isOpen) return null;
 
@@ -35,17 +41,20 @@ export default function ConfirmDialog({
         : 'btn-primary';
 
     return (
-        <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="confirm-dialog-title">
-            <div className="modal-card" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '440px' }}>
+        <div className="modal-overlay" role="presentation"
+            onMouseDown={event => event.target === event.currentTarget && !loading && onClose?.()}>
+            <div ref={dialogRef} className="modal-card" role="dialog" aria-modal="true"
+                aria-labelledby={titleId} aria-describedby={descriptionId} style={{ maxWidth: '440px' }}>
                 <div className="modal-card__header">
-                    <h2 id="confirm-dialog-title" className="modal-card__title">{title}</h2>
-                    <button type="button" className="modal-card__close" onClick={onClose} aria-label="Close modal">
+                    <h2 id={titleId} className="modal-card__title">{title}</h2>
+                    <button type="button" className="modal-card__close" onClick={onClose}
+                        disabled={loading} aria-label="Close modal">
                         ✕
                     </button>
                 </div>
 
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', padding: '4px 0' }}>
-                    <p style={{ margin: 0, color: 'var(--text)', lineHeight: 1.5, fontSize: '0.95rem' }}>
+                    <p id={descriptionId} style={{ margin: 0, color: 'var(--text)', lineHeight: 1.5, fontSize: '0.95rem' }}>
                         {message}
                     </p>
                     {children}

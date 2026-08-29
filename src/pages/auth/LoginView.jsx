@@ -1,35 +1,44 @@
-import React, { useState } from 'react';
+import React, { useRef, useState } from 'react';
 import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../app/contextHooks.js';
 import Button from '../../shared/common/Button.jsx';
 import { authApi } from '../../features/auth/api/authApi.js';
+import { continuationFromParams, continuationQuery } from '../../features/auth/continuation.js';
 
 export default function LoginView() {
     const { login }   = useAuth();
     const navigate    = useNavigate();
     const [searchParams] = useSearchParams();
-    const inviteToken = searchParams.get('inviteToken');
-    const joinCode = searchParams.get('joinCode');
-    const continuation = inviteToken
-        ? `?inviteToken=${encodeURIComponent(inviteToken)}`
-        : joinCode ? `?joinCode=${encodeURIComponent(joinCode)}` : '';
-    const destination = inviteToken
-        ? `/clubs/join?token=${encodeURIComponent(inviteToken)}`
-        : joinCode ? `/clubs/join?code=${encodeURIComponent(joinCode)}` : '/dashboard';
+    const destination = continuationFromParams(searchParams);
+    const continuation = continuationQuery(destination);
 
     const [fields, setFields] = useState({ email: '', password: '' });
     const [error,  setError]  = useState('');
+    const [fieldErrors, setFieldErrors] = useState({});
     const [busy,   setBusy]   = useState(false);
+    const emailRef = useRef(null);
+    const passwordRef = useRef(null);
 
-    const handleChange = (e) =>
-        setFields(f => ({ ...f, [e.target.name]: e.target.value }));
+    const handleChange = (e) => {
+        const { name, value } = e.target;
+        setFields(current => ({ ...current, [name]: value }));
+        setFieldErrors(current => ({ ...current, [name]: '' }));
+    };
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
 
-        if (!fields.email || !fields.password) {
+        const nextErrors = {
+            email: fields.email ? '' : 'Enter your email address.',
+            password: fields.password ? '' : 'Enter your password.',
+        };
+        if (nextErrors.email || nextErrors.password) {
+            setFieldErrors(nextErrors);
             setError('Please fill in all fields.');
+            window.requestAnimationFrame(() => {
+                (nextErrors.email ? emailRef : passwordRef).current?.focus();
+            });
             return;
         }
 
@@ -56,7 +65,7 @@ export default function LoginView() {
             </div>
 
             {error && (
-                <div className="auth-error" role="alert">
+                <div id="login-error" className="auth-error" role="alert">
                     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
                         <circle cx="8" cy="8" r="7" stroke="currentColor" strokeWidth="1.5"/>
                         <path d="M8 5v3.5M8 11v.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
@@ -70,6 +79,7 @@ export default function LoginView() {
                     <label htmlFor="email" className="auth-label">Email</label>
                     <input
                         id="email"
+                        ref={emailRef}
                         name="email"
                         type="email"
                         autoComplete="email"
@@ -79,13 +89,17 @@ export default function LoginView() {
                         value={fields.email}
                         onChange={handleChange}
                         disabled={busy}
+                        aria-invalid={Boolean(fieldErrors.email)}
+                        aria-describedby={fieldErrors.email ? 'email-error login-error' : undefined}
                     />
+                    {fieldErrors.email && <span id="email-error" className="auth-field-error">{fieldErrors.email}</span>}
                 </div>
 
                 <div className="auth-field">
                     <label htmlFor="password" className="auth-label">Password</label>
                     <input
                         id="password"
+                        ref={passwordRef}
                         name="password"
                         type="password"
                         autoComplete="current-password"
@@ -95,7 +109,10 @@ export default function LoginView() {
                         value={fields.password}
                         onChange={handleChange}
                         disabled={busy}
+                        aria-invalid={Boolean(fieldErrors.password)}
+                        aria-describedby={fieldErrors.password ? 'password-error login-error' : undefined}
                     />
+                    {fieldErrors.password && <span id="password-error" className="auth-field-error">{fieldErrors.password}</span>}
                 </div>
 
                 <Button

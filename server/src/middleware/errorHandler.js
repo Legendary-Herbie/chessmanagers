@@ -46,7 +46,10 @@ export function errorHandler(err, req, res, _next) {
 
     // Explicit status set by application code (e.g. throw Object.assign(new Error(...), { status: 422 }))
     if (err.status && err.status < 500) {
-        return res.status(err.status).json({ error: err.message });
+        return res.status(err.status).json({
+            error: err.message,
+            ...(err.code ? { code: err.code } : {}),
+        });
     }
 
     // ── Fallback 500 ──────────────────────────────────────────────────────────

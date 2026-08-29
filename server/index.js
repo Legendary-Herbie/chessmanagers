@@ -38,7 +38,17 @@ const { PORT, CORS_ORIGIN, NODE_ENV, SERVE_FRONTEND } = env;
 
 const escapeRegex = (value) => value.replace(/[|\\{}()[\]^$+?.]/g, '\\$&');
 
-const createOriginMatcher = (origins) => {
+const isLoopbackOrigin = (value) => {
+    try {
+        const url = new URL(value);
+        return ['http:', 'https:'].includes(url.protocol)
+            && ['localhost', '127.0.0.1', '[::1]'].includes(url.hostname);
+    } catch {
+        return false;
+    }
+};
+
+export const createOriginMatcher = (origins, { allowDevelopmentLoopback = false } = {}) => {
     const exactOrigins = new Set();
     const wildcardPatterns = [];
 
@@ -58,12 +68,19 @@ const createOriginMatcher = (origins) => {
 
     return (requestOrigin) => {
         if (!requestOrigin) return true;
+        if (allowDevelopmentLoopback && isLoopbackOrigin(requestOrigin)) return true;
         if (exactOrigins.has(requestOrigin)) return true;
         return wildcardPatterns.some(pattern => pattern.test(requestOrigin));
     };
 };
 
-const isOriginAllowed = createOriginMatcher(CORS_ORIGIN);
+if (NODE_ENV === 'production' && CORS_ORIGIN.includes('*')) {
+    throw new Error('CORS_ORIGIN cannot be "*" when credentialed requests are enabled in production.');
+}
+
+const isOriginAllowed = createOriginMatcher(CORS_ORIGIN, {
+    allowDevelopmentLoopback: NODE_ENV === 'development',
+});
 
 // ─── Core Middleware ───────────────────────────────────────────────────────────
 
@@ -80,7 +97,10 @@ app.use(cors({
             callback(null, true);
         } else {
             console.warn(`[CORS] Blocked origin: ${requestOrigin}`);
-            callback(new Error('Not allowed by CORS'));
+            callback(Object.assign(new Error('Origin is not allowed by CORS.'), {
+                status: 403,
+                code: 'CORS_ORIGIN_DENIED',
+            }));
         }
     },
     methods: ['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],

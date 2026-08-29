@@ -23,13 +23,44 @@ async function registerAndVerify(agent, values, ip) {
     const registered = await agent.post('/api/v1/auth/register')
         .set('X-Forwarded-For', ip).send(values).expect(201);
     const email = consumeTestEmails().find(message => message.type === 'verification');
-    await agent.post('/api/v1/auth/verify-email').set('X-Forwarded-For', ip)
+    const verifyRes = await agent.post('/api/v1/auth/verify-email').set('X-Forwarded-For', ip)
         .send({ token: email.token }).expect(200);
+    expect(verifyRes.body).toEqual({
+        ok: true,
+        alreadyVerified: false,
+        message: 'Email verified successfully',
+    });
+    expect(verifyRes.headers['set-cookie']).toBeUndefined();
+    expect(verifyRes.body).not.toHaveProperty('accessToken');
+    expect(verifyRes.body).not.toHaveProperty('user');
     return { registered, verificationToken: email.token };
 }
 
 describe('authentication lifecycle', () => {
     beforeEach(() => { consumeTestEmails(); });
+
+    it('accepts Google callback metadata while still validating code and state', async () => {
+        const response = await request(app).get('/api/v1/auth/google/callback')
+            .query({
+                code: 'google-authorization-code',
+                state: 'google-oauth-state',
+                iss: 'https://accounts.google.com',
+                scope: 'openid email profile',
+                authuser: '0',
+                prompt: 'consent',
+            })
+            .expect(302);
+        expect(response.headers.location).toContain('/auth/oauth/callback?error=oauth_cancelled');
+    });
+
+    it('rejects external authentication continuations before account creation', async () => {
+        await request(app).post('/api/v1/auth/register').set('X-Forwarded-For', '198.51.100.9')
+            .send({ ...account('unsafe-continuation'), continuation: 'https://evil.example/steal' })
+            .expect(400);
+        await request(app).post('/api/v1/auth/forgot-password').set('X-Forwarded-For', '198.51.100.9')
+            .send({ email: 'missing@example.test', continuation: '//evil.example/steal' })
+            .expect(400);
+    });
 
     it('registers separate account identity, verifies once, and rotates a hashed session', async () => {
         const agent = request.agent(app);
@@ -41,20 +72,32 @@ describe('authentication lifecycle', () => {
             username: values.username, fullName: values.fullName, emailVerified: false,
         });
         expect(JSON.stringify(registered.body)).not.toContain('password_hash');
-        await agent.post('/api/v1/auth/verify-email').set('X-Forwarded-For', '198.51.100.10')
-            .send({ token: verificationToken }).expect(400);
+
+        // Re-verifying the same token returns alreadyVerified = true idempotently
+        const reVerify = await agent.post('/api/v1/auth/verify-email').set('X-Forwarded-For', '198.51.100.10')
+            .send({ token: verificationToken }).expect(200);
+        expect(reVerify.body).toEqual({
+            ok: true,
+            alreadyVerified: true,
+            message: 'Email already verified',
+        });
 
         const login = await agent.post('/api/v1/auth/login').set('X-Forwarded-For', '198.51.100.10')
             .send({ email: values.email, password: values.password }).expect(200);
         expect(login.body.accessToken).toBeTruthy();
         expect(login.headers['set-cookie'].some(value => value.startsWith('cm_refresh=') && value.includes('HttpOnly'))).toBe(true);
         const csrf = cookie(login, 'cm_csrf');
+        expect(login.body.csrfToken).toBe(csrf);
         const originalRefresh = cookie(login, 'cm_refresh');
+        const csrfBootstrap = await agent.get('/api/v1/auth/csrf').expect(200);
+        expect(csrfBootstrap.body).toEqual({ csrfToken: csrf });
+        expect(csrfBootstrap.headers['cache-control']).toBe('no-store');
         await agent.post('/api/v1/auth/refresh').send({}).expect(403);
         const refreshed = await agent.post('/api/v1/auth/refresh')
             .set('x-csrf-token', csrf).send({}).expect(200);
         expect(refreshed.body.accessToken).not.toBe(login.body.accessToken);
         const rotatedCsrf = cookie(refreshed, 'cm_csrf');
+        expect(refreshed.body.csrfToken).toBe(rotatedCsrf);
         await request(app).post('/api/v1/auth/refresh')
             .set('Cookie', [`cm_refresh=${originalRefresh}`, `cm_csrf=${csrf}`])
             .set('x-csrf-token', csrf).send({}).expect(401);
@@ -149,7 +192,45 @@ describe('authentication lifecycle', () => {
         expect((await db.query('SELECT COUNT(*)::INTEGER AS count FROM user_clubs WHERE user_id = $1', [user.id])).first.count).toBe(0);
     });
 
-    it('rejects expired verification tokens and invalidates access on logout-all', async () => {
+    it('creates a verified global account for a new Google identity without creating club data', async () => {
+        const state = randomToken();
+        await db.query(
+            `INSERT INTO oauth_states (state_hash, provider, continuation, expires_at)
+             VALUES ($1, 'google', '/clubs/club_public', NOW() + INTERVAL '10 minutes')`,
+            [hashToken(state)]
+        );
+
+        const result = await linkGoogleIdentity({
+            state,
+            payload: {
+                sub: 'google-new-account-subject',
+                email: 'New.Google.Account@Example.test',
+                email_verified: true,
+                name: 'New Google Account',
+            },
+        });
+
+        expect(result).toMatchObject({
+            ok: true,
+            continuation: '/clubs/club_public',
+            user: {
+                email: 'new.google.account@example.test',
+                full_name: 'New Google Account',
+                email_verified: true,
+            },
+        });
+        expect(result.accessToken).toBeTruthy();
+        expect((await db.query(
+            `SELECT COUNT(*)::INTEGER AS count FROM oauth_identities
+             WHERE user_id = $1 AND provider = 'google'`, [result.user.id]
+        )).first.count).toBe(1);
+        expect((await db.query(
+            'SELECT COUNT(*)::INTEGER AS count FROM user_clubs WHERE user_id = $1',
+            [result.user.id]
+        )).first.count).toBe(0);
+    });
+
+    it('rejects expired verification tokens with specific error message and invalidates access on logout-all', async () => {
         const expiredUser = await createUser({ email: 'expired@example.test', emailVerified: false });
         const expiredToken = randomToken();
         await db.query(
@@ -157,8 +238,19 @@ describe('authentication lifecycle', () => {
              VALUES ($1, $2, NOW() - INTERVAL '1 minute')`,
             [expiredUser.id, hashToken(expiredToken)]
         );
-        await request(app).post('/api/v1/auth/verify-email').set('X-Forwarded-For', '198.51.100.14')
+        const expiredRes = await request(app).post('/api/v1/auth/verify-email').set('X-Forwarded-For', '198.51.100.14')
             .send({ token: expiredToken }).expect(400);
+        expect(expiredRes.body).toEqual({
+            code: 'VERIFICATION_TOKEN_EXPIRED',
+            error: 'Verification link expired',
+        });
+
+        const invalidRes = await request(app).post('/api/v1/auth/verify-email').set('X-Forwarded-For', '198.51.100.14')
+            .send({ token: 'invalid_token_which_does_not_exist_at_all' }).expect(400);
+        expect(invalidRes.body).toEqual({
+            code: 'VERIFICATION_TOKEN_INVALID',
+            error: 'Invalid verification link',
+        });
 
         const agent = request.agent(app);
         const values = account('logoutall');
@@ -171,6 +263,57 @@ describe('authentication lifecycle', () => {
             .set('x-csrf-token', csrf).send({}).expect(200);
         await request(app).get('/api/v1/auth/me')
             .set('Authorization', `Bearer ${login.body.accessToken}`).expect(401);
+    });
+
+    it('handles concurrent verification requests safely and idempotently', async () => {
+        const agent = request.agent(app);
+        const values = account('concurrent');
+        await agent.post('/api/v1/auth/register')
+            .set('X-Forwarded-For', '198.51.100.15').send(values).expect(201);
+        const email = consumeTestEmails().find(message => message.type === 'verification');
+        const token = email.token;
+
+        const [res1, res2] = await Promise.all([
+            agent.post('/api/v1/auth/verify-email').set('X-Forwarded-For', '198.51.100.15').send({ token }),
+            agent.post('/api/v1/auth/verify-email').set('X-Forwarded-For', '198.51.100.15').send({ token }),
+        ]);
+
+        expect(res1.status).toBe(200);
+        expect(res2.status).toBe(200);
+        const messages = [res1.body.message, res2.body.message];
+        expect(messages).toContain('Email verified successfully');
+        expect(messages).toContain('Email already verified');
+
+        const dbUser = await db.query('SELECT email_verified, email_verified_at FROM users WHERE email = $1', [values.email]).then(r => r.first);
+        expect(dbUser.email_verified).toBe(true);
+        expect(dbUser.email_verified_at).toBeTruthy();
+    });
+
+    it('returns already verified when an older unused token is opened for an already verified account without modifying token', async () => {
+        const agent = request.agent(app);
+        const values = account('oldtoken');
+        await agent.post('/api/v1/auth/register')
+            .set('X-Forwarded-For', '198.51.100.16').send(values).expect(201);
+        const token1 = consumeTestEmails().find(message => message.type === 'verification').token;
+
+        // Resend to get token2
+        await agent.post('/api/v1/auth/resend-verification')
+            .set('X-Forwarded-For', '198.51.100.16').send({ email: values.email }).expect(200);
+        const token2 = consumeTestEmails().find(message => message.type === 'verification').token;
+
+        // Verify with token2
+        const verifyRes = await agent.post('/api/v1/auth/verify-email')
+            .set('X-Forwarded-For', '198.51.100.16').send({ token: token2 }).expect(200);
+        expect(verifyRes.body.message).toBe('Email verified successfully');
+
+        // Now user clicks token1 (which was superseded when token2 was issued)
+        const oldTokenRes = await agent.post('/api/v1/auth/verify-email')
+            .set('X-Forwarded-For', '198.51.100.16').send({ token: token1 }).expect(200);
+        expect(oldTokenRes.body).toEqual({
+            ok: true,
+            alreadyVerified: true,
+            message: 'Email already verified',
+        });
     });
 
     it('rate-limits repeated login attempts independently from the global limiter', async () => {

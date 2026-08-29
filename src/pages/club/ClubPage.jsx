@@ -4,14 +4,16 @@ import '../../styles/club.css';
 import Button from '../../shared/common/Button.jsx';
 import ClubDashboard from './ClubDashboard.jsx';
 import { resolveAssetUrl } from '../../config/api.js';
-import { useClub, useAuth } from '../../app/contextHooks.js';
+import { useClub, useAuth, useNotifications } from '../../app/contextHooks.js';
 import { clubApi } from '../../features/clubs/api/clubApi.js';
 import { leaderboardApi } from '../../features/leaderboard/api/leaderboardApi.js';
 import DataExportPanel from '../../features/exports/components/DataExportPanel.jsx';
+import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 
 export default function ClubPage() {
     const { club, capabilities, refreshClub } = useClub();
     const { user } = useAuth();
+    const { notify } = useNotifications();
     const [searchParams, setSearchParams] = useSearchParams();
 
     // Read active tab from URL params, default to 'profile'
@@ -32,6 +34,9 @@ export default function ClubPage() {
     const [joinCodeStatus, setJoinCodeStatus] = useState({ active: false });
     const [revealedJoinCode, setRevealedJoinCode] = useState(null);
     const [joinCodeLoading, setJoinCodeLoading] = useState(false);
+    const [dialogAction, setDialogAction] = useState(null);
+    const [dialogReason, setDialogReason] = useState('');
+    const [dialogBusy, setDialogBusy] = useState(false);
 
     // Dashboard payload — lazy-loaded only when tab is 'dashboard' (see useEffect below)
     const [dashboard, setDashboard] = useState(null);
@@ -212,26 +217,23 @@ export default function ClubPage() {
         }
     }
 
-    async function archiveClub() {
-        if (!confirm('Archive this club? It will become read-only until restored.')) return;
-        setManagementError(null);
-        try {
-            await clubApi.archive(club.id);
-            await refreshClub();
-        } catch (err) {
-            setManagementError(err.message || 'Failed to archive club');
-        }
+    function openDialog(action) {
+        setDialogReason('');
+        setDialogAction(action);
     }
 
-    async function deleteClub() {
-        if (!confirm('Delete this club? Historical chess records will be retained, but the club cannot be restored.')) return;
-        setManagementError(null);
-        try {
-            await clubApi.delete(club.id);
-            await refreshClub();
-        } catch (err) {
-            setManagementError(err.message || 'Failed to delete club');
-        }
+    function archiveClub() {
+        openDialog({
+            kind: 'archiveClub', title: 'Archive club', confirmLabel: 'Archive club', variant: 'warning',
+            message: 'Archive this club? It will become read-only until restored.',
+        });
+    }
+
+    function deleteClub() {
+        openDialog({
+            kind: 'deleteClub', title: 'Delete club', confirmLabel: 'Delete club', variant: 'danger',
+            message: 'Delete this club? Historical chess records will be retained, but the club cannot be restored.',
+        });
     }
 
     async function createInvite() {
@@ -243,12 +245,12 @@ export default function ClubPage() {
                 setInvites(prev => [inv, ...prev]);
                 const url = `${window.location.origin}/clubs/join?token=${inv.token}`;
                 await navigator.clipboard.writeText(url);
-                alert('Invite created and copied to clipboard');
+                notify('Invite created and copied to clipboard', 'success');
             } else {
-                alert('Invite created');
+                notify('Invite created', 'success');
             }
         } catch (err) {
-            alert(err?.message || 'Failed to create invite');
+            notify(err?.message || 'Failed to create invite', 'error');
         } finally {
             setCreatingInvite(false);
         }
@@ -256,34 +258,30 @@ export default function ClubPage() {
 
     async function reviewJoinRequest(requestId, action) {
         if (!club) return;
+        if (action === 'reject') {
+            openDialog({
+                kind: 'rejectRequest', requestId, title: 'Reject join request', confirmLabel: 'Reject request',
+                variant: 'danger', message: 'Reject this membership request?', reasonLabel: 'Reason (optional)',
+            });
+            return;
+        }
         try {
-            let body = {};
-            if (action === 'reject') {
-                const reason = prompt('Optional rejection reason:');
-                if (reason === null) return;
-                body = reason.trim() ? { reason: reason.trim() } : {};
-            }
-            if (action === 'approve') await clubApi.approveJoinRequest(club.id, requestId);
-            else await clubApi.rejectJoinRequest(club.id, requestId, body.reason);
+            await clubApi.approveJoinRequest(club.id, requestId);
             setJoinRequests(current => current.filter(request => request.id !== requestId));
-            if (action === 'approve') await loadMembers();
+            await loadMembers();
+            notify('Join request approved', 'success');
         } catch (err) {
-            alert(err?.message || `Failed to ${action} join request`);
+            notify(err?.message || 'Failed to approve join request', 'error');
         }
     }
 
-    async function removeMember(member) {
-        if (!confirm(`Remove ${member.email} from the club?`)) return;
-        if (member.role === 'owner') { alert('Cannot remove owner'); return; }
-        if (member.userId === user?.id) { alert('Cannot remove yourself'); return; }
-        const reason = prompt('Optional revocation reason:');
-        if (reason === null) return;
-        try {
-            await clubApi.revokeMember(club.id, member.userId, reason.trim() || undefined);
-            await loadMembers();
-        } catch (err) {
-            alert(err.message || 'Failed to remove member');
-        }
+    function removeMember(member) {
+        if (member.role === 'owner') { notify('The club owner cannot be removed.', 'error'); return; }
+        if (member.userId === user?.id) { notify('You cannot remove yourself from this screen.', 'error'); return; }
+        openDialog({
+            kind: 'removeMember', member, title: 'Remove club member', confirmLabel: 'Remove member',
+            variant: 'danger', message: `Remove ${member.email} from the club?`, reasonLabel: 'Reason (optional)',
+        });
     }
 
     async function rotateJoinCode() {
@@ -300,17 +298,60 @@ export default function ClubPage() {
         }
     }
 
-    async function revokeJoinCode() {
-        if (!confirm('Disable the active join code?')) return;
-        setJoinCodeLoading(true);
+    function revokeJoinCode() {
+        openDialog({
+            kind: 'revokeJoinCode', title: 'Disable join code', confirmLabel: 'Disable code', variant: 'danger',
+            message: 'Disable the active join code? Members will no longer be able to use it.',
+        });
+    }
+
+    function revokeInvite(invite) {
+        openDialog({
+            kind: 'revokeInvite', invite, title: 'Revoke invite', confirmLabel: 'Revoke invite', variant: 'danger',
+            message: 'Revoke this invite? Anyone with its link will no longer be able to use it.',
+        });
+    }
+
+    async function confirmDialogAction() {
+        if (!dialogAction || !club) return;
+        const action = dialogAction;
+        const reason = dialogReason.trim() || undefined;
+        setDialogBusy(true);
         setManagementError(null);
         try {
-            await clubApi.revokeJoinCode(club.id);
-            setJoinCodeStatus({ active: false });
-            setRevealedJoinCode(null);
+            if (action.kind === 'archiveClub') {
+                await clubApi.archive(club.id);
+                await refreshClub();
+                notify('Club archived', 'success');
+            } else if (action.kind === 'deleteClub') {
+                await clubApi.delete(club.id);
+                await refreshClub();
+                notify('Club deleted', 'success');
+            } else if (action.kind === 'rejectRequest') {
+                await clubApi.rejectJoinRequest(club.id, action.requestId, reason);
+                setJoinRequests(current => current.filter(request => request.id !== action.requestId));
+                notify('Join request rejected', 'success');
+            } else if (action.kind === 'removeMember') {
+                await clubApi.revokeMember(club.id, action.member.userId, reason);
+                await loadMembers();
+                notify('Member removed', 'success');
+            } else if (action.kind === 'revokeJoinCode') {
+                setJoinCodeLoading(true);
+                await clubApi.revokeJoinCode(club.id);
+                setJoinCodeStatus({ active: false });
+                setRevealedJoinCode(null);
+                notify('Join code disabled', 'success');
+            } else if (action.kind === 'revokeInvite') {
+                await clubApi.revokeInvite(club.id, action.invite.id);
+                setInvites(current => current.filter(invite => invite.id !== action.invite.id));
+                notify('Invite revoked', 'success');
+            }
+            setDialogAction(null);
+            setDialogReason('');
         } catch (err) {
-            setManagementError(err.message || 'Failed to disable join code');
+            notify(err?.message || 'The club action could not be completed.', 'error');
         } finally {
+            setDialogBusy(false);
             setJoinCodeLoading(false);
         }
     }
@@ -609,15 +650,8 @@ export default function ClubPage() {
                                         <code style={{ fontSize: 12 }}>{i.token}</code>
                                         <div style={{ marginLeft: 'auto' }}>
                                             <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/clubs/join?token=${i.token}`)}>Copy</Button>
-                                            <Button variant="danger" style={{ marginLeft: 8 }} onClick={async () => {
-                                                if (!confirm('Revoke this invite?')) return;
-                                                try {
-                                                    await clubApi.revokeInvite(club.id, i.id);
-                                                    setInvites(prev => prev.filter(x => x.id !== i.id));
-                                                } catch (err) {
-                                                    alert(err?.message || 'Failed to revoke invite');
-                                                }
-                                            }}>Revoke</Button>
+                                            <Button variant="danger" style={{ marginLeft: 8 }}
+                                                onClick={() => revokeInvite(i)}>Revoke</Button>
                                         </div>
                                     </li>
                                 ))}
@@ -653,6 +687,23 @@ export default function ClubPage() {
                     </div>
                 </div>
             ) : null}
+
+            <ConfirmDialog isOpen={Boolean(dialogAction)} title={dialogAction?.title}
+                message={dialogAction?.message} confirmLabel={dialogAction?.confirmLabel}
+                variant={dialogAction?.variant} loading={dialogBusy}
+                onClose={() => {
+                    if (!dialogBusy) {
+                        setDialogAction(null);
+                        setDialogReason('');
+                    }
+                }}
+                onConfirm={confirmDialogAction}>
+                {dialogAction?.reasonLabel && <label className="form-row">
+                    <span className="label">{dialogAction.reasonLabel}</span>
+                    <textarea className="input" maxLength={500} value={dialogReason}
+                        onChange={event => setDialogReason(event.target.value)} />
+                </label>}
+            </ConfirmDialog>
         </div>
     );
 }

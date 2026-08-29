@@ -1,0 +1,76 @@
+import React from 'react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { ClubContext } from '../../app/contextHooks.js';
+import { tournamentApi } from '../../features/tournaments/api/tournamentApi.js';
+import { playerApi } from '../../features/players/api/playerApi.js';
+import TournamentPage from './TournamentPage.jsx';
+
+vi.mock('../../features/tournaments/api/tournamentApi.js', () => ({
+    tournamentApi: { get: vi.fn(), recordResult: vi.fn(), archive: vi.fn() },
+}));
+vi.mock('../../features/players/api/playerApi.js', () => ({
+    playerApi: { fetchPlayers: vi.fn() },
+}));
+
+const detail = {
+    tournament: {
+        id: 'tour_1', name: 'Club Swiss', type: 'swiss', status: 'active',
+        rating_category: 'rapid', is_rated: true, current_round: 1,
+    },
+    participants: [
+        { id: 'player_1', name: 'Alpha', rating: 1500, registrationRound: 1, status: 'active', byeCount: 0 },
+        { id: 'player_2', name: 'Beta', rating: 1500, registrationRound: 1, status: 'active', byeCount: 0 },
+    ],
+    standings: [],
+    rounds: [{ id: 'round_1',
+        roundNumber: 1, status: 'active', pairings: [{
+            id: 'pairing_1', board: 1, whitePlayerId: 'player_1', whitePlayerName: 'Alpha',
+            blackPlayerId: 'player_2', blackPlayerName: 'Beta', status: 'pending', result: null, isBye: false,
+        }],
+    }],
+};
+
+function renderPage() {
+    return render(<MemoryRouter initialEntries={['/tournaments/tour_1']}>
+        <ClubContext.Provider value={{
+            club: { id: 'club_1' }, capabilities: { canManageMatches: true },
+        }}><Routes><Route path="/tournaments/:tournamentId" element={<TournamentPage />} /></Routes>
+        </ClubContext.Provider>
+    </MemoryRouter>);
+}
+
+describe('TournamentPage duplicate result protection', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        tournamentApi.get.mockResolvedValue(detail);
+        playerApi.fetchPlayers.mockResolvedValue(detail.participants);
+    });
+    afterEach(cleanup);
+
+    it('does not retry a possible duplicate until the admin confirms', async () => {
+        tournamentApi.recordResult
+            .mockRejectedValueOnce({ code: 'POSSIBLE_DUPLICATE_MATCH' })
+            .mockResolvedValueOnce({ ratingStatus: 'complete' });
+        renderPage();
+        fireEvent.click(await screen.findByRole('button', { name: 'Result' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save result' }));
+        expect(await screen.findByRole('dialog', { name: 'Possible duplicate result' })).toBeTruthy();
+        expect(tournamentApi.recordResult).toHaveBeenCalledTimes(1);
+        fireEvent.click(screen.getByRole('button', { name: 'Save anyway' }));
+        await waitFor(() => expect(tournamentApi.recordResult).toHaveBeenCalledTimes(2));
+        expect(tournamentApi.recordResult.mock.calls[1][3]).toMatchObject({ confirmDuplicate: true });
+    });
+
+    it('keeps the editor open and makes no retry when the warning is cancelled', async () => {
+        tournamentApi.recordResult.mockRejectedValueOnce({ code: 'POSSIBLE_DUPLICATE_MATCH' });
+        renderPage();
+        fireEvent.click(await screen.findByRole('button', { name: 'Result' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Save result' }));
+        const duplicateDialog = await screen.findByRole('dialog', { name: 'Possible duplicate result' });
+        fireEvent.click(within(duplicateDialog).getByRole('button', { name: 'Cancel' }));
+        expect(tournamentApi.recordResult).toHaveBeenCalledTimes(1);
+        expect(screen.getByRole('button', { name: 'Save result' })).toBeTruthy();
+    });
+});

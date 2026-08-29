@@ -4,6 +4,7 @@ import {
     changePassword,
     completePasswordReset,
     forgotPassword,
+    getCsrfToken,
     getMe,
     googleCallback,
     googleStart,
@@ -53,6 +54,7 @@ router.post('/register', registrationLimiter, validate(registerSchema), register
 router.post('/verify-email', tokenLimiter, validate(verificationTokenSchema), verifyEmail);
 router.post('/resend-verification', recoveryLimiter, validate(resendVerificationSchema), resendEmailVerification);
 router.post('/login', loginLimiter, validate(loginSchema), login);
+router.get('/csrf', tokenLimiter, getCsrfToken);
 router.post('/refresh', tokenLimiter, requireCsrf, validate(emptyBodySchema), refresh);
 router.post('/logout', requireCsrf, validate(emptyBodySchema), logout);
 router.post('/logout-all', requireAuth, requireCsrf, validate(emptyBodySchema), logoutAll);

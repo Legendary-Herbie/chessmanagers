@@ -6,10 +6,10 @@ export const clubApi = {
         const data = await api.get(endpoints.clubs.byId(clubId), options);
         return data.club;
     },
-    listPublic: ({ q = '', limit = 20, offset = 0 } = {}) => {
+    listPublic: ({ q = '', limit = 20, offset = 0 } = {}, options = {}) => {
         const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
         if (q) params.set('q', q);
-        return api.get(`${endpoints.clubs.list()}?${params}`);
+        return api.get(`${endpoints.clubs.list()}?${params}`, options);
     },
     fetchMemberships: (options = {}) => api.get(endpoints.clubs.mine(), options),
     fetchContext: (clubId, options = {}) => api.get(endpoints.clubs.context(clubId), options),

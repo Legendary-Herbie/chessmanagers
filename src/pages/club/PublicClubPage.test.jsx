@@ -18,10 +18,10 @@ vi.mock('../../features/leaderboard/api/leaderboardApi.js', () => ({
     leaderboardApi: { fetchPublicLeaderboard: vi.fn(), fetchStats: vi.fn() },
 }));
 
-function renderClub(club) {
+function renderClub(club, user = { id: 'user_1' }) {
     clubApi.fetchPresentation.mockResolvedValue(club);
     return render(
-        <AuthContext.Provider value={{ user: { id: 'user_1' } }}>
+        <AuthContext.Provider value={{ user }}>
             <NotificationsContext.Provider value={{ notify: vi.fn() }}>
                 <MemoryRouter initialEntries={['/clubs/club_1']}>
                     <Routes>
@@ -71,5 +71,13 @@ describe('PublicClubPage membership states', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Request to rejoin' }));
         await waitFor(() => expect(clubApi.requestJoin).toHaveBeenCalledWith('club_1'));
         expect(await screen.findByText('Join request pending')).toBeTruthy();
+    });
+
+    it('preserves the club destination for guest authentication actions', async () => {
+        renderClub({ id: 'club_1', name: 'Test Club', can_request_join: true }, null);
+        expect((await screen.findByRole('link', { name: 'Sign in' })).getAttribute('href'))
+            .toBe('/auth/login?returnTo=%2Fclubs%2Fclub_1');
+        expect(screen.getByRole('link', { name: 'Register to join' }).getAttribute('href'))
+            .toBe('/auth/register?returnTo=%2Fclubs%2Fclub_1');
     });
 });

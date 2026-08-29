@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { authApi } from '../../features/auth/api/authApi.js';
 import Button from '../../shared/common/Button.jsx';
+import { continuationFromParams, continuationQuery } from '../../features/auth/continuation.js';
 
 export default function VerificationPendingView() {
     const [params] = useSearchParams();
     const email = params.get('email') || '';
-    const continuation = params.get('inviteToken')
-        ? `/clubs/join?token=${encodeURIComponent(params.get('inviteToken'))}`
-        : params.get('joinCode') ? `/clubs/join?code=${encodeURIComponent(params.get('joinCode'))}` : '/dashboard';
+    const continuation = continuationFromParams(params);
+    const authQuery = continuationQuery(continuation);
     const [message, setMessage] = useState('We sent a verification link to your email.');
     const [busy, setBusy] = useState(false);
     async function resend() {
@@ -23,6 +23,6 @@ export default function VerificationPendingView() {
         <div className="auth-form-header"><h1 className="auth-form-title">Verify your email</h1><p className="auth-form-subtitle">{message}</p></div>
         <p className="auth-switch">{email}</p>
         <Button className="auth-submit" loading={busy} disabled={!email} onClick={resend}>Resend verification email</Button>
-        <p className="auth-switch"><Link className="auth-link" to="/auth/login">Back to sign in</Link></p>
+        <p className="auth-switch"><Link className="auth-link" to={`/auth/login${authQuery}`}>Back to sign in</Link></p>
     </div>;
 }

@@ -52,10 +52,15 @@
 
 .auth-right {
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
     padding: clamp(1.5rem, 3vw, 2.5rem);
 }
+
+.auth-brand--mobile { display: none; }
+
+.auth-brand-logo .brand-logo__lockup { height: 62px; }
 
 .auth-brand {
     display: flex;
@@ -142,10 +147,19 @@
         grid-template-columns: 1fr;
     }
 
-    .auth-left,
-    .auth-right {
-        border-radius: 1.75rem;
+    .auth-left { display: none; }
+
+    .auth-right { border-radius: 1.75rem; padding-top: 0; }
+
+    .auth-brand--mobile {
+        display: flex;
+        align-self: flex-start;
+        margin: 0 0 1rem 0.5rem;
+        color: #fff;
     }
+
+    .auth-brand--mobile .auth-brand-name { color: #fff; }
+    .auth-brand--mobile .auth-brand-logo .brand-logo__lockup { height: 52px; }
 }
 
 @media (max-width: 640px) {
@@ -251,6 +265,16 @@
 
 .auth-error svg {
     flex-shrink: 0;
+}
+
+.auth-field-error {
+    color: var(--danger);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-medium);
+}
+
+.auth-input[aria-invalid='true'] {
+    border-color: var(--danger);
 }
 
 /* â”€â”€ Form â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */
@@ -362,4 +386,11 @@
     color: var(--text);
     font-weight: 700;
     cursor: pointer;
+}
+
+/* Keep the compact authentication lockup mobile-only despite later shared brand rules. */
+.auth-brand.auth-brand--mobile { display: none; }
+
+@media (max-width: 900px) {
+    .auth-brand.auth-brand--mobile { display: flex; }
 }

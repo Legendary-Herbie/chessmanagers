@@ -1,8 +1,10 @@
+import React from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contextHooks.js';
 
 // Layouts
 import AppLayout from '../shared/layouts/AppLayout.jsx';
+import PublicLayout from '../shared/layouts/PublicLayout.jsx';
 
 // Pages — auth
 import AuthPage    from '../pages/auth/AuthPage.jsx';
@@ -58,7 +60,9 @@ function RequireGuest({ children }) {
     const { user, loading } = useAuth();
     const location = useLocation();
     if (loading) return null;
-    if (user && location.pathname !== '/auth/oauth/callback') return <Navigate to="/dashboard" replace />;
+    if (user && !['/auth/oauth/callback', '/auth/verify'].includes(location.pathname)) {
+        return <Navigate to="/dashboard" replace />;
+    }
     return children;
 }
 
@@ -71,11 +75,13 @@ export default function AppRoutes() {
             <Route path="/" element={<Landing />} />
 
             {/* Find clubs (public) */}
-            <Route path="/clubs" element={<FindClubsPage />} />
-            <Route path="/clubs/join" element={<ClubInviteHandler />} />
-            <Route path="/clubs/:clubId" element={<PublicClubPage />} />
-            <Route path="/clubs/:clubId/players/:publicPlayerId" element={<PublicPlayerPage />} />
-            <Route path="/clubs/:clubId/tournaments/:tournamentId" element={<PublicTournamentPage />} />
+            <Route element={<PublicLayout />}>
+                <Route path="/clubs" element={<FindClubsPage />} />
+                <Route path="/clubs/join" element={<ClubInviteHandler />} />
+                <Route path="/clubs/:clubId" element={<PublicClubPage />} />
+                <Route path="/clubs/:clubId/players/:publicPlayerId" element={<PublicPlayerPage />} />
+                <Route path="/clubs/:clubId/tournaments/:tournamentId" element={<PublicTournamentPage />} />
+            </Route>
 
             {/* ── Auth ─────────────────────────────────────────────────── */}
             <Route
