@@ -25,6 +25,14 @@ select {
     font: inherit;
 }
 
+.page-loading {
+    min-height: 35vh;
+    display: grid;
+    place-items: center;
+    padding: 32px;
+    color: var(--text-muted);
+}
+
 .brand-logo {
     display: inline-grid;
     align-items: center;

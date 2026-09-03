@@ -10,6 +10,7 @@ vi.mock('../api/notificationApi.js', () => ({
         unreadCount: vi.fn(),
         markRead: vi.fn(),
         markAllRead: vi.fn(),
+        dismiss: vi.fn(),
     },
 }));
 
@@ -30,6 +31,7 @@ describe('NotificationTray', () => {
         notificationApi.unreadCount.mockResolvedValue({ count: 1 });
         notificationApi.markRead.mockResolvedValue({ notification: { id: notification.id } });
         notificationApi.markAllRead.mockResolvedValue({ updated: 1 });
+        notificationApi.dismiss.mockResolvedValue({ notification: { id: notification.id } });
     });
     afterEach(cleanup);
 
@@ -45,9 +47,9 @@ describe('NotificationTray', () => {
     it('marks one record read through the persistent API', async () => {
         render(<NotificationTray />);
         fireEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
-        fireEvent.click(await screen.findByRole('button', { name: /A match involving your player/ }));
+        fireEvent.click(await screen.findByRole('button', { name: /^A match involving your player/ }));
         await waitFor(() => expect(notificationApi.markRead).toHaveBeenCalledWith('notif_1'));
-        expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
+        expect(await screen.findByRole('button', { name: 'Notifications' })).toBeTruthy();
     });
 
     it('marks all records read through the persistent API', async () => {
@@ -55,6 +57,16 @@ describe('NotificationTray', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
         fireEvent.click(await screen.findByRole('button', { name: 'Mark all read' }));
         await waitFor(() => expect(notificationApi.markAllRead).toHaveBeenCalledTimes(1));
+        expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
+    });
+
+    it('deletes one notification through the user-owned dismissal API', async () => {
+        render(<NotificationTray />);
+        fireEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
+        fireEvent.click(await screen.findByRole('button', { name: /^Delete notification:/ }));
+
+        await waitFor(() => expect(notificationApi.dismiss).toHaveBeenCalledWith('notif_1'));
+        expect(screen.queryByText('Ada vs Grace')).toBeNull();
         expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
     });
 });

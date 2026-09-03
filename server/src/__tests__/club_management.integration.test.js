@@ -40,6 +40,136 @@ describe('club management', () => {
         });
     });
 
+    it('rejects whitespace identity and malformed public contacts while trimming valid profile updates', async () => {
+        const owner = await createUser();
+        const club = await createClub(owner);
+        const token = authorization(owner);
+
+        const whitespace = await request(app)
+            .post('/api/v1/clubs')
+            .set('Authorization', token)
+            .send({ name: '   ', federation: 'TEST' })
+            .expect(400);
+        expect(whitespace.body.errors).toContainEqual({ field: 'name', message: 'Club name is required.' });
+
+        const invalidContacts = await request(app)
+            .patch(`/api/v1/clubs/${club.id}`)
+            .set('Authorization', token)
+            .send({
+                settings: {
+                    contacts: {
+                        website: 'javascript:alert(1)',
+                        email: 'not-an-email',
+                    },
+                },
+            })
+            .expect(400);
+        expect(invalidContacts.body.errors).toEqual(expect.arrayContaining([
+            expect.objectContaining({ field: 'settings.contacts.website' }),
+            { field: 'settings.contacts.email', message: 'Enter a valid email address.' },
+        ]));
+
+        const updated = await request(app)
+            .patch(`/api/v1/clubs/${club.id}`)
+            .set('Authorization', token)
+            .send({
+                name: '  Trimmed Club Name  ',
+                federation: '  FIDE  ',
+                description: '  Weekly rated play  ',
+                contactInfo: '  Contact the secretary  ',
+            })
+            .expect(200);
+        expect(updated.body.club).toMatchObject({
+            name: 'Trimmed Club Name',
+            federation: 'FIDE',
+            description: 'Weekly rated play',
+            contact_info: 'Contact the secretary',
+        });
+    });
+
+    it('stores independent starting ratings in both player projections and authoritative rating state', async () => {
+        const owner = await createUser();
+        const club = await createClub(owner);
+        const token = authorization(owner);
+
+        const single = await request(app)
+            .post(`/api/v1/clubs/${club.id}/players`)
+            .set('Authorization', token)
+            .send({
+                name: 'Category Rated Player',
+                startRatings: { blitz: 1625, rapid: 1725, classical: 1825 },
+            })
+            .expect(201);
+
+        expect(single.body.player).toMatchObject({
+            rating: 1625,
+            start_rating: 1625,
+            blitz_rating: 1625,
+            rapid_rating: 1725,
+            classical_rating: 1825,
+        });
+        const singleState = await db.query(
+            `SELECT category, start_rating, current_rating
+             FROM player_rating_state
+             WHERE club_id = $1 AND player_id = $2
+             ORDER BY category`,
+            [club.id, single.body.player.id]
+        );
+        expect(singleState.rows).toEqual([
+            { category: 'blitz', start_rating: 1625, current_rating: 1625 },
+            { category: 'classical', start_rating: 1825, current_rating: 1825 },
+            { category: 'rapid', start_rating: 1725, current_rating: 1725 },
+        ]);
+
+        const bulk = await request(app)
+            .post(`/api/v1/clubs/${club.id}/players/bulk`)
+            .set('Authorization', token)
+            .send({
+                players: [
+                    { name: 'Bulk Category Player', startRatings: { blitz: 1400, rapid: 1500, classical: 1600 } },
+                    { name: 'Legacy Compatible Player', rating: 1750 },
+                ],
+            })
+            .expect(201);
+        expect(bulk.body.players).toHaveLength(2);
+
+        const bulkState = await db.query(
+            `SELECT player_id, category, start_rating, current_rating
+             FROM player_rating_state
+             WHERE club_id = $1 AND player_id = ANY($2::TEXT[])
+             ORDER BY player_id, category`,
+            [club.id, bulk.body.players.map(player => player.id)]
+        );
+        const stateByPlayer = Object.fromEntries(bulk.body.players.map(player => [
+            player.id,
+            bulkState.rows.filter(row => row.player_id === player.id),
+        ]));
+        expect(stateByPlayer[bulk.body.players[0].id].map(({ category, start_rating, current_rating }) => ({ category, start_rating, current_rating }))).toEqual([
+            { category: 'blitz', start_rating: 1400, current_rating: 1400 },
+            { category: 'classical', start_rating: 1600, current_rating: 1600 },
+            { category: 'rapid', start_rating: 1500, current_rating: 1500 },
+        ]);
+        expect(stateByPlayer[bulk.body.players[1].id].every(row => row.start_rating === 1750 && row.current_rating === 1750)).toBe(true);
+    });
+
+    it('rejects a category starting rating below the club floor without creating the player', async () => {
+        const owner = await createUser();
+        const club = await createClub(owner);
+
+        const response = await request(app)
+            .post(`/api/v1/clubs/${club.id}/players`)
+            .set('Authorization', authorization(owner))
+            .send({ name: 'Below Floor', startRatings: { rapid: 400 } })
+            .expect(400);
+
+        expect(response.body).toMatchObject({ code: 'START_RATING_BELOW_FLOOR' });
+        const stored = await db.query(
+            'SELECT id FROM players WHERE club_id = $1 AND name = $2',
+            [club.id, 'Below Floor']
+        );
+        expect(stored.rows).toHaveLength(0);
+    });
+
     it('keeps visibility, public leaderboard, structured settings, and ratings independent', async () => {
         const owner = await createUser();
         const club = await createClub(owner, { isPublic: true });
@@ -116,6 +246,64 @@ describe('club management', () => {
             .set('Authorization', authorization(owner))
             .send({ description: 'Owner managed' })
             .expect(200);
+    });
+
+    it('lets an admin update public presentation fields without changing owner-only governance', async () => {
+        const owner = await createUser();
+        const admin = await createUser();
+        const club = await createClub(owner, { isPublic: true });
+        await addClubMember(club, admin, 'admin');
+        const token = authorization(admin);
+
+        const response = await request(app)
+            .patch(`/api/v1/clubs/${club.id}/presentation`)
+            .set('Authorization', token)
+            .send({
+                description: 'Weekly rated play for the whole city.',
+                contactInfo: 'Doors open at 6:30 PM.',
+                settings: {
+                    contacts: {
+                        website: 'https://club.example.test',
+                        email: 'hello@club.example.test',
+                        phone: '+1 555 0100',
+                        address: '42 Knight Street',
+                    },
+                    affiliation: 'City Chess Association',
+                    presentation: { primaryColor: '#123456' },
+                },
+            })
+            .expect(200);
+
+        expect(response.body.club).toMatchObject({
+            description: 'Weekly rated play for the whole city.',
+            settings_json: {
+                contacts: { address: '42 Knight Street', email: 'hello@club.example.test' },
+                affiliation: 'City Chess Association',
+            },
+        });
+
+        await request(app)
+            .patch(`/api/v1/clubs/${club.id}/presentation`)
+            .set('Authorization', token)
+            .send({ settings: { notifications: { emailEnabled: true } } })
+            .expect(400);
+        await request(app)
+            .patch(`/api/v1/clubs/${club.id}`)
+            .set('Authorization', token)
+            .send({ visibility: 'private' })
+            .expect(403);
+
+        const publicResponse = await request(app).get(`/api/v1/clubs/${club.id}`).expect(200);
+        expect(publicResponse.body.club).toMatchObject({
+            contacts: { address: '42 Knight Street', email: 'hello@club.example.test' },
+            affiliation: 'City Chess Association',
+            metrics: {
+                memberCount: 2,
+                rosterPlayers: 0,
+                totalGames: 0,
+                averageRatings: {},
+            },
+        });
     });
 
     it('rejects invalid structured rating settings before they reach the database', async () => {

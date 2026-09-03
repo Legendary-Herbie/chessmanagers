@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import {
+    dismissUserNotification,
     getUserUnreadCount,
     listUserNotifications,
     readAllUserNotifications,
@@ -26,5 +27,6 @@ router.get('/', validateRequest({ query: listQuery }), listUserNotifications);
 router.get('/unread-count', validateRequest({ query: unreadQuery }), getUserUnreadCount);
 router.patch('/read', validateRequest({ body: readAllBody }), readAllUserNotifications);
 router.patch('/:notificationId/read', validateRequest({ params: readParams }), readUserNotification);
+router.delete('/:notificationId', validateRequest({ params: readParams }), dismissUserNotification);
 
 export default router;

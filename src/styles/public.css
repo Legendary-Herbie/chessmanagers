@@ -155,6 +155,13 @@
 .public-club-hero h1 { margin: 0; color: var(--text-strong); font-size: clamp(2rem, 4vw, 3rem); }
 .public-club-hero p { margin: 0.3rem 0 0; color: var(--text-muted); }
 .public-club-hero__actions { display: flex; align-items: center; gap: 0.6rem; flex-wrap: wrap; justify-content: flex-end; }
+.public-club-metrics { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--gap-sm); }
+.public-club-metrics > div { min-height: 92px; padding: 1rem; display: flex; flex-direction: column; justify-content: center; gap: 0.2rem; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-surface); }
+.public-club-metrics strong { color: var(--text-strong); font-size: clamp(1.35rem, 3vw, 1.8rem); }
+.public-club-metrics span { color: var(--text-muted); font-size: var(--font-size-xs); text-transform: capitalize; }
+.public-category-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
+.public-category-tabs button { min-height: 38px; padding: 0 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-muted); font: inherit; cursor: pointer; }
+.public-category-tabs button.active { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--bg-surface)); color: var(--primary); }
 .public-membership-state { padding: 0.65rem 0.8rem; border-radius: var(--radius-md); background: var(--bg-muted); color: var(--text); }
 .public-membership-state--success { color: var(--text-green); }
 
@@ -197,6 +204,7 @@
     .public-club-hero { grid-template-columns: auto minmax(0, 1fr); }
     .public-club-hero__actions { grid-column: 1 / -1; justify-content: stretch; }
     .public-club-hero__actions > * { flex: 1 1 auto; text-align: center; }
+    .public-club-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 }
 
 @media (max-width: 520px) {
@@ -206,6 +214,7 @@
     .public-join-form .public-button { width: 100%; }
     .public-club-hero { grid-template-columns: 1fr; text-align: center; }
     .public-club-hero__logo, .public-club-hero__placeholder { margin: 0 auto; }
+    .public-club-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .public-profile { grid-template-columns: 1fr; text-align: center; }
     .public-profile__photo { margin: 0 auto; }
     .public-ratings { grid-template-columns: 1fr; text-align: left; }

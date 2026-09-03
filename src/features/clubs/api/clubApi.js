@@ -37,6 +37,7 @@ export const clubApi = {
         endpoints.clubs.joinRequest(clubId, requestId, 'reject'), reason ? { reason } : {}
     ),
     update: (clubId, changes) => api.patch(endpoints.clubs.byId(clubId), changes),
+    updatePresentation: (clubId, changes) => api.patch(endpoints.clubs.presentation(clubId), changes),
     uploadBadge: (clubId, file) => {
         const formData = new FormData();
         formData.append('image', file);

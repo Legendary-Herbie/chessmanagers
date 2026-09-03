@@ -8,6 +8,7 @@ import {
     getInactivePlayers,
     getPlayer,
     getPlayers,
+    getRosterSummary,
     restorePlayer,
     unlinkPlayer,
     updateOwnPlayerProfile,
@@ -56,6 +57,7 @@ router.use(requireAuth, validateRequest({ params: clubParamsSchema }), loadClubC
 router.get('/', validateRequest({ query: playerListQuerySchema }), getPlayers);
 router.post('/', requireClubAdmin, validate(createPlayerSchema), createPlayer);
 router.post('/bulk', requireClubAdmin, validate(createPlayersBulkSchema), createPlayersBulk);
+router.get('/summary', getRosterSummary);
 router.get('/inactive', requireClubAdmin, getInactivePlayers);
 
 // Compatibility aliases for clients created before player-link routes were split.

@@ -7,6 +7,7 @@ import {
     getClub,
     createClub,
     updateClub,
+    updateClubPresentation,
     getMembers,
     setMemberRole,
     createInvite,
@@ -49,6 +50,7 @@ import {
     clubMemberParamsSchema,
     publicClubListQuerySchema,
     updateClubSchema,
+    updateClubPresentationSchema,
     createClubSchema,
     requestJoinClubSchema,
     joinByTokenSchema,
@@ -118,7 +120,8 @@ router.post('/join-by-code', joinCodeLimiter, validate(joinByCodeSchema), joinWi
 
 // PATCH /api/v1/clubs/:clubId
 router.patch('/:clubId', validateRequest({ params: clubParamsSchema, body: updateClubSchema }), loadClubContext, requireActiveClubMember, requireClubOwner, updateClub);
-router.post('/:clubId/badge', validateRequest({ params: clubParamsSchema }), loadClubContext, requireActiveClubMember, requireClubOwner, uploadSingleImage, uploadClubBadge);
+router.patch('/:clubId/presentation', validateRequest({ params: clubParamsSchema, body: updateClubPresentationSchema }), loadClubContext, requireActiveClubMember, requireClubAdmin, updateClubPresentation);
+router.post('/:clubId/badge', validateRequest({ params: clubParamsSchema }), loadClubContext, requireActiveClubMember, requireClubAdmin, uploadSingleImage, uploadClubBadge);
 router.post('/:clubId/ownership', validateRequest({ params: clubParamsSchema, body: transferClubOwnershipSchema }), loadClubContext, requireActiveClubMember, requireClubOwner, transferClubOwnership);
 router.post('/:clubId/archive', validateRequest({ params: clubParamsSchema, body: clubLifecycleSchema }), loadClubContext, requireActiveClubMember, requireClubOwner, archiveClub);
 router.post('/:clubId/restore', validateRequest({ params: clubParamsSchema, body: clubLifecycleSchema }), allowInactiveClubMutation, loadClubContext, requireActiveClubMember, requireClubOwner, restoreClub);

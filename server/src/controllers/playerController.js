@@ -31,6 +31,15 @@ export async function getPlayers(req, res, next) {
     }
 }
 
+export async function getRosterSummary(req, res, next) {
+    try {
+        const summary = await PlayerModel.getRosterSummary(req.params.clubId);
+        res.json({ summary });
+    } catch (error) {
+        next(error);
+    }
+}
+
 export async function getInactivePlayers(req, res, next) {
     try {
         const players = await PlayerModel.findInactiveByClub(req.params.clubId);

@@ -4,10 +4,11 @@ import Button from '../../shared/common/Button.jsx';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 import { useClub } from '../../app/contextHooks.js';
 import { matchApi } from '../../features/matches/api/matchApi.js';
-import { playerApi } from '../../features/players/api/playerApi.js';
+import PlayerSearchSelect from '../../features/players/components/PlayerSearchSelect.jsx';
 import { tournamentApi } from '../../features/tournaments/api/tournamentApi.js';
 
 const CATEGORIES = ['blitz', 'rapid', 'classical'];
+const PAGE_SIZE = 25;
 const categoryLabel = category => category[0].toUpperCase() + category.slice(1);
 
 function localDateTime(value = new Date()) {
@@ -39,11 +40,20 @@ export default function MatchesPage() {
     const { club, capabilities } = useClub();
     const isAdmin = Boolean(capabilities.canManageMatches);
     const [matches, setMatches] = useState([]);
-    const [players, setPlayers] = useState([]);
     const [tournaments, setTournaments] = useState([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [categoryFilter, setCategoryFilter] = useState('all');
+    const [ratedFilter, setRatedFilter] = useState('all');
+    const [statusFilter, setStatusFilter] = useState('all');
+    const [playerFilter, setPlayerFilter] = useState('');
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
+    const [sortOrder, setSortOrder] = useState('playedAt-desc');
+    const [page, setPage] = useState(0);
+    const [total, setTotal] = useState(0);
     const [modalOpen, setModalOpen] = useState(false);
     const [editingMatch, setEditingMatch] = useState(null);
     const [form, setForm] = useState(emptyForm);
@@ -52,39 +62,84 @@ export default function MatchesPage() {
     const [duplicateConfirmation, setDuplicateConfirmation] = useState(null);
     const [lifecycleAction, setLifecycleAction] = useState(null);
 
-    const refreshAll = useCallback(async () => {
+    useEffect(() => {
+        const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
+        return () => clearTimeout(timer);
+    }, [search]);
+
+    const loadMatches = useCallback(async (signal) => {
         if (!club) return;
         setLoading(true);
         try {
-            const [loadedMatches, loadedPlayers, tournamentResponse] = await Promise.all([
-                matchApi.list(club.id, { q: search, limit: 100 }),
-                playerApi.fetchPlayers(club.id, { limit: 100 }),
-                tournamentApi.list(club.id, { limit: 100 }),
-            ]);
-            setMatches(loadedMatches);
-            setPlayers(loadedPlayers);
-            setTournaments(tournamentResponse.tournaments);
+            const [sortBy, sortDirection] = sortOrder.split('-');
+            const response = await matchApi.list(club.id, {
+                q: debouncedSearch,
+                ratingCategory: categoryFilter === 'all' ? undefined : categoryFilter,
+                isRated: ratedFilter === 'all' ? undefined : ratedFilter === 'rated',
+                status: statusFilter === 'all' ? undefined : statusFilter,
+                playerId: playerFilter || undefined,
+                playedFrom: dateFrom ? new Date(`${dateFrom}T00:00:00`).toISOString() : undefined,
+                playedTo: dateTo ? new Date(`${dateTo}T23:59:59.999`).toISOString() : undefined,
+                sortBy,
+                sortDirection,
+                limit: PAGE_SIZE,
+                offset: page * PAGE_SIZE,
+                signal,
+            });
+            if (signal?.aborted) return;
+            setMatches(response.matches);
+            setTotal(response.total);
             setError(null);
         } catch (requestError) {
+            if (signal?.aborted) return;
             setError(requestError.message || 'Failed to load matches.');
         } finally {
-            setLoading(false);
+            if (!signal?.aborted) setLoading(false);
         }
-    }, [club, search]);
+    }, [club, debouncedSearch, categoryFilter, ratedFilter, statusFilter, playerFilter, dateFrom, dateTo, sortOrder, page]);
+
+    const loadReferences = useCallback(async () => {
+        if (!club) return;
+        try {
+            const tournamentResponse = await tournamentApi.list(club.id, { limit: 100 });
+            setTournaments(tournamentResponse.tournaments);
+        } catch (requestError) {
+            setError(requestError.message || 'Failed to load match form options.');
+        }
+    }, [club]);
 
     useEffect(() => {
-        void refreshAll();
-    }, [refreshAll]);
+        const controller = new AbortController();
+        void loadMatches(controller.signal);
+        return () => controller.abort();
+    }, [loadMatches]);
+
+    useEffect(() => {
+        void loadReferences();
+    }, [loadReferences]);
+
+    useEffect(() => {
+        if (!modalOpen) return undefined;
+        const previousOverflow = document.body.style.overflow;
+        document.body.style.overflow = 'hidden';
+        const closeOnEscape = event => {
+            if (event.key === 'Escape') setModalOpen(false);
+        };
+        document.addEventListener('keydown', closeOnEscape);
+        return () => {
+            document.body.style.overflow = previousOverflow;
+            document.removeEventListener('keydown', closeOnEscape);
+        };
+    }, [modalOpen]);
+
+    const refreshAll = useCallback(async () => {
+        await Promise.all([loadMatches(), loadReferences()]);
+    }, [loadMatches, loadReferences]);
 
     const compatibleTournaments = useMemo(() => tournaments.filter(tournament => (
         tournament.rating_category === form.ratingCategory
         && tournament.is_rated === form.isRated
     )), [tournaments, form.ratingCategory, form.isRated]);
-
-    const playerNames = useMemo(
-        () => new Map(players.map(player => [player.id, player.name])),
-        [players]
-    );
 
     function openAddModal() {
         setEditingMatch(null);
@@ -190,7 +245,9 @@ export default function MatchesPage() {
         }
     }
 
-    const visibleMatches = matches;
+    const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+    const firstResult = total === 0 ? 0 : page * PAGE_SIZE + 1;
+    const lastResult = Math.min((page + 1) * PAGE_SIZE, total);
 
     return (
         <div className="matches-page">
@@ -202,7 +259,38 @@ export default function MatchesPage() {
             {notice && <div className="match-notice" role="status">{notice}</div>}
             <div className="matches-controls">
                 <input className="input" placeholder="Search by player or notes" value={search}
-                    onChange={event => setSearch(event.target.value)} aria-label="Search matches" />
+                    onChange={event => { setSearch(event.target.value); setPage(0); }} aria-label="Search matches" />
+                <PlayerSearchSelect clubId={club.id} label="Filter by player" value={playerFilter}
+                    onChange={playerId => { setPlayerFilter(playerId); setPage(0); }}
+                    placeholder="All players" allowClear />
+                <select className="input" aria-label="Filter by rating category" value={categoryFilter}
+                    onChange={event => { setCategoryFilter(event.target.value); setPage(0); }}>
+                    <option value="all">All categories</option>
+                    {CATEGORIES.map(category => <option key={category} value={category}>{categoryLabel(category)}</option>)}
+                </select>
+                <select className="input" aria-label="Filter by rated status" value={ratedFilter}
+                    onChange={event => { setRatedFilter(event.target.value); setPage(0); }}>
+                    <option value="all">Rated and unrated</option>
+                    <option value="rated">Rated only</option>
+                    <option value="unrated">Unrated only</option>
+                </select>
+                <select className="input" aria-label="Filter by match status" value={statusFilter}
+                    onChange={event => { setStatusFilter(event.target.value); setPage(0); }}>
+                    <option value="all">Active and voided</option>
+                    <option value="active">Active only</option>
+                    <option value="voided">Voided only</option>
+                </select>
+                <label className="matches-date-filter"><span>From</span><input className="input" type="date" value={dateFrom}
+                    onChange={event => { setDateFrom(event.target.value); setPage(0); }} /></label>
+                <label className="matches-date-filter"><span>To</span><input className="input" type="date" value={dateTo}
+                    min={dateFrom || undefined} onChange={event => { setDateTo(event.target.value); setPage(0); }} /></label>
+                <select className="input" aria-label="Sort matches" value={sortOrder}
+                    onChange={event => { setSortOrder(event.target.value); setPage(0); }}>
+                    <option value="playedAt-desc">Newest played first</option>
+                    <option value="playedAt-asc">Oldest played first</option>
+                    <option value="createdAt-desc">Recently added first</option>
+                    <option value="createdAt-asc">Earliest added first</option>
+                </select>
             </div>
 
             <div className="matches-list">
@@ -214,11 +302,11 @@ export default function MatchesPage() {
                             {isAdmin && <th>Actions</th>}
                         </tr></thead>
                         <tbody>
-                            {visibleMatches.map(match => (
+                            {matches.map(match => (
                                 <tr key={match.id} className={match.status === 'voided' ? 'voided-match' : ''}>
                                     <td>{new Date(match.playedAt).toLocaleString()}</td>
-                                    <td>{match.whitePlayerName || playerNames.get(match.whitePlayerId)}</td>
-                                    <td>{match.blackPlayerName || playerNames.get(match.blackPlayerId)}</td>
+                                    <td>{match.whitePlayerName || match.whitePlayerId}</td>
+                                    <td>{match.blackPlayerName || match.blackPlayerId}</td>
                                     <td>{resultLabel(match.result)}</td>
                                     <td><span className="badge time-control">{categoryLabel(match.ratingCategory)}</span></td>
                                     <td>{match.isRated ? 'Rated' : 'Unrated'}</td>
@@ -233,32 +321,44 @@ export default function MatchesPage() {
                                     </td>}
                                 </tr>
                             ))}
-                            {!visibleMatches.length && <tr><td colSpan={isAdmin ? 9 : 8} className="muted">No matches found.</td></tr>}
+                            {!matches.length && <tr><td colSpan={isAdmin ? 9 : 8} className="muted">No matches found.</td></tr>}
                         </tbody>
                     </table>
                 )}
             </div>
 
-            {modalOpen && <div className="modal-backdrop">
-                <div className="modal-content small" role="dialog" aria-modal="true" aria-labelledby="match-form-title">
+            <div className="matches-pagination" aria-label="Match results pagination">
+                <span>{firstResult}–{lastResult} of {total}</span>
+                <div>
+                    <Button variant="secondary" disabled={page === 0 || loading} onClick={() => setPage(current => Math.max(0, current - 1))}>Previous</Button>
+                    <span>Page {page + 1} of {totalPages}</span>
+                    <Button variant="secondary" disabled={page + 1 >= totalPages || loading} onClick={() => setPage(current => current + 1)}>Next</Button>
+                </div>
+            </div>
+
+            {modalOpen && <div className="modal-backdrop match-modal-backdrop"
+                onMouseDown={event => event.target === event.currentTarget && setModalOpen(false)}>
+                <div className="modal-content small match-modal" role="dialog" aria-modal="true" aria-labelledby="match-form-title">
                     <div className="modal-header">
                         <h3 id="match-form-title">{editingMatch ? 'Edit Match' : 'Add Match'}</h3>
                         <Button variant="secondary" onClick={() => setModalOpen(false)}>Close</Button>
                     </div>
                     <div className="modal-body">
                         {error && <div className="error" role="alert">{error}</div>}
-                        <label className="form-row"><span className="label">White</span>
-                            <select value={form.whitePlayerId} onChange={event => setForm({ ...form, whitePlayerId: event.target.value })} className="input">
-                                <option value="">Select White</option>
-                                {players.map(player => <option key={player.id} value={player.id}>{player.name}</option>)}
-                            </select>
-                        </label>
-                        <label className="form-row"><span className="label">Black</span>
-                            <select value={form.blackPlayerId} onChange={event => setForm({ ...form, blackPlayerId: event.target.value })} className="input">
-                                <option value="">Select Black</option>
-                                {players.map(player => <option key={player.id} value={player.id}>{player.name}</option>)}
-                            </select>
-                        </label>
+                        <PlayerSearchSelect clubId={club.id} label="White" value={form.whitePlayerId}
+                            selectedPlayer={editingMatch ? {
+                                id: editingMatch.whitePlayerId,
+                                name: editingMatch.whitePlayerName || editingMatch.whitePlayerId,
+                            } : null}
+                            onChange={playerId => setForm(current => ({ ...current, whitePlayerId: playerId }))}
+                            placeholder="Search for White" />
+                        <PlayerSearchSelect clubId={club.id} label="Black" value={form.blackPlayerId}
+                            selectedPlayer={editingMatch ? {
+                                id: editingMatch.blackPlayerId,
+                                name: editingMatch.blackPlayerName || editingMatch.blackPlayerId,
+                            } : null}
+                            onChange={playerId => setForm(current => ({ ...current, blackPlayerId: playerId }))}
+                            placeholder="Search for Black" />
                         <label className="form-row"><span className="label">Result</span>
                             <select value={form.result} onChange={event => setForm({ ...form, result: event.target.value })} className="input">
                                 <option value="white">White wins</option><option value="black">Black wins</option><option value="draw">Draw</option>

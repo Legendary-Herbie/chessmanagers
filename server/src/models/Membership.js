@@ -166,13 +166,13 @@ export const MembershipModel = {
 
     listPendingRequests: async (clubId) => db.query(
         `SELECT request.id, request.user_id, request.message, request.created_at,
-                user.email, user.name
+                account.email, COALESCE(account.full_name, account.name, account.username, account.email) AS name
          FROM club_join_requests request
          JOIN user_clubs membership
            ON membership.club_id = request.club_id
           AND membership.user_id = request.user_id
           AND membership.status = 'PENDING_APPROVAL'
-         JOIN users user ON user.id = request.user_id
+         JOIN users account ON account.id = request.user_id
          WHERE request.club_id = $1 AND request.status = 'pending'
          ORDER BY request.created_at ASC`,
         [clubId]

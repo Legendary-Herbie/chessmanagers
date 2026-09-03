@@ -22,6 +22,8 @@ async function deliver({ to, subject, text, type, token }) {
         port: env.SMTP_PORT,
         secure: env.SMTP_SECURE,
         auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS } : undefined,
+        disableFileAccess: true,
+        disableUrlAccess: true,
     });
     await transport.sendMail({ from: env.SMTP_FROM, to, subject, text });
     return true;

@@ -40,6 +40,7 @@ describe('PublicClubPage membership states', () => {
         clubApi.fetchInvites.mockRejectedValue({ status: 403 });
         clubApi.fetchJoinRequests.mockRejectedValue({ status: 403 });
         leaderboardApi.fetchStats.mockRejectedValue({ status: 403 });
+        leaderboardApi.fetchPublicLeaderboard.mockResolvedValue({ entries: [] });
     });
     afterEach(cleanup);
 
@@ -79,5 +80,34 @@ describe('PublicClubPage membership states', () => {
             .toBe('/auth/login?returnTo=%2Fclubs%2Fclub_1');
         expect(screen.getByRole('link', { name: 'Register to join' }).getAttribute('href'))
             .toBe('/auth/register?returnTo=%2Fclubs%2Fclub_1');
+    });
+
+    it('shows public contacts, club-wide metrics, and category-specific top players', async () => {
+        leaderboardApi.fetchPublicLeaderboard.mockResolvedValue({
+            entries: [{ publicPlayerId: 'public_1', playerName: 'Ada Player', selectedRating: 1810 }],
+        });
+        renderClub({
+            id: 'club_1', name: 'Test Club', visibility: 'public', public_leaderboard: true,
+            can_request_join: true,
+            contacts: {
+                address: '42 Knight Street', email: 'club@example.test',
+                phone: '+1 555 0100', website: 'https://club.example.test',
+            },
+            metrics: {
+                memberCount: 24, rosterPlayers: 19, totalGames: 340,
+                averageRatings: { blitz: 1580, rapid: 1640, classical: 1710 },
+            },
+        });
+
+        expect(await screen.findAllByText('42 Knight Street')).toHaveLength(2);
+        expect(screen.getByRole('link', { name: 'club@example.test' })).toBeTruthy();
+        expect(screen.getByText('340')).toBeTruthy();
+        expect(screen.getByText('Average classical')).toBeTruthy();
+        expect(await screen.findByRole('link', { name: 'Ada Player' })).toBeTruthy();
+
+        fireEvent.click(screen.getByRole('button', { name: 'Rapid' }));
+        await waitFor(() => expect(leaderboardApi.fetchPublicLeaderboard).toHaveBeenLastCalledWith(
+            'club_1', { category: 'rapid', limit: 5 }
+        ));
     });
 });

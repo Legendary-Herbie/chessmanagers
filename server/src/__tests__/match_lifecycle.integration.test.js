@@ -6,6 +6,7 @@ import { drainRatingRecalculationJobs } from '../services/RatingService.js';
 import {
     authorization,
     createClub,
+    createMatch,
     createPlayer,
     createTournament,
     createUser,
@@ -41,6 +42,41 @@ describe('canonical match lifecycle', () => {
         const legacy = await request(app).post(base).set('Authorization', token)
             .send({ ...matchPayload(white, black), type: 'rated' }).expect(400);
         expect(legacy.body.error).toBe('Validation failed.');
+    });
+
+    it('filters, sorts, and paginates match discovery by club chronology and category', async () => {
+        const owner = await createUser();
+        const club = await createClub(owner);
+        const white = await createPlayer(club, { name: 'Searchable White' });
+        const black = await createPlayer(club, { name: 'Searchable Black' });
+        const token = authorization(owner);
+        const base = `/api/v1/clubs/${club.id}/matches`;
+
+        const earlier = await createMatch(club, white, black, {
+            timeControl: 'rapid', isRated: false, notes: 'First rapid game',
+            playedAt: new Date('2026-08-05T12:00:00.000Z'),
+        });
+        const later = await createMatch(club, white, black, {
+            timeControl: 'rapid', isRated: false, notes: 'Second rapid game',
+            playedAt: new Date('2026-08-20T12:00:00.000Z'),
+        });
+        await createMatch(club, white, black, {
+            timeControl: 'blitz', isRated: true,
+            playedAt: new Date('2026-08-10T12:00:00.000Z'),
+        });
+
+        const query = 'ratingCategory=rapid&isRated=false&playedFrom=2026-08-01T00%3A00%3A00.000Z&playedTo=2026-08-31T23%3A59%3A59.999Z&sortBy=playedAt&sortDirection=asc&limit=1';
+        const firstPage = await request(app).get(`${base}?${query}&offset=0`)
+            .set('Authorization', token).expect(200);
+        expect(firstPage.body).toMatchObject({ total: 2, limit: 1, offset: 0 });
+        expect(firstPage.body.matches.map(match => match.id)).toEqual([earlier.id]);
+
+        const secondPage = await request(app).get(`${base}?${query}&offset=1`)
+            .set('Authorization', token).expect(200);
+        expect(secondPage.body.matches.map(match => match.id)).toEqual([later.id]);
+
+        await request(app).get(`${base}?playedFrom=2026-09-01T00%3A00%3A00.000Z&playedTo=2026-08-01T00%3A00%3A00.000Z`)
+            .set('Authorization', token).expect(400);
     });
 
     it('applies a current rated match atomically while keeping unrated matches out of Elo', async () => {

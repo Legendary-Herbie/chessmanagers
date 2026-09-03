@@ -207,3 +207,34 @@
     text-transform: capitalize;
     color: var(--text-muted);
 }
+
+.invite-section {
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-surface);
+    box-shadow: var(--shadow-sm);
+}
+
+.invite-section > div:first-child h2 {
+    color: var(--text-strong);
+}
+
+.invite-list {
+    margin: 14px 0 0;
+    padding: 0;
+    display: grid;
+    gap: 10px;
+    list-style: none;
+}
+
+.invite-item {
+    padding: 12px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-muted);
+}

@@ -1,4 +1,5 @@
 export function toPublicClub(club) {
+    const settings = club.settings_json || {};
     return {
         id: club.id,
         name: club.name,
@@ -7,6 +8,15 @@ export function toPublicClub(club) {
         description: club.description,
         logo: club.logo,
         contact_info: club.contact_info,
+        contacts: settings.contacts || {},
+        affiliation: settings.affiliation || null,
+        primaryColor: settings.presentation?.primaryColor || null,
+        metrics: {
+            memberCount: club.member_count ?? 0,
+            rosterPlayers: club.roster_players ?? 0,
+            totalGames: club.total_games ?? 0,
+            averageRatings: club.average_ratings || {},
+        },
         public_leaderboard: club.public_leaderboard,
         visibility: club.visibility,
         status: club.status,

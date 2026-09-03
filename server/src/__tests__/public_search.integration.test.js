@@ -91,4 +91,41 @@ describe('public boundary and scoped search', () => {
         const publicId = await db.query('SELECT public_id FROM players WHERE id = $1', [alpha.id]);
         expect(publicId.first.public_id).toMatch(/^public_player_/);
     });
+
+    it('aggregates the full active roster independently for every rating category', async () => {
+        const owner = await createUser();
+        const outsider = await createUser();
+        const club = await createClub(owner);
+        const first = await createPlayer(club, { rating: 1400 });
+        const second = await createPlayer(club, { rating: 1600 });
+
+        await db.query(
+            `UPDATE player_rating_state
+             SET current_rating = CASE
+                WHEN player_id = $2 AND category = 'blitz' THEN 1800
+                WHEN player_id = $2 AND category = 'rapid' THEN 1700
+                WHEN player_id = $2 AND category = 'classical' THEN 1600
+                WHEN player_id = $3 AND category = 'blitz' THEN 1600
+                WHEN player_id = $3 AND category = 'rapid' THEN 1500
+                WHEN player_id = $3 AND category = 'classical' THEN 1400
+                ELSE current_rating
+             END
+             WHERE club_id = $1 AND player_id IN ($2, $3)`,
+            [club.id, first.id, second.id]
+        );
+        await db.query('UPDATE players SET games = 1 WHERE id = $1', [first.id]);
+
+        const response = await request(app)
+            .get(`/api/v1/clubs/${club.id}/players/summary`)
+            .set('Authorization', authorization(owner)).expect(200);
+
+        expect(response.body.summary).toEqual({
+            totalPlayers: 2,
+            activePlayers: 1,
+            averageRatings: { blitz: 1700, rapid: 1600, classical: 1500 },
+        });
+
+        await request(app).get(`/api/v1/clubs/${club.id}/players/summary`)
+            .set('Authorization', authorization(outsider)).expect(403);
+    });
 });

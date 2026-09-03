@@ -89,10 +89,12 @@ describe('player lifecycle and account linking', () => {
         await removeImageAsset(photo.body.player.photo_url);
     });
 
-    it('lets only the club owner upload a club badge', async () => {
+    it('lets club owners and admins upload a club badge while blocking members', async () => {
         const owner = await createUser();
+        const admin = await createUser();
         const member = await createUser();
         const club = await createClub(owner);
+        await addClubMember(club, admin, 'admin');
         await addClubMember(club, member);
         const png = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
 
@@ -110,7 +112,7 @@ describe('player lifecycle and account linking', () => {
 
         const uploaded = await request(app)
             .post(`/api/v1/clubs/${club.id}/badge`)
-            .set('Authorization', authorization(owner))
+            .set('Authorization', authorization(admin))
             .attach('image', png, { filename: 'badge.png', contentType: 'image/png' })
             .expect(200);
         expect(uploaded.body.club.logo).toMatch(/^\/uploads\/images\/club-/);

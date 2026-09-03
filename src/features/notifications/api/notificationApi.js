@@ -15,6 +15,7 @@ export const notificationApi = {
         `${endpoints.notifications.unreadCount()}${queryString({ clubId })}`
     ),
     markRead: notificationId => api.patch(endpoints.notifications.markRead(notificationId), {}),
+    dismiss: notificationId => api.delete(endpoints.notifications.dismiss(notificationId)),
     markAllRead: (clubId = null) => api.patch(endpoints.notifications.markAllRead(), {
         ...(clubId ? { clubId } : {}),
     }),

@@ -41,7 +41,10 @@ const APP_TABLES = [
 
 beforeEach(async () => {
     assertTestDatabase();
-    await db.query(`TRUNCATE TABLE ${APP_TABLES.join(', ')} RESTART IDENTITY CASCADE`);
+    // Application IDs are prefixed text values, so there are no identity
+    // sequences to restart between cases. Avoiding that redundant work keeps
+    // the integration suite isolated without adding sequence-lock overhead.
+    await db.query(`TRUNCATE TABLE ${APP_TABLES.join(', ')} CASCADE`);
 });
 
 afterAll(async () => {

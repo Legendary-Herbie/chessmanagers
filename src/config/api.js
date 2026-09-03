@@ -379,6 +379,7 @@ export const endpoints = {
         list: () => '/notifications',
         unreadCount: () => '/notifications/unread-count',
         markRead: notificationId => `/notifications/${notificationId}/read`,
+        dismiss: notificationId => `/notifications/${notificationId}`,
         markAllRead: () => '/notifications/read',
     },
     announcements: {
@@ -402,6 +403,7 @@ export const endpoints = {
         list:        ()                  => '/clubs',
         mine:        ()                  => '/clubs/mine',
         context:     (clubId)            => `/clubs/${clubId}/context`,
+        presentation:(clubId)            => `/clubs/${clubId}/presentation`,
         create:      ()                  => '/clubs',
         byId:        (clubId)            => `/clubs/${clubId}`,
         members:     (clubId)            => `/clubs/${clubId}/members`,
@@ -424,6 +426,7 @@ export const endpoints = {
     },
     players: {
         list:          (clubId)            => `/clubs/${clubId}/players`,
+        summary:       (clubId)            => `/clubs/${clubId}/players/summary`,
         bulk:          (clubId)            => `/clubs/${clubId}/players/bulk`,
         inactive:      (clubId)            => `/clubs/${clubId}/players/inactive`,
         byId:          (clubId, playerId)  => `/clubs/${clubId}/players/${playerId}`,

@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useClub, useTheme } from '../../app/contextHooks.js';
 import { clubApi } from '../../features/clubs/api/clubApi.js';
@@ -7,17 +7,39 @@ import BrandLogo from '../common/BrandLogo.jsx';
 import '../../styles/layout.css';
 
 const navItems = [
-    { to: '/dashboard', label: 'Dashboard', end: true },
-    { to: '/leaderboard', label: 'Leaderboard' },
-    { to: '/players', label: 'Players' },
-    { to: '/matches', label: 'Matches' },
-    { to: '/clubs', label: 'Clubs' },
-    { to: '/tournaments', label: 'Tournaments' },
-    { to: '/announcements', label: 'Announcements' },
+    { to: '/dashboard', label: 'Dashboard', icon: 'dashboard', end: true },
+    { to: '/leaderboard', label: 'Leaderboard', icon: 'leaderboard' },
+    { to: '/players', label: 'Players', icon: 'players' },
+    { to: '/matches', label: 'Matches', icon: 'matches' },
+    { to: '/clubs', label: 'Clubs', icon: 'clubs' },
+    { to: '/tournaments', label: 'Tournaments', icon: 'tournaments' },
+    { to: '/announcements', label: 'Announcements', icon: 'announcements' },
 ];
+
+const iconPaths = {
+    dashboard: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
+    leaderboard: <><path d="M5 21V11h4v10" /><path d="M10 21V3h4v18" /><path d="M15 21v-6h4v6" /></>,
+    players: <><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6" /><path d="M14 15c3.8-.7 7 1 7 5" /></>,
+    matches: <><path d="M7 3l10 18" /><path d="M17 3L7 21" /><circle cx="12" cy="12" r="2" /></>,
+    clubs: <><path d="M4 21V7l8-4 8 4v14" /><path d="M8 10h2M14 10h2M8 14h2M14 14h2" /><path d="M10 21v-4h4v4" /></>,
+    tournaments: <><path d="M8 4h8v4a4 4 0 01-8 0V4z" /><path d="M8 6H4v1a5 5 0 005 5M16 6h4v1a5 5 0 01-5 5" /><path d="M12 12v5M8 21h8M9 17h6" /></>,
+    announcements: <><path d="M4 13V8l13-4v13L4 13z" /><path d="M7 14l2 6h4l-2-7" /><path d="M20 8v5" /></>,
+};
+
+function NavIcon({ name }) {
+    return <svg className="app-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconPaths[name]}</svg>;
+}
 
 function navLinkClass({ isActive }) {
     return `app-nav__link${isActive ? ' app-nav__link--active' : ''}`;
+}
+
+function storedSidebarPreference() {
+    try {
+        return window.localStorage?.getItem?.('chess-managers-sidebar') === 'collapsed';
+    } catch {
+        return false;
+    }
 }
 
 export default function AppLayout() {
@@ -41,6 +63,8 @@ export default function AppLayout() {
     const [restoringClubId, setRestoringClubId] = useState(null);
     const [restoreError, setRestoreError] = useState(null);
     const [leavingClub, setLeavingClub] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(storedSidebarPreference);
+    const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
     const displayName = user?.name || user?.email || 'Member';
     const initial = displayName.trim().charAt(0).toUpperCase() || 'M';
@@ -48,7 +72,23 @@ export default function AppLayout() {
 
     useEffect(() => {
         setMenuOpen(false);
+        setMobileNavOpen(false);
     }, [location.pathname]);
+
+    useLayoutEffect(() => {
+        document.documentElement.scrollTop = 0;
+        document.documentElement.scrollLeft = 0;
+        document.body.scrollTop = 0;
+        document.body.scrollLeft = 0;
+    }, [location.pathname, location.search]);
+
+    useEffect(() => {
+        try {
+            window.localStorage?.setItem?.('chess-managers-sidebar', sidebarCollapsed ? 'collapsed' : 'expanded');
+        } catch {
+            // Storage may be unavailable in private browsing or restricted embeds.
+        }
+    }, [sidebarCollapsed]);
 
     useEffect(() => {
         if (!menuOpen) return;
@@ -130,14 +170,34 @@ export default function AppLayout() {
     };
 
     return (
-        <div className="app-shell">
-            <header className="app-nav">
+        <div className={`app-shell${sidebarCollapsed ? ' app-shell--sidebar-collapsed' : ''}`}>
+            <header className={`app-nav${sidebarCollapsed ? ' app-nav--collapsed' : ''}`}>
                 <div className="app-nav__inner">
-                    <NavLink className="app-nav__brand" to="/dashboard" aria-label="Chess Managers dashboard">
-                        <BrandLogo className="app-nav__brand-logo" collapse="phone" />
-                    </NavLink>
+                    <div className="app-nav__top">
+                        <NavLink className="app-nav__brand" to="/dashboard" aria-label="Chess Managers dashboard">
+                            <BrandLogo className="app-nav__brand-logo" collapse="phone" />
+                        </NavLink>
+                        <button
+                            type="button"
+                            className="app-nav__collapse-button"
+                            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+                            aria-expanded={!sidebarCollapsed}
+                            onClick={() => setSidebarCollapsed(current => !current)}
+                        >
+                            <span aria-hidden="true">{sidebarCollapsed ? '›' : '‹'}</span>
+                        </button>
+                        <button
+                            type="button"
+                            className="app-nav__mobile-toggle"
+                            aria-label={mobileNavOpen ? 'Close navigation menu' : 'Open navigation menu'}
+                            aria-expanded={mobileNavOpen}
+                            onClick={() => setMobileNavOpen(current => !current)}
+                        >
+                            <span aria-hidden="true">{mobileNavOpen ? '✕' : '☰'}</span>
+                        </button>
+                    </div>
 
-                    <label className="app-nav__club-switcher">
+                    <label className={`app-nav__club-switcher${mobileNavOpen ? ' app-nav__club-switcher--mobile-open' : ''}`}>
                         <span className="app-nav__club-switcher-label">Active club</span>
                         <select
                             value={selectedClubId ?? ''}
@@ -154,8 +214,17 @@ export default function AppLayout() {
                             ))}
                         </select>
                     </label>
+                    <button
+                        type="button"
+                        className="app-nav__club-collapsed"
+                        title={`Active club: ${clubName}`}
+                        aria-label={`Expand sidebar. Active club: ${clubName}`}
+                        onClick={() => setSidebarCollapsed(false)}
+                    >
+                        ♜
+                    </button>
 
-                    <nav className="app-nav__links" aria-label="Primary navigation">
+                    <nav className={`app-nav__links${mobileNavOpen ? ' app-nav__links--mobile-open' : ''}`} aria-label="Primary navigation">
                         {navItems.map(item => (
                             <NavLink
                                 key={item.to}
@@ -163,14 +232,15 @@ export default function AppLayout() {
                                 end={item.end}
                                 className={navLinkClass}
                             >
-                                {item.label}
+                                <NavIcon name={item.icon} />
+                                <span className="app-nav__link-label">{item.label}</span>
                             </NavLink>
                         ))}
                     </nav>
 
-                    <NotificationTray />
-
-                    <div className="app-nav__account" ref={dropdownRef}>
+                    <div className="app-nav__utilities">
+                        <NotificationTray />
+                        <div className="app-nav__account" ref={dropdownRef}>
                         <button
                             type="button"
                             className="app-nav__menu-button"
@@ -256,12 +326,15 @@ export default function AppLayout() {
                                 </button>
                             </div>
                         )}
+                        </div>
                     </div>
                 </div>
             </header>
 
             <main className="app-main">
-                <Outlet />
+                <div className="app-main__inner">
+                    <Outlet key={`${location.pathname}${location.search}`} />
+                </div>
             </main>
         </div>
     );

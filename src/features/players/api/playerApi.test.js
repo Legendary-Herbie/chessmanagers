@@ -33,3 +33,25 @@ describe('player history API routes', () => {
         ]);
     });
 });
+
+describe('player roster API routes', () => {
+    beforeEach(() => vi.clearAllMocks());
+
+    it('returns paginated search metadata and the server-derived roster summary', async () => {
+        api.get
+            .mockResolvedValueOnce({ players: [{ id: 'player_a' }], total: 120, limit: 20, offset: 0 })
+            .mockResolvedValueOnce({ summary: { totalPlayers: 120, activePlayers: 70 } });
+
+        const search = await playerApi.searchPlayers('club_1', { q: 'Ada', limit: 20 });
+        const summary = await playerApi.fetchRosterSummary('club_1');
+
+        expect(search.total).toBe(120);
+        expect(api.get).toHaveBeenNthCalledWith(
+            1,
+            '/clubs/club_1/players?limit=20&offset=0&q=Ada',
+            { signal: undefined }
+        );
+        expect(api.get).toHaveBeenNthCalledWith(2, '/clubs/club_1/players/summary', {});
+        expect(summary).toEqual({ totalPlayers: 120, activePlayers: 70 });
+    });
+});

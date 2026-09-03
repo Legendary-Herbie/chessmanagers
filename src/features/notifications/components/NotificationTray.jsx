@@ -49,6 +49,7 @@ export default function NotificationTray() {
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(false);
+    const [deletingId, setDeletingId] = useState(null);
     const [error, setError] = useState(null);
 
     const load = useCallback(async () => {
@@ -112,6 +113,20 @@ export default function NotificationTray() {
         setUnreadCount(0);
     };
 
+    const dismiss = async notification => {
+        setDeletingId(notification.id);
+        setError(null);
+        try {
+            await notificationApi.dismiss(notification.id);
+            setNotifications(current => current.filter(item => item.id !== notification.id));
+            if (!notification.readAt) setUnreadCount(current => Math.max(0, current - 1));
+        } catch (dismissError) {
+            setError(dismissError.message || 'Could not delete the notification.');
+        } finally {
+            setDeletingId(null);
+        }
+    };
+
     return (
         <div className="notification-tray" ref={trayRef}>
             <button
@@ -153,18 +168,26 @@ export default function NotificationTray() {
                         <ul className="notification-tray__list">
                             {notifications.map(notification => (
                                 <li key={notification.id}>
-                                    <button
-                                        type="button"
-                                        className={`notification-tray__item${notification.readAt ? '' : ' notification-tray__item--unread'}`}
-                                        onClick={() => markRead(notification)}
-                                    >
-                                        <span className="notification-tray__item-copy">
-                                            <strong>{EVENT_COPY[notification.eventType] || 'Club update'}</strong>
-                                            {notificationDetail(notification) && <span>{notificationDetail(notification)}</span>}
-                                            <small>{notification.clubName}</small>
-                                        </span>
-                                        {!notification.readAt && <span className="notification-tray__unread-dot" aria-label="Unread" />}
-                                    </button>
+                                    <div className="notification-tray__row">
+                                        <button
+                                            type="button"
+                                            className={`notification-tray__item${notification.readAt ? '' : ' notification-tray__item--unread'}`}
+                                            onClick={() => markRead(notification)}
+                                        >
+                                            <span className="notification-tray__item-copy">
+                                                <strong>{EVENT_COPY[notification.eventType] || 'Club update'}</strong>
+                                                {notificationDetail(notification) && <span>{notificationDetail(notification)}</span>}
+                                                <small>{notification.clubName}</small>
+                                            </span>
+                                            {!notification.readAt && <span className="notification-tray__unread-dot" aria-label="Unread" />}
+                                        </button>
+                                        <button type="button" className="notification-tray__delete"
+                                            aria-label={`Delete notification: ${EVENT_COPY[notification.eventType] || 'Club update'}`}
+                                            disabled={deletingId === notification.id}
+                                            onClick={() => dismiss(notification)}>
+                                            <span aria-hidden="true">×</span>
+                                        </button>
+                                    </div>
                                 </li>
                             ))}
                         </ul>

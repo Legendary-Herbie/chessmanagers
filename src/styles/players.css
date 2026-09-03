@@ -81,6 +81,27 @@
   color: var(--text-muted);
 }
 
+.stat-card__ratings {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  color: var(--text-strong);
+  font-size: var(--font-size-lg, 1.125rem);
+  font-weight: 800;
+}
+
+.stat-card__ratings span {
+  display: grid;
+  gap: 2px;
+}
+
+.stat-card__ratings small {
+  color: var(--text-muted);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
 /* Toolbar & Filters */
 .players-toolbar {
   background-color: var(--bg-surface);
@@ -711,6 +732,13 @@
   display: flex;
   gap: 4px;
   border-bottom: 2px solid var(--border);
+}
+
+.player-category-loading {
+  min-height: 1.25rem;
+  margin-top: -16px;
+  color: var(--text-muted);
+  font-size: var(--font-size-xs, 0.75rem);
 }
 
 .player-tab-btn {

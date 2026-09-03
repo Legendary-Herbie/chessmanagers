@@ -5,6 +5,11 @@ import { isCancelledError } from '../../../config/api.js';
 export function usePlayers(clubId, { includeInactive = false } = {}) {
     const [players, setPlayers] = useState([]);
     const [inactivePlayers, setInactivePlayers] = useState([]);
+    const [rosterSummary, setRosterSummary] = useState({
+        totalPlayers: 0,
+        activePlayers: 0,
+        averageRatings: { blitz: null, rapid: null, classical: null },
+    });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
 
@@ -18,18 +23,25 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
         if (!clubId) {
             setPlayers([]);
             setInactivePlayers([]);
+            setRosterSummary({
+                totalPlayers: 0,
+                activePlayers: 0,
+                averageRatings: { blitz: null, rapid: null, classical: null },
+            });
             setLoading(false);
             return;
         }
         setLoading(true);
         try {
-            const [data, inactive] = await Promise.all([
+            const [data, inactive, summary] = await Promise.all([
                 playerApi.fetchPlayers(clubId, { q: searchTerm, limit: 100, signal }),
                 includeInactive ? playerApi.fetchInactivePlayers(clubId, { signal }) : Promise.resolve([]),
+                playerApi.fetchRosterSummary(clubId, { signal }),
             ]);
             if (signal?.aborted) return;
             setPlayers(data);
             setInactivePlayers(inactive);
+            setRosterSummary(summary);
             setError(null);
         } catch (err) {
             if (signal?.aborted || isCancelledError(err)) return;
@@ -47,9 +59,9 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     }, [clubId, fetchPlayers]);
 
     // Single Add Player
-    const addPlayer = async ({ name, rating, bio }) => {
+    const addPlayer = async ({ name, startRatings, bio }) => {
         if (!clubId) return;
-        const newPlayer = await playerApi.createPlayer(clubId, { name, rating, bio });
+        const newPlayer = await playerApi.createPlayer(clubId, { name, startRatings, bio });
         setPlayers((prev) => [newPlayer, ...prev]);
         return newPlayer;
     };
@@ -127,28 +139,11 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
         return result;
     }, [players, statusFilter, sortBy]);
 
-    // Derived Statistics
-    const stats = useMemo(() => {
-        const totalPlayers = players.length;
-        const avgRating = totalPlayers > 0
-            ? Math.round(players.reduce((sum, p) => sum + (p.rating || 1500), 0) / totalPlayers)
-            : 1500;
-        const activePlayers = players.filter((p) => (p.games || 0) > 0).length;
-        const pendingClaimsCount = players.filter((p) => p.link_status === 'pending').length;
-
-        return {
-            totalPlayers,
-            avgRating,
-            activePlayers,
-            pendingClaimsCount,
-        };
-    }, [players]);
-
     return {
         players,
         inactivePlayers,
         processedPlayers,
-        stats,
+        stats: rosterSummary,
         loading,
         error,
         searchTerm,

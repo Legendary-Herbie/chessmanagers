@@ -33,7 +33,8 @@ export const MatchModel = {
     ).then(result => result.first),
 
     findByClub: async (clubId, { q = '', ratingCategory, isRated, status, tournamentId,
-        playerId, limit = 50, offset = 0 } = {}) => {
+        playerId, playedFrom, playedTo, sortBy = 'playedAt', sortDirection = 'desc',
+        limit = 50, offset = 0 } = {}) => {
         const conditions = ["match.club_id = $1", "match.status <> 'deleted'"];
         const params = [clubId];
         const add = (sql, value) => {
@@ -45,10 +46,14 @@ export const MatchModel = {
         if (status) add('match.status = ?', status);
         if (tournamentId) add('match.tournament_id = ?', tournamentId);
         if (playerId) add('(match.white_player_id = ? OR match.black_player_id = ?)', playerId);
+        if (playedFrom) add('match.played_at >= ?', playedFrom);
+        if (playedTo) add('match.played_at <= ?', playedTo);
         if (q) add(`(white_player.name ILIKE '%' || ? || '%'
             OR black_player.name ILIKE '%' || ? || '%'
             OR COALESCE(match.notes, '') ILIKE '%' || ? || '%')`, q);
         params.push(limit, offset);
+        const sortColumn = sortBy === 'createdAt' ? 'match.created_at' : 'match.played_at';
+        const direction = sortDirection === 'asc' ? 'ASC' : 'DESC';
         return db.query(
             `SELECT match.*, white_player.name AS white_player_name,
                     black_player.name AS black_player_name, COUNT(*) OVER ()::INTEGER AS total_count
@@ -56,7 +61,7 @@ export const MatchModel = {
              JOIN players white_player ON white_player.id = match.white_player_id
              JOIN players black_player ON black_player.id = match.black_player_id
              WHERE ${conditions.join(' AND ')}
-             ORDER BY match.played_at DESC, match.id DESC
+             ORDER BY ${sortColumn} ${direction}, match.id ${direction}
              LIMIT $${params.length - 1} OFFSET $${params.length}`,
             params
         ).then(result => ({ matches: result.rows, total: result.rows[0]?.total_count ?? 0 }));

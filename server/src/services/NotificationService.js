@@ -215,6 +215,7 @@ export async function listNotifications(userId, { clubId = null, unreadOnly = fa
          LEFT JOIN user_clubs membership
            ON membership.club_id = notification.club_id AND membership.user_id = notification.user_id
          WHERE notification.user_id = $1
+           AND notification.dismissed_at IS NULL
            AND ($2::TEXT IS NULL OR notification.club_id = $2)
            AND (NOT $3::BOOLEAN OR notification.read_at IS NULL)
            AND ${visibilitySql}
@@ -238,6 +239,7 @@ export async function getUnreadCount(userId, clubId = null) {
          LEFT JOIN user_clubs membership
            ON membership.club_id = notification.club_id AND membership.user_id = notification.user_id
          WHERE notification.user_id = $1 AND notification.read_at IS NULL
+           AND notification.dismissed_at IS NULL
            AND ($2::TEXT IS NULL OR notification.club_id = $2)
            AND ${visibilitySql}`,
         [userId, clubId]
@@ -247,7 +249,7 @@ export async function getUnreadCount(userId, clubId = null) {
 export async function markNotificationRead(userId, notificationId) {
     return db.query(
         `UPDATE notifications SET read_at = COALESCE(read_at, NOW()), updated_at = NOW()
-         WHERE id = $1 AND user_id = $2
+         WHERE id = $1 AND user_id = $2 AND dismissed_at IS NULL
            AND (
                club_id IS NULL OR EXISTS (
                    SELECT 1 FROM clubs club
@@ -269,7 +271,8 @@ export async function markNotificationRead(userId, notificationId) {
 export async function markAllNotificationsRead(userId, clubId = null) {
     return db.query(
          `UPDATE notifications SET read_at = NOW(), updated_at = NOW()
-         WHERE user_id = $1 AND read_at IS NULL AND ($2::TEXT IS NULL OR club_id = $2)
+         WHERE user_id = $1 AND read_at IS NULL AND dismissed_at IS NULL
+           AND ($2::TEXT IS NULL OR club_id = $2)
            AND (
                club_id IS NULL OR EXISTS (
                    SELECT 1 FROM clubs club
@@ -285,6 +288,16 @@ export async function markAllNotificationsRead(userId, clubId = null) {
            )`,
         [userId, clubId]
     ).then(result => result.rowCount);
+}
+
+export async function dismissNotification(userId, notificationId) {
+    return db.query(
+        `UPDATE notifications
+         SET dismissed_at = NOW(), updated_at = NOW()
+         WHERE id = $1 AND user_id = $2 AND dismissed_at IS NULL
+         RETURNING id, dismissed_at`,
+        [notificationId, userId]
+    ).then(result => result.first);
 }
 
 async function claimOutboxItem() {

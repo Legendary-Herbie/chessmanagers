@@ -104,8 +104,18 @@ export const matchListQuerySchema = z.object({
     status: z.enum(['active', 'voided']).optional(),
     tournamentId: idSchema.optional(),
     playerId: idSchema.optional(),
+    playedFrom: z.string().datetime({ offset: true }).optional(),
+    playedTo: z.string().datetime({ offset: true }).optional(),
+    sortBy: z.enum(['playedAt', 'createdAt']).optional(),
+    sortDirection: z.enum(['asc', 'desc']).optional(),
     ...paginationFields,
-}).strict();
+}).strict().refine(value => (
+    !value.playedFrom || !value.playedTo
+    || new Date(value.playedFrom).valueOf() <= new Date(value.playedTo).valueOf()
+), {
+    message: 'playedFrom must not be after playedTo.',
+    path: ['playedFrom'],
+});
 export const tournamentListQuerySchema = z.object({
     status: z.enum(['upcoming', 'active', 'completed']).optional(),
     q: z.string().trim().max(100).optional(),
@@ -144,21 +154,39 @@ export const changePasswordSchema = z.object({
 
 const nullableProfileText = (max) => z.string().trim().max(max).nullable();
 const nullableDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Date of birth must use YYYY-MM-DD.').nullable();
+const startRatingValue = z.number().int().min(100).max(4000);
+const startRatingsSchema = z.object({
+    blitz: startRatingValue.optional(),
+    rapid: startRatingValue.optional(),
+    classical: startRatingValue.optional(),
+}).strict();
+
+const disallowLegacyAndCategoryRatings = (data, context) => {
+    if (data.rating !== undefined && data.startRatings !== undefined) {
+        context.addIssue({
+            code: z.ZodIssueCode.custom,
+            message: 'Provide either rating or startRatings, not both.',
+            path: ['startRatings'],
+        });
+    }
+};
 
 export const createPlayerSchema = z.object({
     name:   z.string().trim().min(1, 'Player name is required.').max(100),
-    rating: z.number().int().min(100).max(3000).optional(),
+    rating: startRatingValue.optional(),
+    startRatings: startRatingsSchema.optional(),
     bio:    nullableProfileText(500).optional(),
     dateOfBirth: nullableDate.optional(),
     federationId: nullableProfileText(100).optional(),
-}).strict();
+}).strict().superRefine(disallowLegacyAndCategoryRatings);
 
 export const createPlayersBulkSchema = z.object({
     players: z.array(z.object({
         name: z.string().trim().min(1, 'Player name is required.').max(100),
-        rating: z.number().int().min(100).max(3000).optional(),
+        rating: startRatingValue.optional(),
+        startRatings: startRatingsSchema.optional(),
         bio: nullableProfileText(500).optional(),
-    }).strict()).min(1, 'At least one player is required.').max(250),
+    }).strict().superRefine(disallowLegacyAndCategoryRatings)).min(1, 'At least one player is required.').max(250),
 }).strict();
 
 export const updatePlayerAdminSchema = z.object({
@@ -298,14 +326,20 @@ export const clubRatingSettingsSchema = z.object({
     message: 'At least one rating category must be provided.',
 });
 
+const clubWebsiteSchema = z.string()
+    .trim()
+    .max(500, 'Website must be 500 characters or fewer.')
+    .url('Enter a valid website address.')
+    .refine(value => /^https?:\/\//i.test(value), 'Website must begin with http:// or https://.');
+
 export const clubStructuredSettingsSchema = z.object({
     contacts: z.object({
-        website: z.string().url().max(500).optional().nullable(),
-        email: z.string().email().max(320).optional().nullable(),
-        phone: z.string().trim().max(50).optional().nullable(),
-        address: z.string().trim().max(500).optional().nullable(),
+        website: clubWebsiteSchema.optional().nullable(),
+        email: z.string().trim().email('Enter a valid email address.').max(320, 'Email must be 320 characters or fewer.').optional().nullable(),
+        phone: z.string().trim().max(50, 'Phone must be 50 characters or fewer.').optional().nullable(),
+        address: z.string().trim().max(500, 'Address must be 500 characters or fewer.').optional().nullable(),
     }).strict().optional(),
-    affiliation: z.string().trim().max(200).optional().nullable(),
+    affiliation: z.string().trim().max(200, 'Affiliation must be 200 characters or fewer.').optional().nullable(),
     presentation: z.object({
         primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/).optional().nullable(),
         locale: z.string().trim().min(2).max(20).optional(),
@@ -321,10 +355,10 @@ export const clubStructuredSettingsSchema = z.object({
 }).strict();
 
 export const updateClubSchema = z.object({
-    name:        z.string().min(1).max(150).optional(),
-    federation:  z.string().min(1).max(100).optional(),
-    description: z.string().max(1000).optional().nullable(),
-    contactInfo: z.string().max(500).optional().nullable(),
+    name:        z.string().trim().min(1, 'Club name is required.').max(150, 'Club name must be 150 characters or fewer.').optional(),
+    federation:  z.string().trim().min(1, 'Federation is required.').max(100, 'Federation must be 100 characters or fewer.').optional(),
+    description: z.string().trim().max(1000, 'Description must be 1,000 characters or fewer.').optional().nullable(),
+    contactInfo: z.string().trim().max(500, 'Contact information must be 500 characters or fewer.').optional().nullable(),
     visibility: z.enum(['public', 'private']).optional(),
     publicLeaderboard: z.boolean().optional(),
     settings: clubStructuredSettingsSchema.optional(),
@@ -333,11 +367,24 @@ export const updateClubSchema = z.object({
     message: 'At least one club setting must be provided.',
 });
 
+export const updateClubPresentationSchema = z.object({
+    federation: z.string().trim().min(1, 'Federation is required.').max(100, 'Federation must be 100 characters or fewer.').optional(),
+    description: z.string().trim().max(1000, 'Description must be 1,000 characters or fewer.').optional().nullable(),
+    contactInfo: z.string().trim().max(500, 'Contact information must be 500 characters or fewer.').optional().nullable(),
+    settings: z.object({
+        contacts: clubStructuredSettingsSchema.shape.contacts,
+        affiliation: clubStructuredSettingsSchema.shape.affiliation,
+        presentation: clubStructuredSettingsSchema.shape.presentation,
+    }).strict().optional(),
+}).strict().refine(value => Object.keys(value).length > 0, {
+    message: 'At least one public presentation field must be provided.',
+});
+
 export const createClubSchema = z.object({
-    name:        z.string().min(1).max(150),
-    federation:  z.string().min(1).max(100),
-    description: z.string().max(1000).optional().nullable(),
-    contactInfo: z.string().max(500).optional().nullable(),
+    name:        z.string().trim().min(1, 'Club name is required.').max(150, 'Club name must be 150 characters or fewer.'),
+    federation:  z.string().trim().min(1, 'Federation is required.').max(100, 'Federation must be 100 characters or fewer.'),
+    description: z.string().trim().max(1000, 'Description must be 1,000 characters or fewer.').optional().nullable(),
+    contactInfo: z.string().trim().max(500, 'Contact information must be 500 characters or fewer.').optional().nullable(),
     // Previously accepted by the frontend (CreateClub.jsx) but silently
     // dropped here — every club ended up private regardless of what the
     // user picked. Now validated and passed through to ClubModel.create().

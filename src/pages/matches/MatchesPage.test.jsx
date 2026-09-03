@@ -38,10 +38,15 @@ function renderPage() {
     );
 }
 
+async function selectPlayer(label, name) {
+    fireEvent.focus(screen.getByLabelText(label));
+    fireEvent.click(await screen.findByRole('option', { name: new RegExp(name) }));
+}
+
 describe('MatchesPage canonical match flows', () => {
     beforeEach(() => {
         vi.clearAllMocks();
-        matchApi.list.mockResolvedValue([]);
+        matchApi.list.mockResolvedValue({ matches: [], total: 0, limit: 25, offset: 0 });
     });
     afterEach(cleanup);
 
@@ -55,6 +60,19 @@ describe('MatchesPage canonical match flows', () => {
         expect(screen.getByRole('button', { name: 'Blitz' }).className).toContain('active');
     });
 
+    it('keeps the match form dismissible and restores page scrolling', async () => {
+        renderPage();
+        fireEvent.click(await screen.findByRole('button', { name: 'Add Match' }));
+
+        expect(screen.getByRole('dialog', { name: 'Add Match' })).toBeTruthy();
+        expect(document.body.style.overflow).toBe('hidden');
+
+        fireEvent.keyDown(document, { key: 'Escape' });
+
+        expect(screen.queryByRole('dialog', { name: 'Add Match' })).toBeNull();
+        expect(document.body.style.overflow).toBe('');
+    });
+
     it('uses the duplicate confirmation response to retry with confirmation', async () => {
         matchApi.create
             .mockRejectedValueOnce({
@@ -64,8 +82,8 @@ describe('MatchesPage canonical match flows', () => {
             .mockResolvedValueOnce({ ratingStatus: 'unrated', match: { id: 'match_2' } });
         renderPage();
         fireEvent.click(await screen.findByRole('button', { name: 'Add Match' }));
-        fireEvent.change(screen.getByLabelText('White'), { target: { value: 'player_white' } });
-        fireEvent.change(screen.getByLabelText('Black'), { target: { value: 'player_black' } });
+        await selectPlayer('White', 'White Player');
+        await selectPlayer('Black', 'Black Player');
         fireEvent.click(screen.getByLabelText('Rated match'));
         fireEvent.click(screen.getByRole('button', { name: 'Create match' }));
 
@@ -78,5 +96,33 @@ describe('MatchesPage canonical match flows', () => {
             isRated: false,
             confirmDuplicate: true,
         });
+    });
+
+    it('sends category, rated, date, sort, and pagination controls to the server', async () => {
+        matchApi.list.mockResolvedValue({ matches: [], total: 60, limit: 25, offset: 0 });
+        renderPage();
+        await waitFor(() => expect(matchApi.list).toHaveBeenCalled());
+
+        fireEvent.change(screen.getByLabelText('Filter by rating category'), { target: { value: 'rapid' } });
+        fireEvent.change(screen.getByLabelText('Filter by rated status'), { target: { value: 'rated' } });
+        fireEvent.change(screen.getByText('From').parentElement.querySelector('input'), { target: { value: '2026-08-01' } });
+        fireEvent.change(screen.getByText('To').parentElement.querySelector('input'), { target: { value: '2026-08-31' } });
+        fireEvent.change(screen.getByLabelText('Sort matches'), { target: { value: 'playedAt-asc' } });
+        await selectPlayer('Filter by player', 'White Player');
+
+        await waitFor(() => expect(matchApi.list).toHaveBeenLastCalledWith('club_1', expect.objectContaining({
+            playerId: 'player_white',
+            ratingCategory: 'rapid',
+            isRated: true,
+            playedFrom: expect.stringContaining('2026-08-01'),
+            playedTo: expect.stringContaining('2026-08-31'),
+            sortBy: 'playedAt',
+            sortDirection: 'asc',
+            limit: 25,
+            offset: 0,
+        })));
+
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+        await waitFor(() => expect(matchApi.list).toHaveBeenLastCalledWith('club_1', expect.objectContaining({ offset: 25 })));
     });
 });

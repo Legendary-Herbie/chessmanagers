@@ -1,9 +1,20 @@
 import {
+    dismissNotification,
     getUnreadCount,
     listNotifications,
     markAllNotificationsRead,
     markNotificationRead,
 } from '../services/NotificationService.js';
+
+export async function dismissUserNotification(req, res, next) {
+    try {
+        const notification = await dismissNotification(req.user.id, req.validatedParams.notificationId);
+        if (!notification) return res.status(404).json({ error: 'Notification not found.' });
+        return res.json({ notification: { id: notification.id, dismissedAt: notification.dismissed_at } });
+    } catch (error) {
+        return next(error);
+    }
+}
 
 export async function listUserNotifications(req, res, next) {
     try {

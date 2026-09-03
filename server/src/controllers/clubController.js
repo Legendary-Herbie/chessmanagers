@@ -313,6 +313,21 @@ export async function transferClubOwnership(req, res, next) {
     }
 }
 
+export async function updateClubPresentation(req, res, next) {
+    try {
+        const club = await ClubModel.updatePresentation(
+            req.params.clubId,
+            req.user.id,
+            req.validated,
+        );
+        if (!club) return res.status(404).json({ error: 'Club not found.' });
+        const ratingSettings = await ClubModel.getRatingSettings(club.id);
+        res.json({ club: toClubContextClub(club, ratingSettings) });
+    } catch (err) {
+        next(err);
+    }
+}
+
 async function changeClubLifecycle(req, res, next, action) {
     try {
         const { reason = null } = req.validated ?? req.body;

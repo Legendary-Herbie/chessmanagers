@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contextHooks.js';
 
@@ -15,29 +15,37 @@ import VerifyEmailView from '../pages/auth/VerifyEmailView.jsx';
 import ForgotPasswordView from '../pages/auth/ForgotPasswordView.jsx';
 import ResetPasswordView from '../pages/auth/ResetPasswordView.jsx';
 import OAuthCallbackView from '../pages/auth/OAuthCallbackView.jsx';
-import AccountPage from '../pages/auth/AccountPage.jsx';
 
 // Pages — app
 import Landing     from '../pages/Landing.jsx';
-import Dashboard       from '../pages/Dashboard.jsx';
-import CreateClub  from '../pages/CreateClub.jsx';
 import NotFound    from '../pages/NotFound.jsx';
 
-// Feature pages
-import PlayersPage    from '../pages/players/PlayersPage.jsx';
-import PlayerPage     from '../pages/players/PlayerPage.jsx';
-import MatchesPage    from '../pages/matches/MatchesPage.jsx';
-import TournamentsPage from '../pages/tournaments/TournamentsPage.jsx';
-import TournamentPage  from '../pages/tournaments/TournamentPage.jsx';
-import LeaderboardPage from '../pages/leaderboard/LeaderboardPage.jsx';
-import ClubPage        from '../pages/club/ClubPage.jsx';
-import FindClubsPage   from '../pages/club/FindClubsPage.jsx';
-import ClubInviteHandler from '../pages/club/ClubInviteHandler.jsx';
-import PublicClubPage  from '../pages/club/PublicClubPage.jsx';
-import PublicPlayerPage from '../pages/club/PublicPlayerPage.jsx';
-import PublicTournamentPage from '../pages/club/PublicTournamentPage.jsx';
-import AnnouncementsPage from '../pages/announcements/AnnouncementsPage.jsx';
-import AnnouncementPage from '../pages/announcements/AnnouncementPage.jsx';
+// Route-level splitting keeps feature code out of the landing/authentication bundle.
+const AccountPage = lazy(() => import('../pages/auth/AccountPage.jsx'));
+const Dashboard = lazy(() => import('../pages/Dashboard.jsx'));
+const CreateClub = lazy(() => import('../pages/CreateClub.jsx'));
+const PlayersPage = lazy(() => import('../pages/players/PlayersPage.jsx'));
+const PlayerPage = lazy(() => import('../pages/players/PlayerPage.jsx'));
+const MatchesPage = lazy(() => import('../pages/matches/MatchesPage.jsx'));
+const TournamentsPage = lazy(() => import('../pages/tournaments/TournamentsPage.jsx'));
+const TournamentPage = lazy(() => import('../pages/tournaments/TournamentPage.jsx'));
+const LeaderboardPage = lazy(() => import('../pages/leaderboard/LeaderboardPage.jsx'));
+const ClubPage = lazy(() => import('../pages/club/ClubPage.jsx'));
+const FindClubsPage = lazy(() => import('../pages/club/FindClubsPage.jsx'));
+const ClubInviteHandler = lazy(() => import('../pages/club/ClubInviteHandler.jsx'));
+const PublicClubPage = lazy(() => import('../pages/club/PublicClubPage.jsx'));
+const PublicPlayerPage = lazy(() => import('../pages/club/PublicPlayerPage.jsx'));
+const PublicTournamentPage = lazy(() => import('../pages/club/PublicTournamentPage.jsx'));
+const AnnouncementsPage = lazy(() => import('../pages/announcements/AnnouncementsPage.jsx'));
+const AnnouncementPage = lazy(() => import('../pages/announcements/AnnouncementPage.jsx'));
+
+function LazyPage({ component }) {
+    return (
+        <Suspense fallback={<div className="page-loading" role="status">Loading page…</div>}>
+            {React.createElement(component)}
+        </Suspense>
+    );
+}
 
 // ─── Route guards ──────────────────────────────────────────────────────────────
 
@@ -76,11 +84,11 @@ export default function AppRoutes() {
 
             {/* Find clubs (public) */}
             <Route element={<PublicLayout />}>
-                <Route path="/clubs" element={<FindClubsPage />} />
-                <Route path="/clubs/join" element={<ClubInviteHandler />} />
-                <Route path="/clubs/:clubId" element={<PublicClubPage />} />
-                <Route path="/clubs/:clubId/players/:publicPlayerId" element={<PublicPlayerPage />} />
-                <Route path="/clubs/:clubId/tournaments/:tournamentId" element={<PublicTournamentPage />} />
+                <Route path="/clubs" element={<LazyPage component={FindClubsPage} />} />
+                <Route path="/clubs/join" element={<LazyPage component={ClubInviteHandler} />} />
+                <Route path="/clubs/:clubId" element={<LazyPage component={PublicClubPage} />} />
+                <Route path="/clubs/:clubId/players/:publicPlayerId" element={<LazyPage component={PublicPlayerPage} />} />
+                <Route path="/clubs/:clubId/tournaments/:tournamentId" element={<LazyPage component={PublicTournamentPage} />} />
             </Route>
 
             {/* ── Auth ─────────────────────────────────────────────────── */}
@@ -111,31 +119,31 @@ export default function AppRoutes() {
                 }
             >
                 {/* Dashboard */}
-                <Route path="/dashboard" element={<Dashboard />} />
+                <Route path="/dashboard" element={<LazyPage component={Dashboard} />} />
 
                 {/* Create club — shown when user has no club yet */}
-                <Route path="/create-club" element={<CreateClub />} />
+                <Route path="/create-club" element={<LazyPage component={CreateClub} />} />
 
                 {/* Leaderboard */}
-                <Route path="/leaderboard" element={<LeaderboardPage />} />
+                <Route path="/leaderboard" element={<LazyPage component={LeaderboardPage} />} />
 
                 {/* Players */}
-                <Route path="/players"          element={<PlayersPage />} />
-                <Route path="/players/:playerId" element={<PlayerPage />} />
+                <Route path="/players"          element={<LazyPage component={PlayersPage} />} />
+                <Route path="/players/:playerId" element={<LazyPage component={PlayerPage} />} />
 
                 {/* Matches */}
-                <Route path="/matches" element={<MatchesPage />} />
+                <Route path="/matches" element={<LazyPage component={MatchesPage} />} />
 
                 {/* Tournaments */}
-                <Route path="/tournaments"                element={<TournamentsPage />} />
-                <Route path="/tournaments/:tournamentId"  element={<TournamentPage />} />
+                <Route path="/tournaments"                element={<LazyPage component={TournamentsPage} />} />
+                <Route path="/tournaments/:tournamentId"  element={<LazyPage component={TournamentPage} />} />
 
-                <Route path="/announcements" element={<AnnouncementsPage />} />
-                <Route path="/announcements/:announcementId" element={<AnnouncementPage />} />
+                <Route path="/announcements" element={<LazyPage component={AnnouncementsPage} />} />
+                <Route path="/announcements/:announcementId" element={<LazyPage component={AnnouncementPage} />} />
 
                 {/* Club dashboard — authenticated users (admin controls shown only to club admins) */}
-                <Route path="/club" element={<ClubPage />} />
-                <Route path="/account" element={<AccountPage />} />
+                <Route path="/club" element={<LazyPage component={ClubPage} />} />
+                <Route path="/account" element={<LazyPage component={AccountPage} />} />
             </Route>
 
             {/* ── 404 ──────────────────────────────────────────────────── */}

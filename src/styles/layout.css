@@ -1,30 +1,44 @@
 @import './variables.css';
 
 .app-shell {
+    --app-sidebar-width: 248px;
     min-height: 100dvh;
     background: var(--bg-page);
     color: var(--text);
     font-family: var(--font-sans);
 }
 
+.app-shell--sidebar-collapsed {
+    --app-sidebar-width: 72px;
+}
+
 .app-nav {
-    position: sticky;
-    top: 0;
+    position: fixed;
+    inset: 0 auto 0 0;
+    width: var(--app-sidebar-width);
     z-index: 20;
     background: var(--glass);
-    border-bottom: 1px solid var(--border);
+    border-right: 1px solid var(--border);
     backdrop-filter: blur(18px);
     box-shadow: var(--shadow-sm);
+    transition: width var(--motion-fast) var(--ease);
 }
 
 .app-nav__inner {
-    width: min(100%, calc(var(--content-max-width) + 48px));
-    min-height: 64px;
-    margin: 0 auto;
-    padding: 0 var(--gap-md);
+    height: 100%;
+    padding: var(--gap-sm);
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--gap-sm);
+}
+
+.app-nav__top {
+    min-height: 52px;
     display: flex;
     align-items: center;
-    gap: var(--gap-sm);
+    justify-content: space-between;
+    gap: 8px;
 }
 
 .app-nav__brand {
@@ -37,6 +51,37 @@
 
 .app-nav__brand-logo .brand-logo__lockup { height: 48px; }
 .app-nav__brand-logo .brand-logo__icon { height: 32px; }
+
+.app-nav--collapsed .app-nav__brand-logo .brand-logo__lockup { display: none; }
+.app-nav--collapsed .app-nav__brand-logo .brand-logo__icon { display: block; }
+
+.app-nav__collapse-button,
+.app-nav__mobile-toggle {
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    display: inline-grid;
+    place-items: center;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    font: inherit;
+    font-size: 1.35rem;
+    cursor: pointer;
+}
+
+.app-nav__collapse-button:hover,
+.app-nav__collapse-button:focus-visible,
+.app-nav__mobile-toggle:hover,
+.app-nav__mobile-toggle:focus-visible {
+    outline: none;
+    border-color: var(--border-emphasis);
+    color: var(--text-strong);
+    box-shadow: var(--focus-ring);
+}
+
+.app-nav__mobile-toggle { display: none; }
 
 .app-nav__brand-mark {
     width: 30px;
@@ -76,12 +121,28 @@
 }
 
 .app-nav__club-switcher {
-    flex: 0 1 190px;
-    min-width: 120px;
+    width: 100%;
     display: flex;
     flex-direction: column;
     gap: 2px;
 }
+
+.app-nav__club-collapsed {
+    display: none;
+    width: 44px;
+    min-height: 44px;
+    margin: 0 auto;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-surface);
+    color: var(--primary);
+    font: inherit;
+    font-size: 1.2rem;
+    cursor: pointer;
+}
+
+.app-nav--collapsed .app-nav__club-switcher { display: none; }
+.app-nav--collapsed .app-nav__club-collapsed { display: block; }
 
 .app-nav__club-switcher-label {
     color: var(--text-muted);
@@ -109,13 +170,14 @@
 }
 
 .app-nav__links {
-    min-width: 0;
+    min-height: 0;
     flex: 1 1 auto;
     display: flex;
-    align-items: center;
+    flex-direction: column;
+    align-items: stretch;
     gap: 4px;
-    overflow-x: auto;
-    scrollbar-width: none;
+    overflow-y: auto;
+    overflow-x: hidden;
 }
 
 .app-nav__links::-webkit-scrollbar {
@@ -123,10 +185,11 @@
 }
 
 .app-nav__link {
-    min-height: 38px;
-    display: inline-flex;
+    min-height: 44px;
+    display: flex;
     align-items: center;
-    padding: 0 12px;
+    gap: 12px;
+    padding: 0 11px;
     border-radius: var(--radius-md);
     color: var(--text-muted);
     text-decoration: none;
@@ -136,6 +199,45 @@
     transition:
         background-color var(--motion-fast) var(--ease),
         color var(--motion-fast) var(--ease);
+}
+
+.app-nav__icon {
+    width: 21px;
+    height: 21px;
+    flex: 0 0 auto;
+}
+
+.app-nav__link-label {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.app-nav--collapsed .app-nav__link {
+    width: 44px;
+    margin: 0 auto;
+    justify-content: center;
+    padding: 0;
+}
+
+.app-nav--collapsed .app-nav__link-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+}
+
+.app-nav__utilities {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: var(--gap-sm);
+    border-top: 1px solid var(--border);
+}
+
+.app-nav--collapsed .app-nav__utilities {
+    flex-direction: column;
 }
 
 .app-nav__link:hover {
@@ -150,7 +252,8 @@
 
 .app-nav__account {
     position: relative;
-    flex: 0 0 auto;
+    min-width: 0;
+    flex: 1 1 auto;
 }
 
 .notification-tray {
@@ -214,6 +317,27 @@
     background: var(--bg-surface);
     box-shadow: var(--shadow-lg);
     z-index: 35;
+}
+
+@media (max-width: 900px) {
+    .notification-tray__panel {
+        position: fixed;
+        top: 72px;
+        right: 12px;
+        left: 12px;
+        width: auto;
+        max-height: calc(100dvh - 84px);
+    }
+}
+
+@media (min-width: 901px) {
+    .notification-tray__panel {
+        position: fixed;
+        top: auto;
+        right: auto;
+        bottom: 12px;
+        left: calc(var(--app-sidebar-width) + 10px);
+    }
 }
 
 .notification-tray__header {
@@ -282,8 +406,15 @@
     border-top: 1px solid var(--border);
 }
 
+.notification-tray__row {
+    display: flex;
+    align-items: stretch;
+    background: var(--bg-surface);
+}
+
 .notification-tray__item {
-    width: 100%;
+    min-width: 0;
+    flex: 1 1 auto;
     min-height: 76px;
     padding: 12px 14px;
     display: flex;
@@ -296,6 +427,30 @@
     text-align: left;
     font: inherit;
     cursor: pointer;
+}
+
+.notification-tray__delete {
+    width: 42px;
+    flex: 0 0 42px;
+    border: 0;
+    border-left: 1px solid var(--border);
+    background: var(--bg-surface);
+    color: var(--text-muted);
+    cursor: pointer;
+    font: inherit;
+    font-size: 1.25rem;
+}
+
+.notification-tray__delete:hover,
+.notification-tray__delete:focus-visible {
+    outline: none;
+    background: color-mix(in srgb, var(--danger) 10%, var(--bg-surface));
+    color: var(--danger);
+}
+
+.notification-tray__delete:disabled {
+    cursor: wait;
+    opacity: 0.5;
 }
 
 .notification-tray__item:hover,
@@ -338,6 +493,7 @@
 }
 
 .app-nav__menu-button {
+    width: 100%;
     min-height: var(--min-tap-size);
     max-width: 240px;
     display: inline-flex;
@@ -355,6 +511,16 @@
         border-color var(--motion-fast) var(--ease),
         box-shadow var(--motion-fast) var(--ease),
         background-color var(--motion-fast) var(--ease);
+}
+
+.app-nav--collapsed .app-nav__menu-button {
+    width: 44px;
+    padding: 4px;
+}
+
+.app-nav--collapsed .app-nav__account-copy,
+.app-nav--collapsed .app-nav__chevron {
+    display: none;
 }
 
 .app-nav__menu-button:hover,
@@ -438,6 +604,16 @@
     z-index: 30;
 }
 
+@media (min-width: 901px) {
+    .app-nav__dropdown {
+        position: fixed;
+        top: auto;
+        right: auto;
+        bottom: 12px;
+        left: calc(var(--app-sidebar-width) + 10px);
+    }
+}
+
 .app-nav__dropdown--open {
     display: block;
 }
@@ -503,47 +679,116 @@
 }
 
 .app-main {
-    width: min(100%, calc(var(--content-max-width) + 48px));
-    margin: 0 auto;
+    min-height: 100dvh;
+    margin-left: var(--app-sidebar-width);
     padding: var(--gap-lg) var(--gap-md);
+    transition: margin-left var(--motion-fast) var(--ease);
 }
 
-@media (max-width: 760px) {
+.app-main__inner {
+    width: min(100%, calc(var(--content-max-width) + 48px));
+    margin: 0 auto;
+}
+
+@media (max-width: 900px) {
+    .app-shell,
+    .app-shell--sidebar-collapsed {
+        --app-sidebar-width: 0px;
+    }
+
+    .app-nav,
+    .app-nav--collapsed {
+        position: sticky;
+        inset: 0 auto auto 0;
+        width: 100%;
+        border-right: 0;
+        border-bottom: 1px solid var(--border);
+    }
+
     .app-nav__inner {
-        min-height: auto;
+        height: auto;
         padding: 10px var(--gap-sm);
-        flex-wrap: wrap;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        align-items: center;
     }
 
-    .app-nav__brand {
-        flex: 1 1 auto;
+    .app-nav__top {
+        min-width: 0;
+        justify-content: flex-start;
     }
 
+    .app-nav__collapse-button { display: none; }
+    .app-nav__mobile-toggle { display: inline-grid; margin-left: auto; }
+
+    .app-nav--collapsed .app-nav__brand-logo .brand-logo__lockup { display: initial; }
+    .app-nav--collapsed .app-nav__brand-logo .brand-logo__icon { display: none; }
+
+    .app-nav__club-collapsed,
+    .app-nav--collapsed .app-nav__club-collapsed { display: none; }
+
+    .app-nav__club-switcher,
+    .app-nav--collapsed .app-nav__club-switcher,
     .app-nav__links {
-        order: 3;
-        flex-basis: 100%;
-        padding-top: 2px;
+        display: none;
+        grid-column: 1 / -1;
+        width: 100%;
     }
 
-    .app-nav__club-switcher {
-        order: 2;
-        flex: 1 1 180px;
-        max-width: 220px;
+    .app-nav__club-switcher--mobile-open {
+        display: flex;
+        margin-top: 4px;
     }
 
+    .app-nav__links--mobile-open {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        max-height: calc(100dvh - 180px);
+        padding-top: 4px;
+        overflow-y: auto;
+    }
+
+    .app-nav--collapsed .app-nav__link,
+    .app-nav__link {
+        width: 100%;
+        margin: 0;
+        justify-content: flex-start;
+        padding: 0 11px;
+    }
+
+    .app-nav--collapsed .app-nav__link-label {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        clip: auto;
+    }
+
+    .app-nav__utilities,
+    .app-nav--collapsed .app-nav__utilities {
+        grid-column: 2;
+        grid-row: 1;
+        flex-direction: row;
+        justify-self: end;
+        padding: 0;
+        border: 0;
+    }
+
+    .app-nav--collapsed .app-nav__menu-button,
     .app-nav__menu-button {
+        width: auto;
         max-width: 150px;
+        padding: 4px;
     }
 
-    .notification-tray {
-        order: 1;
-    }
-
-    .app-nav__account-copy {
+    .app-nav__account-copy,
+    .app-nav--collapsed .app-nav__account-copy,
+    .app-nav--collapsed .app-nav__chevron {
         display: none;
     }
 
     .app-main {
+        margin-left: 0;
         padding: var(--gap-md) var(--gap-sm);
     }
 }

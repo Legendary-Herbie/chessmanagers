@@ -35,6 +35,19 @@ describe('club membership lifecycle', () => {
             .expect(409);
         expect(duplicate.body.code).toBe('DUPLICATE_PENDING');
 
+        const queue = await request(app)
+            .get(`/api/v1/clubs/${club.id}/join-requests`)
+            .set('Authorization', authorization(owner))
+            .expect(200);
+        expect(queue.body.requests).toEqual([expect.objectContaining({
+            id: requested.body.request.id,
+            name: applicant.name,
+            email: applicant.email,
+            message: 'I would like to join.',
+        })]);
+        await request(app).get(`/api/v1/clubs/${club.id}/join-requests`)
+            .set('Authorization', authorization(applicant)).expect(403);
+
         await request(app)
             .patch(`/api/v1/clubs/${club.id}/join-requests/${requested.body.request.id}/approve`)
             .set('Authorization', authorization(owner))

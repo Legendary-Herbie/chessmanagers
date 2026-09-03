@@ -1,3 +1,4 @@
+import crypto from 'node:crypto';
 import db from '../database/database.js';
 
 const qry = (trx) => trx ? trx.query.bind(trx) : db.query.bind(db);
@@ -27,9 +28,33 @@ const PLAYER_RATINGS_JOIN = `
 
 async function ratingConfiguration(trx, clubId) {
     return trx.query(
-        'SELECT category, initial_rating FROM club_rating_settings WHERE club_id = $1',
+        'SELECT category, initial_rating, rating_floor FROM club_rating_settings WHERE club_id = $1',
         [clubId]
-    ).then(result => Object.fromEntries(result.rows.map(row => [row.category, row.initial_rating])));
+    ).then(result => Object.fromEntries(result.rows.map(row => [row.category, {
+        initialRating: row.initial_rating,
+        ratingFloor: row.rating_floor,
+    }])));
+}
+
+const RATING_CATEGORIES = ['blitz', 'rapid', 'classical'];
+
+function resolveStartRatings({ rating = null, startRatings = null }, configured) {
+    const resolved = Object.fromEntries(RATING_CATEGORIES.map(category => [
+        category,
+        startRatings?.[category] ?? rating ?? configured[category]?.initialRating ?? 1500,
+    ]));
+
+    for (const category of RATING_CATEGORIES) {
+        const floor = configured[category]?.ratingFloor ?? 500;
+        if (resolved[category] < floor) {
+            throw Object.assign(
+                new Error(`${category[0].toUpperCase()}${category.slice(1)} starting rating cannot be below the club rating floor of ${floor}.`),
+                { status: 400, code: 'START_RATING_BELOW_FLOOR' }
+            );
+        }
+    }
+
+    return resolved;
 }
 
 async function recordLifecycleEvent(trx, {
@@ -43,19 +68,23 @@ async function recordLifecycleEvent(trx, {
     );
 }
 
-async function createRatingStates(trx, clubId, playerIds) {
-    if (!playerIds.length) return;
+async function createRatingStates(trx, clubId, playerRatings) {
+    if (!playerRatings.length) return;
+    const values = [];
+    const placeholders = [];
+    for (const { playerId, ratings } of playerRatings) {
+        for (const category of RATING_CATEGORIES) {
+            const start = values.length;
+            values.push(clubId, playerId, category, ratings[category]);
+            placeholders.push(`($${start + 1}, $${start + 2}, $${start + 3}, $${start + 4}, $${start + 4}, 0, NULL)`);
+        }
+    }
     await trx.query(
         `INSERT INTO player_rating_state (
             club_id, player_id, category, start_rating, current_rating, completed_rated_games, peak_rating
-         )
-         SELECT player.club_id, player.id, settings.category,
-                settings.initial_rating, settings.initial_rating, 0, NULL
-         FROM players player
-         JOIN club_rating_settings settings ON settings.club_id = player.club_id
-         WHERE player.club_id = $1 AND player.id = ANY($2::TEXT[])
+         ) VALUES ${placeholders.join(', ')}
          ON CONFLICT (player_id, category) DO NOTHING`,
-        [clubId, playerIds]
+        values
     );
 }
 
@@ -77,21 +106,19 @@ export const PlayerModel = {
         [clubId, publicPlayerId]
     ).then(result => result.first),
 
-    create: async ({ clubId, actorUserId, name, rating = null, bio = null, photoUrl = null, dateOfBirth = null, federationId = null }) => (
+    create: async ({ clubId, actorUserId, name, rating = null, startRatings = null, bio = null, photoUrl = null, dateOfBirth = null, federationId = null }) => (
         db.transaction(async (trx) => {
             const configured = await ratingConfiguration(trx, clubId);
-            const blitzRating = rating ?? configured.blitz ?? 1500;
-            const rapidRating = rating ?? configured.rapid ?? 1500;
-            const classicalRating = rating ?? configured.classical ?? 1500;
+            const resolvedRatings = resolveStartRatings({ rating, startRatings }, configured);
             const player = await trx.query(
                 `INSERT INTO players (
                     club_id, name, rating, start_rating, blitz_rating, rapid_rating, classical_rating,
                     bio, photo_url, date_of_birth, federation_id
                  ) VALUES ($1, $2, $3, $3, $3, $4, $5, $6, $7, $8, $9)
                  RETURNING *`,
-                [clubId, name, blitzRating, rapidRating, classicalRating, bio, photoUrl, dateOfBirth, federationId]
+                [clubId, name, resolvedRatings.blitz, resolvedRatings.rapid, resolvedRatings.classical, bio, photoUrl, dateOfBirth, federationId]
             ).then(result => result.first);
-            await createRatingStates(trx, clubId, [player.id]);
+            await createRatingStates(trx, clubId, [{ playerId: player.id, ratings: resolvedRatings }]);
             await recordLifecycleEvent(trx, {
                 clubId, playerId: player.id, actorUserId, eventType: 'player.created', toStatus: 'active',
             });
@@ -103,22 +130,26 @@ export const PlayerModel = {
         if (!players?.length) return [];
         const configured = await ratingConfiguration(trx, clubId);
         const values = [];
-        const placeholders = players.map((player, index) => {
-            const explicitRating = player.rating ?? null;
-            const blitzRating = explicitRating ?? configured.blitz ?? 1500;
-            const rapidRating = explicitRating ?? configured.rapid ?? 1500;
-            const classicalRating = explicitRating ?? configured.classical ?? 1500;
-            const start = index * 6;
-            values.push(clubId, player.name, blitzRating, rapidRating, classicalRating, player.bio ?? null);
-            return `($${start + 1}, $${start + 2}, $${start + 3}, $${start + 3}, $${start + 3}, $${start + 4}, $${start + 5}, $${start + 6})`;
+        const resolvedPlayers = players.map(player => ({
+            ...player,
+            id: `player_${crypto.randomBytes(16).toString('hex')}`,
+            resolvedRatings: resolveStartRatings(player, configured),
+        }));
+        const placeholders = resolvedPlayers.map((player, index) => {
+            const start = index * 7;
+            values.push(player.id, clubId, player.name, player.resolvedRatings.blitz, player.resolvedRatings.rapid, player.resolvedRatings.classical, player.bio ?? null);
+            return `($${start + 1}, $${start + 2}, $${start + 3}, $${start + 4}, $${start + 4}, $${start + 4}, $${start + 5}, $${start + 6}, $${start + 7})`;
         });
         const created = await trx.query(
-            `INSERT INTO players (club_id, name, rating, start_rating, blitz_rating, rapid_rating, classical_rating, bio)
+            `INSERT INTO players (id, club_id, name, rating, start_rating, blitz_rating, rapid_rating, classical_rating, bio)
              VALUES ${placeholders.join(', ')}
              RETURNING *`,
             values
         ).then(result => result.rows);
-        await createRatingStates(trx, clubId, created.map(player => player.id));
+        await createRatingStates(trx, clubId, resolvedPlayers.map(player => ({
+            playerId: player.id,
+            ratings: player.resolvedRatings,
+        })));
         for (const player of created) {
             await recordLifecycleEvent(trx, {
                 clubId, playerId: player.id, actorUserId, eventType: 'player.created', toStatus: 'active',
@@ -183,6 +214,31 @@ export const PlayerModel = {
         }),
         total: result.rows[0]?.total_count ?? 0,
     })),
+
+    getRosterSummary: async (clubId) => db.query(
+        `SELECT
+            COUNT(DISTINCT p.id)::INTEGER AS total_players,
+            COUNT(DISTINCT p.id) FILTER (WHERE p.games > 0)::INTEGER AS active_players,
+            ROUND(AVG(state.current_rating) FILTER (WHERE state.category = 'blitz'))::INTEGER AS average_blitz,
+            ROUND(AVG(state.current_rating) FILTER (WHERE state.category = 'rapid'))::INTEGER AS average_rapid,
+            ROUND(AVG(state.current_rating) FILTER (WHERE state.category = 'classical'))::INTEGER AS average_classical
+         FROM players p
+         LEFT JOIN player_rating_state state
+           ON state.club_id = p.club_id AND state.player_id = p.id
+         WHERE p.club_id = $1 AND p.status = 'active' AND p.deleted_at IS NULL`,
+        [clubId]
+    ).then(result => {
+        const row = result.first;
+        return {
+            totalPlayers: row.total_players,
+            activePlayers: row.active_players,
+            averageRatings: {
+                blitz: row.average_blitz,
+                rapid: row.average_rapid,
+                classical: row.average_classical,
+            },
+        };
+    }),
 
     findInactiveByClub: async (clubId) => db.query(
         `SELECT ${PLAYER_FIELDS}, COALESCE(rating_state.ratings, '{}'::JSONB) AS ratings

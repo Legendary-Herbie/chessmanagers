@@ -93,6 +93,37 @@ describe('persistent notifications and delivery outbox', () => {
         expect(unread.body.count).toBe(1);
     });
 
+    it('lets only the recipient dismiss a notification while preserving delivery history', async () => {
+        const owner = await createUser();
+        const member = await createUser();
+        const outsider = await createUser();
+        const club = await createClub(owner);
+        await addClubMember(club, member);
+        const notification = await membershipNotification({ user: member, club });
+
+        await request(app).delete(`/api/v1/notifications/${notification.id}`)
+            .set('Authorization', authorization(outsider)).expect(404);
+        await request(app).delete(`/api/v1/notifications/${notification.id}`)
+            .set('Authorization', authorization(member)).expect(200);
+
+        const listed = await request(app).get('/api/v1/notifications')
+            .set('Authorization', authorization(member)).expect(200);
+        expect(listed.body).toMatchObject({ notifications: [], total: 0 });
+        const unread = await request(app).get('/api/v1/notifications/unread-count')
+            .set('Authorization', authorization(member)).expect(200);
+        expect(unread.body.count).toBe(0);
+
+        const retained = await db.query(
+            `SELECT notification.dismissed_at, COUNT(outbox.id)::INTEGER AS deliveries
+             FROM notifications notification
+             LEFT JOIN notification_outbox outbox ON outbox.notification_id = notification.id
+             WHERE notification.id = $1 GROUP BY notification.id`,
+            [notification.id]
+        ).then(result => result.first);
+        expect(retained.dismissed_at).toBeTruthy();
+        expect(retained.deliveries).toBe(1);
+    });
+
     it('enforces eligibility and event settings before creating private club records', async () => {
         const owner = await createUser();
         const formerMember = await createUser();

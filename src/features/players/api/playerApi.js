@@ -1,11 +1,22 @@
 import { api, endpoints } from '../../../config/api.js';
 
 export const playerApi = {
+    searchPlayers: async (clubId, { q = '', limit = 20, offset = 0, signal } = {}) => {
+        const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+        if (q) params.set('q', q);
+        return await api.get(`${endpoints.players.list(clubId)}?${params}`, { signal });
+    },
+
     fetchPlayers: async (clubId, { q = '', limit = 50, offset = 0, signal } = {}) => {
         const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
         if (q) params.set('q', q);
         const data = await api.get(`${endpoints.players.list(clubId)}?${params}`, { signal });
         return data.players;
+    },
+
+    fetchRosterSummary: async (clubId, options = {}) => {
+        const data = await api.get(endpoints.players.summary(clubId), options);
+        return data.summary;
     },
 
     fetchPlayer: async (clubId, playerId, options = {}) => {

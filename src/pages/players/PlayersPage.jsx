@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useAuth, useClub } from '../../app/contextHooks.js';
+import { useAuth, useClub, useNotifications } from '../../app/contextHooks.js';
 import { usePlayers } from '../../features/players/hooks/usePlayers.js';
 
 import PlayerCard from '../../features/players/components/PlayerCard.jsx';
@@ -8,6 +8,7 @@ import PlayerTable from '../../features/players/roster/PlayerTable.jsx';
 import AddPlayerForm from '../../features/players/admin/AddPlayerForm.jsx';
 import EditPlayerForm from '../../features/players/admin/EditPlayerForm.jsx';
 import PendingLinksList from '../../features/players/admin/PendingLinksList.jsx';
+import { runPlayerAction } from '../../features/players/playerActionFeedback.js';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 
 import '../../styles/players.css';
@@ -15,6 +16,7 @@ import '../../styles/players.css';
 export default function PlayersPage() {
     const { user } = useAuth();
     const { club, linkedPlayer, capabilities, loading: clubLoading } = useClub();
+    const { notify } = useNotifications();
     const isAdmin = Boolean(capabilities.canManagePlayers);
 
     const {
@@ -63,13 +65,12 @@ export default function PlayersPage() {
             message: `Are you sure you want to request to claim the profile "${player.name}"? An admin will review your request.`,
             variant: 'primary',
             onConfirm: async () => {
-                try {
-                    await claimPlayer(player.id);
-                } catch (err) {
-                    alert(err.message || 'Failed to submit claim request.');
-                } finally {
-                    closeConfirmModal();
-                }
+                await runPlayerAction(() => claimPlayer(player.id), {
+                    notify,
+                    successMessage: 'Claim request submitted.',
+                    fallbackError: 'Failed to submit claim request.',
+                });
+                closeConfirmModal();
             },
         });
     };
@@ -82,13 +83,12 @@ export default function PlayersPage() {
             message: `Are you sure you want to unlink the user account from player "${player.name}"?`,
             variant: 'warning',
             onConfirm: async () => {
-                try {
-                    await unlinkPlayer(player.id);
-                } catch (err) {
-                    alert(err.message || 'Failed to unlink player.');
-                } finally {
-                    closeConfirmModal();
-                }
+                await runPlayerAction(() => unlinkPlayer(player.id), {
+                    notify,
+                    successMessage: 'Player link removed.',
+                    fallbackError: 'Failed to unlink player.',
+                });
+                closeConfirmModal();
             },
         });
     };
@@ -101,13 +101,12 @@ export default function PlayersPage() {
             message: `Archive "${player.name}"? Their match and rating history will be preserved, and an admin can restore them later.`,
             variant: 'warning',
             onConfirm: async () => {
-                try {
-                    await archivePlayer(player.id);
-                } catch (err) {
-                    alert(err.message || 'Failed to archive player.');
-                } finally {
-                    closeConfirmModal();
-                }
+                await runPlayerAction(() => archivePlayer(player.id), {
+                    notify,
+                    successMessage: 'Player archived.',
+                    fallbackError: 'Failed to archive player.',
+                });
+                closeConfirmModal();
             },
         });
     };
@@ -169,6 +168,7 @@ export default function PlayersPage() {
                 <AddPlayerForm
                     isInline={true}
                     clubId={club.id}
+                    ratingSettings={club.rating_settings}
                     onPlayerAdded={() => {
                         refetch();
                     }}
@@ -183,25 +183,22 @@ export default function PlayersPage() {
             <div className="players-stats-bar">
                 <div className="stat-card">
                     <span className="stat-card__label">Total Roster</span>
-                    <span className="stat-card__value">{stats.totalPlayers}</span>
-                    <span className="stat-card__subtext">Registered club players</span>
+                    <span className="stat-card__value">{loading ? '—' : stats.totalPlayers}</span>
+                    <span className="stat-card__subtext">{loading ? 'Loading roster summary' : 'Registered club players'}</span>
                 </div>
                 <div className="stat-card">
-                    <span className="stat-card__label">Average ELO</span>
-                    <span className="stat-card__value">🏆 {stats.avgRating}</span>
-                    <span className="stat-card__subtext">Club rating average</span>
+                    <span className="stat-card__label">Average ratings</span>
+                    <span className="stat-card__ratings" aria-label="Average club ratings by category">
+                        <span><small>Blitz</small>{loading ? '—' : stats.averageRatings.blitz ?? '—'}</span>
+                        <span><small>Rapid</small>{loading ? '—' : stats.averageRatings.rapid ?? '—'}</span>
+                        <span><small>Classical</small>{loading ? '—' : stats.averageRatings.classical ?? '—'}</span>
+                    </span>
+                    <span className="stat-card__subtext">All active roster players</span>
                 </div>
                 <div className="stat-card">
                     <span className="stat-card__label">Active Players</span>
-                    <span className="stat-card__value">{stats.activePlayers}</span>
-                    <span className="stat-card__subtext">Played at least 1 match</span>
-                </div>
-                <div className="stat-card">
-                    <span className="stat-card__label">Pending Claims</span>
-                    <span className="stat-card__value" style={{ color: stats.pendingClaimsCount > 0 ? 'var(--warning)' : 'inherit' }}>
-                        {stats.pendingClaimsCount}
-                    </span>
-                    <span className="stat-card__subtext">Awaiting admin review</span>
+                    <span className="stat-card__value">{loading ? '—' : stats.activePlayers}</span>
+                    <span className="stat-card__subtext">{loading ? 'Loading activity summary' : 'Played at least 1 match'}</span>
                 </div>
             </div>
 
@@ -287,6 +284,7 @@ export default function PlayersPage() {
                         <AddPlayerForm
                             isInline={true}
                             clubId={club.id}
+                            ratingSettings={club.rating_settings}
                             onPlayerAdded={refetch}
                         />
                     )}

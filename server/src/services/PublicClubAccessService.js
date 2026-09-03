@@ -6,12 +6,12 @@ function isActive(club) {
 
 export const PublicClubAccessService = {
     getDirectPresentation: async (clubId) => {
-        const club = await ClubModel.findById(clubId);
+        const club = await ClubModel.findPresentationById(clubId);
         return isActive(club) ? club : null;
     },
 
     getPublicClub: async (clubId) => {
-        const club = await ClubModel.findById(clubId);
+        const club = await ClubModel.findPresentationById(clubId);
         return isActive(club) && club.visibility === 'public' ? club : null;
     },
 };

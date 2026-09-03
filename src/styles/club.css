@@ -6,7 +6,7 @@
 }
 .tabs {
     display: grid;
-    grid-template-columns: repeat(2, auto);
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
     gap: 0.5rem;
     margin-bottom: 1rem;
 }
@@ -44,6 +44,32 @@
     border: 1px solid var(--border);
     border-radius: 0.85rem;
     background: var(--bg);
+}
+.input[aria-invalid='true'],
+.rating-settings input[aria-invalid='true'] {
+    border-color: var(--danger);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--danger) 16%, transparent);
+}
+.profile-field-error {
+    color: var(--danger);
+    font-size: 0.82rem;
+    line-height: 1.35;
+}
+.form-helper {
+    color: var(--text-muted);
+    font-size: 0.82rem;
+}
+.rating-settings label {
+    display: grid;
+    gap: 0.35rem;
+}
+.rating-settings input {
+    width: 100%;
+    padding: 0.65rem 0.75rem;
+    border: 1px solid var(--border);
+    border-radius: 0.65rem;
+    background: var(--bg);
+    color: var(--text);
 }
 textarea.input {
     min-height: 100px;

@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { useAuth, useClub } from '../../app/contextHooks.js';
+import { useAuth, useClub, useNotifications } from '../../app/contextHooks.js';
 import { usePlayer } from '../../features/players/hooks/usePlayer.js';
 
 import EditPlayerForm from '../../features/players/admin/EditPlayerForm.jsx';
 import PlayerRatingChart from '../../features/players/profile/PlayerRatingChart.jsx';
 import HeadToHeadView from '../../features/players/profile/HeadToHeadView.jsx';
+import { runPlayerAction } from '../../features/players/playerActionFeedback.js';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 import { resolveAssetUrl } from '../../config/api.js';
 
@@ -19,6 +20,7 @@ export default function PlayerPage() {
     const navigate = useNavigate();
     const { user } = useAuth();
     const { club, linkedPlayer, capabilities, loading: clubLoading } = useClub();
+    const { notify } = useNotifications();
     const isAdmin = Boolean(capabilities.canManagePlayers);
     const [ratingCategory, setRatingCategory] = useState('blitz');
 
@@ -60,13 +62,12 @@ export default function PlayerPage() {
             message: `Request to claim player profile "${player?.name}"? An admin will review your request.`,
             variant: 'primary',
             onConfirm: async () => {
-                try {
-                    await claimPlayer();
-                } catch (err) {
-                    alert(err.message || 'Failed to submit claim request.');
-                } finally {
-                    closeConfirmModal();
-                }
+                await runPlayerAction(claimPlayer, {
+                    notify,
+                    successMessage: 'Claim request submitted.',
+                    fallbackError: 'Failed to submit claim request.',
+                });
+                closeConfirmModal();
             },
         });
     };
@@ -79,13 +80,12 @@ export default function PlayerPage() {
             message: `Unlink account from "${player?.name}"?`,
             variant: 'warning',
             onConfirm: async () => {
-                try {
-                    await unlinkPlayer();
-                } catch (err) {
-                    alert(err.message || 'Failed to unlink player.');
-                } finally {
-                    closeConfirmModal();
-                }
+                await runPlayerAction(unlinkPlayer, {
+                    notify,
+                    successMessage: 'Player link removed.',
+                    fallbackError: 'Failed to unlink player.',
+                });
+                closeConfirmModal();
             },
         });
     };
@@ -97,19 +97,20 @@ export default function PlayerPage() {
             message: `Archive "${player?.name}"? Match and rating history will be preserved.`,
             variant: 'warning',
             onConfirm: async () => {
-                try {
-                    await archivePlayer();
+                const archived = await runPlayerAction(archivePlayer, {
+                    notify,
+                    successMessage: 'Player archived.',
+                    fallbackError: 'Failed to archive player.',
+                });
+                if (archived) {
                     navigate('/players');
-                } catch (err) {
-                    alert(err.message || 'Failed to archive player.');
-                } finally {
-                    closeConfirmModal();
                 }
+                closeConfirmModal();
             },
         });
     };
 
-    if (clubLoading || loading) {
+    if (clubLoading || (loading && !player)) {
         return (
             <div className="players-container">
                 <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
@@ -233,6 +234,9 @@ export default function PlayerPage() {
                         {categoryLabel(category)}
                     </button>
                 ))}
+            </div>
+            <div className="player-category-loading" role="status" aria-live="polite">
+                {loading ? `Updating ${categoryLabel(ratingCategory)} statistics…` : ''}
             </div>
 
             {/* Biography */}

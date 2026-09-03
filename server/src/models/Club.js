@@ -175,6 +175,29 @@ export const ClubModel = {
         ).then(r => r.first);
     },
 
+    findPresentationById: async (id) => db.query(
+        `SELECT c.*,
+                (SELECT COUNT(*)::INTEGER FROM user_clubs membership
+                 WHERE membership.club_id = c.id AND membership.status = 'ACTIVE_MEMBER') AS member_count,
+                (SELECT COUNT(*)::INTEGER FROM players player
+                 WHERE player.club_id = c.id AND player.status = 'active' AND player.deleted_at IS NULL) AS roster_players,
+                (SELECT COUNT(*)::INTEGER FROM matches match
+                 WHERE match.club_id = c.id AND match.status = 'active' AND match.deleted_at IS NULL) AS total_games,
+                COALESCE((
+                    SELECT jsonb_object_agg(averages.category, averages.average_rating)
+                    FROM (
+                        SELECT state.category, ROUND(AVG(state.current_rating))::INTEGER AS average_rating
+                        FROM player_rating_state state
+                        JOIN players player ON player.id = state.player_id AND player.club_id = state.club_id
+                        WHERE state.club_id = c.id AND player.status = 'active' AND player.deleted_at IS NULL
+                        GROUP BY state.category
+                    ) averages
+                ), '{}'::JSONB) AS average_ratings
+         FROM clubs c
+         WHERE c.id = $1`,
+        [id]
+    ).then(r => r.first),
+
     updateManagementSettings: async (clubId, actorUserId, changes) => {
         return db.transaction(async (trx) => {
             const current = await trx.query(
@@ -242,6 +265,41 @@ export const ClubModel = {
             return club;
         });
     },
+
+    updatePresentation: async (clubId, actorUserId, changes) => db.transaction(async (trx) => {
+        const current = await trx.query(
+            `SELECT * FROM clubs WHERE id = $1 AND status = 'active' FOR UPDATE`,
+            [clubId]
+        ).then(r => r.first);
+        if (!current) return null;
+
+        const settings = changes.settings
+            ? mergeStructuredSettings(current.settings_json, changes.settings)
+            : current.settings_json;
+        const club = await trx.query(
+            `UPDATE clubs
+             SET federation = COALESCE($1, federation),
+                 description = CASE WHEN $2::BOOLEAN THEN $3 ELSE description END,
+                 contact_info = CASE WHEN $4::BOOLEAN THEN $5 ELSE contact_info END,
+                 settings_json = $6::JSONB,
+                 updated_at = NOW()
+             WHERE id = $7
+             RETURNING *`,
+            [
+                changes.federation ?? null,
+                Object.hasOwn(changes, 'description'), changes.description ?? null,
+                Object.hasOwn(changes, 'contactInfo'), changes.contactInfo ?? null,
+                JSON.stringify(settings || {}),
+                clubId,
+            ]
+        ).then(r => r.first);
+        await trx.query(
+            `INSERT INTO club_audit_events (club_id, actor_user_id, event_type, payload_json)
+             VALUES ($1, $2, 'club.presentation_updated', $3::JSONB)`,
+            [clubId, actorUserId, JSON.stringify({ fields: Object.keys(changes) })]
+        );
+        return club;
+    }),
 
     // ── Members ───────────────────────────────────────────────────────────────
 

@@ -1,14 +1,54 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Navigate, useSearchParams } from 'react-router-dom';
 import '../../styles/club.css';
 import Button from '../../shared/common/Button.jsx';
-import ClubDashboard from './ClubDashboard.jsx';
 import { resolveAssetUrl } from '../../config/api.js';
 import { useClub, useAuth, useNotifications } from '../../app/contextHooks.js';
 import { clubApi } from '../../features/clubs/api/clubApi.js';
-import { leaderboardApi } from '../../features/leaderboard/api/leaderboardApi.js';
+import {
+    mapClubProfileApiErrors,
+    validateClubProfile,
+} from '../../features/clubs/clubProfileValidation.js';
 import DataExportPanel from '../../features/exports/components/DataExportPanel.jsx';
+import { canRemoveClubMember } from '../../features/clubs/membership/memberActionPermissions.js';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
+
+const profileFieldId = field => `club-profile-${field.replaceAll('.', '-')}`;
+const PROFILE_FIELD_LABELS = {
+    name: 'Name',
+    federation: 'Federation',
+    description: 'Description',
+    badgeFile: 'Club badge',
+    contactInfo: 'Contact information',
+    website: 'Website',
+    email: 'Public email',
+    phone: 'Public phone',
+    address: 'Location / address',
+    affiliation: 'Affiliation',
+    primaryColor: 'Presentation color',
+};
+const RATING_FIELD_LABELS = {
+    initialRating: 'initial rating',
+    ratingFloor: 'rating floor',
+    establishedKFactor: 'established K-factor',
+    provisionalKFactor: 'provisional K-factor',
+    provisionalGames: 'provisional games',
+};
+
+function profileFieldLabel(field) {
+    if (PROFILE_FIELD_LABELS[field]) return PROFILE_FIELD_LABELS[field];
+    const [, category, key] = field.split('.');
+    if (category && RATING_FIELD_LABELS[key]) {
+        return `${category[0].toUpperCase()}${category.slice(1)} ${RATING_FIELD_LABELS[key]}`;
+    }
+    return field;
+}
+
+function ProfileFieldError({ field, errors }) {
+    const message = errors[field];
+    if (!message) return null;
+    return <div className="profile-field-error" id={`${profileFieldId(field)}-error`}>{message}</div>;
+}
 
 export default function ClubPage() {
     const { club, capabilities, refreshClub } = useClub();
@@ -26,9 +66,9 @@ export default function ClubPage() {
     const [loading, setLoading] = useState(false);
     const [creatingInvite, setCreatingInvite] = useState(false);
     const [invites, setInvites] = useState([]);
-    const [joinRequests, setJoinRequests] = useState([]);
     const [savingSettings, setSavingSettings] = useState(false);
     const [managementError, setManagementError] = useState(null);
+    const [profileErrors, setProfileErrors] = useState({});
     const [transferTarget, setTransferTarget] = useState('');
     const [previousOwnerRole, setPreviousOwnerRole] = useState('member');
     const [joinCodeStatus, setJoinCodeStatus] = useState({ active: false });
@@ -37,12 +77,6 @@ export default function ClubPage() {
     const [dialogAction, setDialogAction] = useState(null);
     const [dialogReason, setDialogReason] = useState('');
     const [dialogBusy, setDialogBusy] = useState(false);
-
-    // Dashboard payload — lazy-loaded only when tab is 'dashboard' (see useEffect below)
-    const [dashboard, setDashboard] = useState(null);
-    const [dashboardCategory, setDashboardCategory] = useState('blitz');
-    const [dashboardLoading, setDashboardLoading] = useState(false);
-    const [dashboardError, setDashboardError] = useState(null);
 
     const loadMembers = useCallback(async () => {
         if (!club || !capabilities.canManageMemberships) return;
@@ -100,72 +134,96 @@ export default function ClubPage() {
     const isOwner = Boolean(capabilities.canManageClubSettings);
     const canExportData = Boolean(capabilities.canExportData);
 
-    // Lazy-load dashboard stats only when:
-    // 1. dashboard tab is active
-    // 2. user is a club admin (prevents URL manipulation bypass)
-    useEffect(() => {
-        if (!club || activeTab !== 'dashboard' || !isClubAdmin) return;
+    function clearProfileError(field) {
+        setProfileErrors(current => {
+            if (!current[field]) return current;
+            const next = { ...current };
+            delete next[field];
+            return next;
+        });
+    }
 
-        async function loadDashboard() {
-            setDashboardLoading(true);
-            setDashboardError(null);
-            try {
-                setDashboard(await leaderboardApi.fetchDashboard(club.id, dashboardCategory));
-            } catch (err) {
-                setDashboardError(err?.message || 'Failed to load dashboard stats');
-            } finally {
-                setDashboardLoading(false);
-            }
+    function validationProps(field) {
+        return {
+            id: profileFieldId(field),
+            'aria-label': profileFieldLabel(field),
+            'aria-invalid': Boolean(profileErrors[field]),
+            'aria-describedby': profileErrors[field] ? `${profileFieldId(field)}-error` : undefined,
+        };
+    }
+
+    function focusFirstProfileError(errors) {
+        const firstField = Object.keys(errors).find(field => field !== '_form');
+        if (!firstField) return;
+        requestAnimationFrame(() => document.getElementById(profileFieldId(firstField))?.focus());
+    }
+
+    async function saveProfile(event) {
+        event?.preventDefault();
+        if (!club || !isClubAdmin) return;
+        const validation = validateClubProfile(profile, { isOwner, badgeFile });
+        if (!validation.success) {
+            setProfileErrors(validation.errors);
+            setManagementError('Please correct the highlighted club profile fields.');
+            focusFirstProfileError(validation.errors);
+            return;
         }
-        loadDashboard();
-    }, [club, activeTab, isClubAdmin, dashboardCategory]);
 
-    const loadJoinRequests = useCallback(async () => {
-        if (!club) return;
-        try {
-            setJoinRequests(await clubApi.fetchJoinRequests(club.id));
-        } catch {
-            setJoinRequests([]);
-        }
-    }, [club]);
-
-    useEffect(() => {
-        if (isClubAdmin) loadJoinRequests();
-    }, [isClubAdmin, loadJoinRequests]);
-
-    async function saveProfile() {
-        if (!club || !isOwner) return;
         setSavingSettings(true);
         setManagementError(null);
+        setProfileErrors({});
         try {
-            await clubApi.update(club.id, {
-                name: profile.name,
-                federation: profile.federation,
-                description: profile.description || null,
-                contactInfo: profile.contact_info || null,
-                visibility: profile.visibility,
-                publicLeaderboard: Boolean(profile.public_leaderboard),
+            const values = validation.data;
+            const presentation = {
+                federation: values.federation,
+                description: values.description,
+                contactInfo: values.contactInfo,
                 settings: {
-                    contacts: profile.settings_json?.contacts || {},
-                    affiliation: profile.settings_json?.affiliation || null,
-                    presentation: profile.settings_json?.presentation || {},
-                    notifications: profile.settings_json?.notifications || {},
+                    contacts: values.contacts,
+                    affiliation: values.affiliation,
+                    presentation: {
+                        ...(profile.settings_json?.presentation || {}),
+                        primaryColor: values.primaryColor,
+                    },
                 },
-                ratingSettings: profile.rating_settings,
-            });
+            };
+            if (isOwner) {
+                await clubApi.update(club.id, {
+                    name: values.name,
+                    ...presentation,
+                    visibility: profile.visibility,
+                    publicLeaderboard: Boolean(profile.public_leaderboard),
+                    settings: {
+                        ...presentation.settings,
+                        notifications: profile.settings_json?.notifications || {},
+                    },
+                    ratingSettings: values.ratingSettings,
+                });
+            } else {
+                await clubApi.updatePresentation(club.id, presentation);
+            }
             if (badgeFile) {
                 await clubApi.uploadBadge(club.id, badgeFile);
                 setBadgeFile(null);
             }
             await refreshClub();
+            notify('Club profile saved.', 'success');
         } catch (err) {
-            setManagementError(err.message || 'Failed to update club');
+            const fieldErrors = mapClubProfileApiErrors(err?.errors);
+            if (Object.keys(fieldErrors).length > 0) {
+                setProfileErrors(fieldErrors);
+                setManagementError('Please correct the highlighted club profile fields.');
+                focusFirstProfileError(fieldErrors);
+            } else {
+                setManagementError(err.message || 'Failed to update club');
+            }
         } finally {
             setSavingSettings(false);
         }
     }
 
     function updateStructuredSetting(section, key, value) {
+        clearProfileError(key === 'primaryColor' ? 'primaryColor' : key);
         setProfile(current => ({
             ...current,
             settings_json: {
@@ -179,6 +237,7 @@ export default function ClubPage() {
     }
 
     function updateRatingSetting(category, key, value) {
+        clearProfileError(`ratingSettings.${category}.${key}`);
         setProfile(current => ({
             ...current,
             rating_settings: {
@@ -256,25 +315,6 @@ export default function ClubPage() {
         }
     }
 
-    async function reviewJoinRequest(requestId, action) {
-        if (!club) return;
-        if (action === 'reject') {
-            openDialog({
-                kind: 'rejectRequest', requestId, title: 'Reject join request', confirmLabel: 'Reject request',
-                variant: 'danger', message: 'Reject this membership request?', reasonLabel: 'Reason (optional)',
-            });
-            return;
-        }
-        try {
-            await clubApi.approveJoinRequest(club.id, requestId);
-            setJoinRequests(current => current.filter(request => request.id !== requestId));
-            await loadMembers();
-            notify('Join request approved', 'success');
-        } catch (err) {
-            notify(err?.message || 'Failed to approve join request', 'error');
-        }
-    }
-
     function removeMember(member) {
         if (member.role === 'owner') { notify('The club owner cannot be removed.', 'error'); return; }
         if (member.userId === user?.id) { notify('You cannot remove yourself from this screen.', 'error'); return; }
@@ -327,10 +367,6 @@ export default function ClubPage() {
                 await clubApi.delete(club.id);
                 await refreshClub();
                 notify('Club deleted', 'success');
-            } else if (action.kind === 'rejectRequest') {
-                await clubApi.rejectJoinRequest(club.id, action.requestId, reason);
-                setJoinRequests(current => current.filter(request => request.id !== action.requestId));
-                notify('Join request rejected', 'success');
             } else if (action.kind === 'removeMember') {
                 await clubApi.revokeMember(club.id, action.member.userId, reason);
                 await loadMembers();
@@ -357,28 +393,21 @@ export default function ClubPage() {
     }
 
     if (!club) return <div className="muted">No active club selected.</div>;
+    if (activeTab === 'dashboard') return <Navigate to="/dashboard" replace />;
 
     return (
         <div className="club-page">
             <div className="page-header">
                 <h1>Club: {club.name}</h1>
-                <div className="club-stats">
-                    {dashboard ? (
-                        <div style={{ fontSize: 14, color: 'var(--text-muted)' }}>
-                            Players: {dashboard.metrics?.rosterPlayers ?? 0} · Games: {dashboard.metrics?.totalGames ?? 0} · Rated: {dashboard.metrics?.ratedGames ?? 0}
-                        </div>
-                    ) : null}
-                </div>
             </div>
 
             {managementError && <div className="error" role="alert">{managementError}</div>}
 
-            {/* Tab buttons — Dashboard only visible to admins */}
+            {/* Club profile and administration tabs. Operational work lives on the main dashboard. */}
             <div className="tabs">
                 <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => setActiveTab('profile')}>Profile</button>
-                <button className={activeTab === 'members' ? 'active' : ''} onClick={() => setActiveTab('members')}>Members</button>
                 {isClubAdmin && (
-                    <button className={activeTab === 'dashboard' ? 'active' : ''} onClick={() => setActiveTab('dashboard')}>Dashboard</button>
+                    <button className={activeTab === 'members' ? 'active' : ''} onClick={() => setActiveTab('members')}>Members &amp; access</button>
                 )}
                 {canExportData && (
                     <button className={activeTab === 'exports' ? 'active' : ''} onClick={() => setActiveTab('exports')}>Data exports</button>
@@ -388,29 +417,36 @@ export default function ClubPage() {
             {/* Profile tab — club info editing (name, federation, description, logo) */}
             {activeTab === 'profile' && (
                 <div className="tab-panel profile-panel">
+                    <form noValidate onSubmit={saveProfile}>
                     <label className="form-row">
                         <div className="label">Name</div>
-                        <input className="input" disabled={!isOwner} value={profile?.name || ''} onChange={e => setProfile({ ...profile, name: e.target.value })} />
+                        <input {...validationProps('name')} className="input" maxLength={150} disabled={!isOwner} value={profile?.name || ''} onChange={e => { clearProfileError('name'); setProfile({ ...profile, name: e.target.value }); }} />
+                        <ProfileFieldError field="name" errors={profileErrors} />
                     </label>
 
                     <label className="form-row">
                         <div className="label">Federation</div>
-                        <input className="input" disabled={!isOwner} value={profile?.federation || ''} onChange={e => setProfile({ ...profile, federation: e.target.value })} />
+                        <input {...validationProps('federation')} className="input" maxLength={100} disabled={!isClubAdmin} value={profile?.federation || ''} onChange={e => { clearProfileError('federation'); setProfile({ ...profile, federation: e.target.value }); }} />
+                        <ProfileFieldError field="federation" errors={profileErrors} />
                     </label>
 
                     <label className="form-row">
                         <div className="label">Description</div>
-                        <textarea className="input" disabled={!isOwner} value={profile?.description || ''} onChange={e => setProfile({ ...profile, description: e.target.value })} />
+                        <textarea {...validationProps('description')} className="input" maxLength={1000} disabled={!isClubAdmin} value={profile?.description || ''} onChange={e => { clearProfileError('description'); setProfile({ ...profile, description: e.target.value }); }} />
+                        <ProfileFieldError field="description" errors={profileErrors} />
                     </label>
 
                     <label className="form-row">
                         <div className="label">Club badge</div>
-                        <input className="input" type="file" accept="image/jpeg,image/png,image/webp" disabled={!isOwner} onChange={e => setBadgeFile(e.target.files?.[0] || null)} />
+                        <input {...validationProps('badgeFile')} className="input" type="file" accept="image/jpeg,image/png,image/webp" disabled={!isClubAdmin} onChange={e => { clearProfileError('badgeFile'); setBadgeFile(e.target.files?.[0] || null); }} />
+                        <div className="form-helper">JPEG, PNG, or WebP; maximum 5 MB.</div>
+                        <ProfileFieldError field="badgeFile" errors={profileErrors} />
                     </label>
 
                     <label className="form-row">
                         <div className="label">Contact information</div>
-                        <input className="input" disabled={!isOwner} value={profile?.contact_info || ''} onChange={e => setProfile({ ...profile, contact_info: e.target.value })} />
+                        <input {...validationProps('contactInfo')} className="input" maxLength={500} disabled={!isClubAdmin} value={profile?.contact_info || ''} onChange={e => { clearProfileError('contactInfo'); setProfile({ ...profile, contact_info: e.target.value }); }} />
+                        <ProfileFieldError field="contactInfo" errors={profileErrors} />
                     </label>
 
                     <label className="form-row">
@@ -428,17 +464,38 @@ export default function ClubPage() {
 
                     <label className="form-row">
                         <div className="label">Website</div>
-                        <input className="input" disabled={!isOwner} value={profile?.settings_json?.contacts?.website || ''} onChange={e => updateStructuredSetting('contacts', 'website', e.target.value || null)} />
+                        <input {...validationProps('website')} className="input" type="url" maxLength={500} placeholder="https://example.org" disabled={!isClubAdmin} value={profile?.settings_json?.contacts?.website || ''} onChange={e => updateStructuredSetting('contacts', 'website', e.target.value || null)} />
+                        <ProfileFieldError field="website" errors={profileErrors} />
+                    </label>
+
+                    <label className="form-row">
+                        <div className="label">Public email</div>
+                        <input {...validationProps('email')} className="input" type="email" maxLength={320} disabled={!isClubAdmin} value={profile?.settings_json?.contacts?.email || ''} onChange={e => updateStructuredSetting('contacts', 'email', e.target.value || null)} />
+                        <ProfileFieldError field="email" errors={profileErrors} />
+                    </label>
+
+                    <label className="form-row">
+                        <div className="label">Public phone</div>
+                        <input {...validationProps('phone')} className="input" type="tel" maxLength={50} disabled={!isClubAdmin} value={profile?.settings_json?.contacts?.phone || ''} onChange={e => updateStructuredSetting('contacts', 'phone', e.target.value || null)} />
+                        <ProfileFieldError field="phone" errors={profileErrors} />
+                    </label>
+
+                    <label className="form-row">
+                        <div className="label">Location / address</div>
+                        <input {...validationProps('address')} className="input" maxLength={500} disabled={!isClubAdmin} value={profile?.settings_json?.contacts?.address || ''} onChange={e => updateStructuredSetting('contacts', 'address', e.target.value || null)} />
+                        <ProfileFieldError field="address" errors={profileErrors} />
                     </label>
 
                     <label className="form-row">
                         <div className="label">Affiliation</div>
-                        <input className="input" disabled={!isOwner} value={profile?.settings_json?.affiliation || ''} onChange={e => setProfile(current => ({ ...current, settings_json: { ...(current.settings_json || {}), affiliation: e.target.value || null } }))} />
+                        <input {...validationProps('affiliation')} className="input" maxLength={200} disabled={!isClubAdmin} value={profile?.settings_json?.affiliation || ''} onChange={e => { clearProfileError('affiliation'); setProfile(current => ({ ...current, settings_json: { ...(current.settings_json || {}), affiliation: e.target.value || null } })); }} />
+                        <ProfileFieldError field="affiliation" errors={profileErrors} />
                     </label>
 
                     <label className="form-row">
                         <div className="label">Presentation color</div>
-                        <input type="color" disabled={!isOwner} value={profile?.settings_json?.presentation?.primaryColor || '#2563eb'} onChange={e => updateStructuredSetting('presentation', 'primaryColor', e.target.value)} />
+                        <input {...validationProps('primaryColor')} type="color" disabled={!isClubAdmin} value={profile?.settings_json?.presentation?.primaryColor || '#2563eb'} onChange={e => updateStructuredSetting('presentation', 'primaryColor', e.target.value)} />
+                        <ProfileFieldError field="primaryColor" errors={profileErrors} />
                     </label>
 
                     <label className="form-row">
@@ -471,29 +528,48 @@ export default function ClubPage() {
                         <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.announcementEvents !== false} onChange={e => updateStructuredSetting('notifications', 'announcementEvents', e.target.checked)} />
                     </label>
 
-                    {['blitz', 'rapid', 'classical'].map(category => (
-                        <fieldset key={category} className="form-row" disabled={!isOwner}>
-                            <legend>{category[0].toUpperCase() + category.slice(1)} Elo settings</legend>
-                            <label>Initial rating <input type="number" value={profile?.rating_settings?.[category]?.initialRating ?? 1500} onChange={e => updateRatingSetting(category, 'initialRating', e.target.value)} /></label>
-                            <label>Rating floor <input type="number" value={profile?.rating_settings?.[category]?.ratingFloor ?? 500} onChange={e => updateRatingSetting(category, 'ratingFloor', e.target.value)} /></label>
-                            <label>Established K <input type="number" value={profile?.rating_settings?.[category]?.establishedKFactor ?? 32} onChange={e => updateRatingSetting(category, 'establishedKFactor', e.target.value)} /></label>
-                            <label>Provisional K <input type="number" value={profile?.rating_settings?.[category]?.provisionalKFactor ?? 40} onChange={e => updateRatingSetting(category, 'provisionalKFactor', e.target.value)} /></label>
-                            <label>Provisional games <input type="number" value={profile?.rating_settings?.[category]?.provisionalGames ?? 10} onChange={e => updateRatingSetting(category, 'provisionalGames', e.target.value)} /></label>
-                        </fieldset>
-                    ))}
+                    {['blitz', 'rapid', 'classical'].map(category => {
+                        const field = key => `ratingSettings.${category}.${key}`;
+                        return (
+                            <fieldset key={category} className="form-row rating-settings" disabled={!isOwner}>
+                                <legend>{category[0].toUpperCase() + category.slice(1)} Elo settings</legend>
+                                <label>Initial rating
+                                    <input {...validationProps(field('initialRating'))} type="number" min="100" max="4000" step="1" value={profile?.rating_settings?.[category]?.initialRating ?? 1500} onChange={e => updateRatingSetting(category, 'initialRating', e.target.value)} />
+                                    <ProfileFieldError field={field('initialRating')} errors={profileErrors} />
+                                </label>
+                                <label>Rating floor
+                                    <input {...validationProps(field('ratingFloor'))} type="number" min="0" max="4000" step="1" value={profile?.rating_settings?.[category]?.ratingFloor ?? 500} onChange={e => updateRatingSetting(category, 'ratingFloor', e.target.value)} />
+                                    <ProfileFieldError field={field('ratingFloor')} errors={profileErrors} />
+                                </label>
+                                <label>Established K
+                                    <input {...validationProps(field('establishedKFactor'))} type="number" min="1" max="100" step="1" value={profile?.rating_settings?.[category]?.establishedKFactor ?? 32} onChange={e => updateRatingSetting(category, 'establishedKFactor', e.target.value)} />
+                                    <ProfileFieldError field={field('establishedKFactor')} errors={profileErrors} />
+                                </label>
+                                <label>Provisional K
+                                    <input {...validationProps(field('provisionalKFactor'))} type="number" min="1" max="100" step="1" value={profile?.rating_settings?.[category]?.provisionalKFactor ?? 40} onChange={e => updateRatingSetting(category, 'provisionalKFactor', e.target.value)} />
+                                    <ProfileFieldError field={field('provisionalKFactor')} errors={profileErrors} />
+                                </label>
+                                <label>Provisional games
+                                    <input {...validationProps(field('provisionalGames'))} type="number" min="1" max="100" step="1" value={profile?.rating_settings?.[category]?.provisionalGames ?? 10} onChange={e => updateRatingSetting(category, 'provisionalGames', e.target.value)} />
+                                    <ProfileFieldError field={field('provisionalGames')} errors={profileErrors} />
+                                </label>
+                            </fieldset>
+                        );
+                    })}
 
                     {profile?.logo && <div className="logo-preview"><img src={resolveAssetUrl(profile.logo)} alt="Club badge" /></div>}
 
                     <div className="form-actions">
-                        {isOwner ? (
+                        {isClubAdmin ? (
                             <>
-                                <Button onClick={saveProfile} disabled={savingSettings} className="mr-2">{savingSettings ? 'Saving...' : 'Save'}</Button>
-                                <Button variant="secondary" onClick={() => setProfile(club)}>Reset</Button>
+                                <Button type="submit" disabled={savingSettings} className="mr-2">{savingSettings ? 'Saving...' : 'Save'}</Button>
+                                <Button variant="secondary" onClick={() => { setProfile(club); setBadgeFile(null); setProfileErrors({}); setManagementError(null); }}>Reset</Button>
                             </>
                         ) : (
-                            <div className="muted">Only the club owner can edit club settings.</div>
+                            <div className="muted">Only club owners and admins can edit the public club presentation.</div>
                         )}
                     </div>
+                    </form>
 
                     {isOwner && (
                         <div className="dashboard-settings-card">
@@ -524,8 +600,8 @@ export default function ClubPage() {
                 </div>
             )}
 
-            {/* Members tab — list of club members, remove option for admins */}
-            {activeTab === 'members' && (
+            {/* Member roster and access methods are restricted to owners/admins. */}
+            {activeTab === 'members' && isClubAdmin ? (
                 <div className="tab-panel members-panel">
                     {loading ? <div className="muted">Loading…</div> : (
                         <table className="members-table">
@@ -548,7 +624,9 @@ export default function ClubPage() {
                                                         {m.role === 'admin' ? 'Revoke admin' : 'Make admin'}
                                                     </Button>
                                                 )}
-                                                <Button variant="danger" onClick={() => removeMember(m)}>Remove</Button>
+                                                {canRemoveClubMember(m, user?.id) && (
+                                                    <Button variant="danger" onClick={() => removeMember(m)}>Remove</Button>
+                                                )}
                                             </td>
                                         )}
                                     </tr>
@@ -557,64 +635,9 @@ export default function ClubPage() {
                             </tbody>
                         </table>
                     )}
-                </div>
-            )}
 
-            {activeTab === 'exports' && canExportData ? (
-                <div className="tab-panel">
-                    <DataExportPanel clubId={club.id} />
-                </div>
-            ) : activeTab === 'exports' ? (
-                <div className="tab-panel">
-                    <div style={{ padding: 'var(--gap-lg)', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        Only club owners and admins can export club data.
-                    </div>
-                </div>
-            ) : null}
-
-            {/* Dashboard tab — admin only, includes stats + settings + admin actions */}
-            {activeTab === 'dashboard' && isClubAdmin ? (
-                <div className="tab-panel dashboard-panel">
-                    {/* Club settings card (admin only) — same fields as Profile tab */}
-                    <div className="dashboard-settings-card">
-                        <h3>Club Settings (owner only)</h3>
-                        <label className="form-row">
-                            <div className="label">Name</div>
-                            <input className="input" disabled={!isOwner} value={profile?.name || ''} onChange={e => setProfile({ ...profile, name: e.target.value })} />
-                        </label>
-
-                        <label className="form-row">
-                            <div className="label">Federation</div>
-                            <input className="input" disabled={!isOwner} value={profile?.federation || ''} onChange={e => setProfile({ ...profile, federation: e.target.value })} />
-                        </label>
-
-                        <label className="form-row">
-                            <div className="label">Description</div>
-                            <textarea className="input" disabled={!isOwner} value={profile?.description || ''} onChange={e => setProfile({ ...profile, description: e.target.value })} />
-                        </label>
-
-                        <label className="form-row">
-                            <div className="label">Club badge</div>
-                            <input className="input" type="file" accept="image/jpeg,image/png,image/webp" disabled={!isOwner} onChange={e => setBadgeFile(e.target.files?.[0] || null)} />
-                        </label>
-
-                        {profile?.logo && <div className="logo-preview"><img src={resolveAssetUrl(profile.logo)} alt="Club badge" /></div>}
-
-                        <div className="form-actions">
-                            <Button onClick={saveProfile} disabled={!isOwner || savingSettings} className="mr-2">Save</Button>
-                            <Button variant="secondary" onClick={() => setProfile(club)}>Reset</Button>
-                        </div>
-                    </div>
-
-                    {/* Dashboard stats — top players, recent matches, games by category */}
-                    {dashboardLoading && <div className="muted">Loading stats…</div>}
-                    {dashboardError && <div style={{ color: 'var(--danger)' }}>{dashboardError}</div>}
-                    {!dashboardLoading && dashboard && (
-                        <ClubDashboard data={dashboard} onCategoryChange={setDashboardCategory} />
-                    )}
-
-                    {/* Admin actions — invites & join requests */}
-                    <div className="invite-section">
+                    <div className="invite-section" style={{ marginTop: 24 }}>
+                        <h2>Club access</h2>
                         <div className="invite-label">Six-digit join code</div>
                         <div className="muted">
                             {joinCodeStatus.active
@@ -645,34 +668,12 @@ export default function ClubPage() {
                             <div className="muted">No active invites</div>
                         ) : (
                             <ul className="invite-list">
-                                {invites.map(i => (
-                                    <li key={i.id} className="invite-item">
-                                        <code style={{ fontSize: 12 }}>{i.token}</code>
+                                {invites.map(invite => (
+                                    <li key={invite.id} className="invite-item">
+                                        <code style={{ fontSize: 12 }}>{invite.token}</code>
                                         <div style={{ marginLeft: 'auto' }}>
-                                            <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/clubs/join?token=${i.token}`)}>Copy</Button>
-                                            <Button variant="danger" style={{ marginLeft: 8 }}
-                                                onClick={() => revokeInvite(i)}>Revoke</Button>
-                                        </div>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-
-                        <div className="invite-label" style={{ marginTop: 20 }}>Join requests</div>
-                        {joinRequests.length === 0 ? (
-                            <div className="muted">No pending join requests</div>
-                        ) : (
-                            <ul className="invite-list">
-                                {joinRequests.map(request => (
-                                    <li key={request.id} className="invite-item">
-                                        <div>
-                                            <strong>{request.name || request.email}</strong>
-                                            {request.message ? <div className="muted">{request.message}</div> : null}
-                                            {request.createdAt ? <div className="muted">Requested {new Date(request.createdAt).toLocaleString()}</div> : null}
-                                        </div>
-                                        <div style={{ marginLeft: 'auto' }}>
-                                            <Button onClick={() => reviewJoinRequest(request.id, 'approve')}>Approve</Button>
-                                            <Button variant="danger" style={{ marginLeft: 8 }} onClick={() => reviewJoinRequest(request.id, 'reject')}>Reject</Button>
+                                            <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/clubs/join?token=${invite.token}`)}>Copy</Button>
+                                            <Button variant="danger" style={{ marginLeft: 8 }} onClick={() => revokeInvite(invite)}>Revoke</Button>
                                         </div>
                                     </li>
                                 ))}
@@ -680,10 +681,20 @@ export default function ClubPage() {
                         )}
                     </div>
                 </div>
-            ) : activeTab === 'dashboard' ? (
+            ) : activeTab === 'members' ? (
+                <div className="tab-panel">
+                    <div className="muted">Only club owners and admins can manage members and club access.</div>
+                </div>
+            ) : null}
+
+            {activeTab === 'exports' && canExportData ? (
+                <div className="tab-panel">
+                    <DataExportPanel clubId={club.id} />
+                </div>
+            ) : activeTab === 'exports' ? (
                 <div className="tab-panel">
                     <div style={{ padding: 'var(--gap-lg)', textAlign: 'center', color: 'var(--text-muted)' }}>
-                        You do not have permission to view the dashboard. Only club admins can access this page.
+                        Only club owners and admins can export club data.
                     </div>
                 </div>
             ) : null}

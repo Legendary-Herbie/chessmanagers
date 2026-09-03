@@ -6,11 +6,21 @@ export default function AddPlayerForm({
     isInline = false,
     onClose,
     clubId,
+    ratingSettings = {},
     onPlayerAdded,
 }) {
+    const ratingDefaults = {
+        blitz: ratingSettings.blitz?.initialRating ?? 1500,
+        rapid: ratingSettings.rapid?.initialRating ?? 1500,
+        classical: ratingSettings.classical?.initialRating ?? 1500,
+    };
     const [tab, setTab] = useState('single'); // 'single' | 'bulk'
     const [name, setName] = useState('');
-    const [rating, setRating] = useState('');
+    const [startRatings, setStartRatings] = useState(() => ({
+        blitz: String(ratingDefaults.blitz),
+        rapid: String(ratingDefaults.rapid),
+        classical: String(ratingDefaults.classical),
+    }));
     const [bio, setBio] = useState('');
     
     // Bulk state
@@ -35,6 +45,14 @@ export default function AddPlayerForm({
         }
     }, [isInline, isOpen, onClose]);
 
+    useEffect(() => {
+        setStartRatings({
+            blitz: String(ratingDefaults.blitz),
+            rapid: String(ratingDefaults.rapid),
+            classical: String(ratingDefaults.classical),
+        });
+    }, [ratingDefaults.blitz, ratingDefaults.rapid, ratingDefaults.classical]);
+
     if (!isInline && !isOpen) return null;
 
     const handleSingleSubmit = async (e) => {
@@ -48,16 +66,25 @@ export default function AddPlayerForm({
         setError(null);
 
         try {
-            const parsedRating = rating.trim() ? Number.parseInt(rating, 10) : null;
+            const parsedStartRatings = Object.fromEntries(
+                Object.entries(startRatings)
+                    .filter(([, value]) => value.trim())
+                    .map(([category, value]) => [category, Number.parseInt(value, 10)])
+                    .filter(([, value]) => Number.isInteger(value))
+            );
             await playerApi.createPlayer(clubId, {
                 name: name.trim(),
-                ...(Number.isInteger(parsedRating) ? { rating: parsedRating } : {}),
+                ...(Object.keys(parsedStartRatings).length > 0 ? { startRatings: parsedStartRatings } : {}),
                 bio: bio.trim() || undefined,
             });
 
             // Reset form
             setName('');
-            setRating('');
+            setStartRatings({
+                blitz: String(ratingDefaults.blitz),
+                rapid: String(ratingDefaults.rapid),
+                classical: String(ratingDefaults.classical),
+            });
             setBio('');
             if (onPlayerAdded) onPlayerAdded();
             if (onClose) onClose();
@@ -77,17 +104,37 @@ export default function AddPlayerForm({
             const line = rawLine.trim();
             if (!line) continue;
 
-            const parts = line.split(',');
-            const parsedRating = parts[1]?.trim()
-                ? Number.parseInt(parts[1].trim(), 10)
-                : null;
-            parsed.push({
-                name: parts[0].trim(),
-                ...(Number.isInteger(parsedRating) ? { rating: parsedRating } : {}),
-                ...(parts.length > 2
-                    ? { bio: parts.slice(2).join(',').trim() || undefined }
-                    : {}),
-            });
+            const parts = line.split(',').map(part => part.trim());
+            if (parts.length >= 4) {
+                const categoryValues = {
+                    blitz: Number.parseInt(parts[1], 10),
+                    rapid: Number.parseInt(parts[2], 10),
+                    classical: Number.parseInt(parts[3], 10),
+                };
+                const parsedStartRatings = Object.fromEntries(
+                    Object.entries(categoryValues).filter(([, value]) => Number.isInteger(value))
+                );
+                parsed.push({
+                    name: parts[0],
+                    ...(Object.keys(parsedStartRatings).length > 0 ? { startRatings: parsedStartRatings } : {}),
+                    ...(parts.length > 4
+                        ? { bio: parts.slice(4).join(',').trim() || undefined }
+                        : {}),
+                });
+            } else {
+                const legacyRating = parts[1] ? Number.parseInt(parts[1], 10) : null;
+                parsed.push({
+                    name: parts[0],
+                    ...(Number.isInteger(legacyRating) ? {
+                        startRatings: {
+                            blitz: legacyRating,
+                            rapid: legacyRating,
+                            classical: legacyRating,
+                        },
+                    } : {}),
+                    ...(parts.length > 2 ? { bio: parts[2] || undefined } : {}),
+                });
+            }
         }
         return parsed;
     };
@@ -171,18 +218,28 @@ export default function AddPlayerForm({
                     </div>
 
                     <div className="form-group">
-                        <label className="form-label" htmlFor="player-rating">Initial ELO Rating</label>
-                        <input
-                            id="player-rating"
-                            type="number"
-                            className="form-input"
-                            value={rating}
-                            onChange={(e) => setRating(e.target.value)}
-                            placeholder="Use club default"
-                            min="100"
-                            max="3500"
-                        />
-                        <span className="form-helper">Leave blank to use this club's configured category ratings.</span>
+                        <span className="form-label">Starting ratings</span>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(145px, 1fr))', gap: '10px' }}>
+                            {['blitz', 'rapid', 'classical'].map((category) => (
+                                <label key={category} className="form-label" htmlFor={`player-${category}-rating`}>
+                                    {category[0].toUpperCase() + category.slice(1)}
+                                    <input
+                                        id={`player-${category}-rating`}
+                                        type="number"
+                                        className="form-input"
+                                        value={startRatings[category]}
+                                        onChange={(e) => setStartRatings((current) => ({
+                                            ...current,
+                                            [category]: e.target.value,
+                                        }))}
+                                        placeholder={`Club default: ${ratingDefaults[category]}`}
+                                        min={ratingSettings[category]?.ratingFloor ?? 100}
+                                        max="4000"
+                                    />
+                                </label>
+                            ))}
+                        </div>
+                        <span className="form-helper">Set each time-control rating independently. Clear a field to use the club default.</span>
                     </div>
 
                     <div className="form-group">
@@ -217,10 +274,10 @@ export default function AddPlayerForm({
                             style={{ minHeight: '140px', fontFamily: 'monospace' }}
                             value={bulkText}
                             onChange={(e) => setBulkText(e.target.value)}
-                            placeholder={`Garry Kasparov\nBobby Fischer, 1400, Grandmaster\nHikaru Nakamura\nJudit Polgar`}
+                            placeholder={`Garry Kasparov\nBobby Fischer, 1600, 1700, 1800, Grandmaster\nHikaru Nakamura\nJudit Polgar, 1750`}
                             autoFocus
                         />
-                        <span className="form-helper">Format per line: <code>Name</code> or <code>Name, Rating, Bio</code></span>
+                        <span className="form-helper">Format: <code>Name, Blitz, Rapid, Classical, Bio</code>. The older <code>Name, Rating, Bio</code> format still applies one rating to all categories.</span>
                     </div>
 
                     {bulkPreview.length > 0 && (
@@ -229,7 +286,9 @@ export default function AddPlayerForm({
                             <ul style={{ margin: '6px 0 0 0', paddingLeft: '20px', fontSize: '0.85rem', color: 'var(--text)' }}>
                                 {bulkPreview.slice(0, 5).map((p, idx) => (
                                     <li key={idx}>
-                                        <strong>{p.name}</strong> — Rating: {p.rating ?? 'club defaults'} {p.bio ? `(${p.bio})` : ''}
+                                        <strong>{p.name}</strong> — B/R/C: {p.startRatings
+                                            ? `${p.startRatings.blitz ?? 'default'} / ${p.startRatings.rapid ?? 'default'} / ${p.startRatings.classical ?? 'default'}`
+                                            : 'club defaults'} {p.bio ? `(${p.bio})` : ''}
                                     </li>
                                 ))}
                                 {bulkPreview.length > 5 && (

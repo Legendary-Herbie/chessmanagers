@@ -1,11 +1,12 @@
 import { api, endpoints } from '../../../config/api.js';
 
 export const matchApi = {
-    list: async (clubId, { q = '', limit = 50, offset = 0 } = {}) => {
-        const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
-        if (q) params.set('q', q);
-        const data = await api.get(`${endpoints.matches.list(clubId)}?${params}`);
-        return data.matches;
+    list: async (clubId, { signal, ...query } = {}) => {
+        const params = new URLSearchParams();
+        Object.entries(query).forEach(([key, value]) => {
+            if (value !== '' && value !== undefined && value !== null) params.set(key, String(value));
+        });
+        return api.get(`${endpoints.matches.list(clubId)}?${params}`, { signal });
     },
     create: (clubId, payload) => api.post(endpoints.matches.list(clubId), payload),
     update: (clubId, matchId, payload) => api.patch(

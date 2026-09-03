@@ -115,6 +115,10 @@
     gap: 1rem;
     align-items: center;
 }
+.leaderboard-table {
+    width: 100%;
+    border-collapse: collapse;
+}
 .leaderboard-cards { display: none; }
 .leaderboard-pagination {
     display: flex;
