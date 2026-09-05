@@ -75,7 +75,7 @@ export default function EditPlayerForm({ isOpen, onClose, clubId, player, isAdmi
                     <h2 className="modal-card__title">{isAdmin ? 'Edit Player Identity' : 'Edit My Profile'}</h2>
                     <button type="button" className="modal-card__close" onClick={onClose} aria-label="Close modal">×</button>
                 </div>
-                {error && <div className="error-box">{error}</div>}
+                {error && <div className="error-box" role="alert">{error}</div>}
                 <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
                     {isAdmin && (
                         <>

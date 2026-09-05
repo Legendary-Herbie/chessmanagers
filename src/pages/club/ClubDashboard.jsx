@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 import '../../styles/club-dashboard.css';
 
 const CATEGORIES = ['blitz', 'rapid', 'classical'];
@@ -57,19 +58,19 @@ export default function ClubDashboard({ data, onCategoryChange }) {
                 {!topPlayers.length ? <p className="muted">No eligible players yet.</p> :
                     <ol className="dash-top-players">{topPlayers.map(player => <li key={player.playerId}>
                         <span className="dash-top-players__rank">{player.rank}</span>
-                        <span className="dash-top-players__name">{player.playerName}</span>
+                        <Link to={`/players/${player.playerId}`} className="dash-top-players__name">{player.playerName}</Link>
                         <span className="dash-top-players__rating">{player.selectedRating}</span>
                     </li>)}</ol>}
             </div>
         </div>
 
         <div className="dash-panel">
-            <h3 className="dash-panel__title">Recent matches</h3>
+            <div className="dash-panel__header"><h3 className="dash-panel__title">Recent matches</h3><Link to="/matches">View match history</Link></div>
             {!recentMatches.length ? <p className="muted">No matches recorded yet.</p> : <table className="dash-matches-table">
-                <thead><tr><th>Date</th><th>White</th><th>Black</th><th>Result</th><th>Category</th></tr></thead>
+                <thead><tr><th>Date</th><th>White</th><th>Black</th><th>Result</th><th>Rating category</th></tr></thead>
                 <tbody>{recentMatches.map(match => <tr key={match.id}>
                     <td>{new Date(match.playedAt).toLocaleDateString()}</td>
-                    <td>{match.whitePlayerName}</td><td>{match.blackPlayerName}</td>
+                    <td>{match.whitePlayerId ? <Link to={`/players/${match.whitePlayerId}`}>{match.whitePlayerName}</Link> : match.whitePlayerName}</td><td>{match.blackPlayerId ? <Link to={`/players/${match.blackPlayerId}`}>{match.blackPlayerName}</Link> : match.blackPlayerName}</td>
                     <td>{RESULT_LABELS[match.result]}</td><td>{title(match.ratingCategory)}</td>
                 </tr>)}</tbody>
             </table>}

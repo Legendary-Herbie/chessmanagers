@@ -72,7 +72,7 @@
 }
 
 .public-page { display: grid; gap: var(--gap-lg); }
-.public-page__header { display: grid; gap: 0.5rem; }
+.public-page__header { display: flex; align-items: flex-end; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
 .public-page__header h1 { margin: 0; color: var(--text-strong); font-size: clamp(2rem, 5vw, 3.25rem); letter-spacing: -0.04em; }
 .public-page__header p { margin: 0; max-width: 680px; color: var(--text-muted); font-size: var(--font-size-lg); }
 
@@ -128,7 +128,7 @@
 .public-button--danger { background: var(--danger); }
 
 .public-results-status { min-height: 1.5rem; color: var(--text-muted); font-size: var(--font-size-sm); }
-.public-club-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); gap: var(--gap-md); }
+.public-club-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--gap-md); }
 .public-club-card { padding: 1.25rem; display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1rem; align-items: center; }
 .public-club-card__logo,
 .public-club-card__placeholder {
@@ -198,6 +198,7 @@
 .public-admin-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
 @media (max-width: 760px) {
+    .public-club-grid { grid-template-columns: 1fr; }
     .public-header__inner { min-height: 64px; }
     .public-nav a { padding-inline: 0.5rem; font-size: var(--font-size-sm); white-space: nowrap; }
     .public-discovery-tools, .public-content-grid { grid-template-columns: 1fr; }
@@ -219,3 +220,5 @@
     .public-profile__photo { margin: 0 auto; }
     .public-ratings { grid-template-columns: 1fr; text-align: left; }
 }
+.public-join-message { margin-bottom: 1rem; color: var(--status-success-text); background: var(--status-success-bg); }
+.public-join-message--error { color: var(--status-error-text); background: var(--status-error-bg); }

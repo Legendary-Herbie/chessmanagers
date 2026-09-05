@@ -4,7 +4,7 @@ import BrandLogo from '../shared/common/BrandLogo.jsx';
 import '../styles/landing.css';
 
 const organizerOutcomes = [
-    ['Start club night ready', 'Approve new members, keep the roster current, and publish the details everyone needs before the first clock starts.'],
+    ['Start every session ready', 'Approve new members, keep the roster current, and publish the details everyone needs before the first clock starts.'],
     ['Trust every result', 'Record the game once. Corrections, backdated results, and category ratings stay connected to a clear history.'],
     ['Know what needs attention', 'See pending requests, recent games, active players, and rating leaders without rebuilding a spreadsheet.'],
 ];
@@ -25,40 +25,39 @@ export default function Landing() {
                 <nav aria-label="Public navigation">
                     <Link to="/clubs">Find clubs</Link>
                     <Link to="/auth/login">Sign in</Link>
-                    <Link className="landing-nav__cta" to="/auth/register">Get started</Link>
                 </nav>
             </header>
 
             <section className="landing-hero">
                 <div className="landing-hero__copy">
-                    <p className="landing-eyebrow">For organizers who would rather run chess than chase records</p>
-                    <h1>Spend club night on the games—not the spreadsheet.</h1>
+                    <p className="landing-eyebrow">One dependable record for your chess club</p>
+                    <h1>Run your club without rebuilding the same spreadsheet.</h1>
                     <p className="landing-lead">
                         Chess Managers turns membership, match results, ratings, and events into one dependable club record—so organizers make faster decisions and players can trust their progress.
                     </p>
                     <div className="landing-actions">
-                        <Link className="landing-button landing-button--primary" to="/auth/register">Create your club</Link>
+                        <Link className="landing-button landing-button--primary" to="/auth/register">Get started</Link>
                         <Link className="landing-button landing-button--secondary" to="/clubs">Find your club</Link>
                     </div>
                     <p className="landing-hero__note">Set up the roster, record the first result, and give everyone a clearer view of club life.</p>
                 </div>
 
-                <div className="landing-outcome-card" aria-label="Example organizer overview">
-                    <div className="landing-outcome-card__header"><span>Tonight’s club overview</span><strong>Ready</strong></div>
+                <div className="landing-outcome-card" aria-label="What Chess Managers keeps connected">
+                    <div className="landing-outcome-card__header"><span>One result, reflected everywhere</span><strong>Connected</strong></div>
                     <div className="landing-outcome-card__metrics">
-                        <div><strong>28</strong><span>active players</span></div>
-                        <div><strong>12</strong><span>games tonight</span></div>
-                        <div><strong>2</strong><span>requests to review</span></div>
+                        <div><strong>Record</strong><span>result and played time</span></div>
+                        <div><strong>Update</strong><span>the right rating category</span></div>
+                        <div><strong>Review</strong><span>history and statistics</span></div>
                     </div>
                     <div className="landing-outcome-card__result">
                         <span aria-hidden="true">♞</span>
-                        <div><strong>Result recorded</strong><small>Rapid ratings and player history updated</small></div>
+                        <div><strong>Record a Rapid result</strong><small>Ratings, history, statistics, and the leaderboard stay in step</small></div>
                         <b>✓</b>
                     </div>
                     <div className="landing-outcome-card__categories">
-                        <span>Blitz <strong>1568</strong></span>
-                        <span>Rapid <strong>1642</strong></span>
-                        <span>Classical <strong>1710</strong></span>
+                        <span>Blitz <strong>Separate</strong></span>
+                        <span>Rapid <strong>Updated</strong></span>
+                        <span>Classical <strong>Separate</strong></span>
                     </div>
                 </div>
             </section>

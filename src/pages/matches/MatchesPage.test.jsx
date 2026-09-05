@@ -1,6 +1,7 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { MemoryRouter } from 'react-router-dom';
 import { ClubContext } from '../../app/contextHooks.js';
 import { api } from '../../config/api.js';
 import { matchApi } from '../../features/matches/api/matchApi.js';
@@ -39,8 +40,14 @@ function renderPage() {
 }
 
 async function selectPlayer(label, name) {
-    fireEvent.focus(screen.getByLabelText(label));
-    fireEvent.click(await screen.findByRole('option', { name: new RegExp(name) }));
+    vi.useFakeTimers();
+    try {
+        fireEvent.focus(screen.getByLabelText(label));
+        await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+    } finally {
+        vi.useRealTimers();
+    }
+    fireEvent.click(screen.getByRole('option', { name: new RegExp(name) }));
 }
 
 describe('MatchesPage canonical match flows', () => {
@@ -49,6 +56,15 @@ describe('MatchesPage canonical match flows', () => {
         matchApi.list.mockResolvedValue({ matches: [], total: 0, limit: 25, offset: 0 });
     });
     afterEach(cleanup);
+
+    it('shows useful next steps instead of rendering a broken match workspace without a club', () => {
+        render(<MemoryRouter><ClubContext.Provider value={{
+            club: null, capabilities: { canManageMatches: false },
+        }}><MatchesPage /></ClubContext.Provider></MemoryRouter>);
+        expect(screen.getByRole('heading', { name: 'Keep every result in one reliable history' })).toBeTruthy();
+        expect(screen.getByRole('link', { name: 'Create a club' })).toBeTruthy();
+        expect(screen.getByRole('link', { name: 'Find a club' })).toBeTruthy();
+    });
 
     it('shows explicit chronology, category, and rated controls', async () => {
         renderPage();
@@ -62,15 +78,18 @@ describe('MatchesPage canonical match flows', () => {
 
     it('keeps the match form dismissible and restores page scrolling', async () => {
         renderPage();
-        fireEvent.click(await screen.findByRole('button', { name: 'Add Match' }));
+        const opener = await screen.findByRole('button', { name: 'Add Match' });
+        opener.focus();
+        fireEvent.click(opener);
 
         expect(screen.getByRole('dialog', { name: 'Add Match' })).toBeTruthy();
         expect(document.body.style.overflow).toBe('hidden');
 
-        fireEvent.keyDown(document, { key: 'Escape' });
+        fireEvent.keyDown(screen.getByRole('dialog', { name: 'Add Match' }), { key: 'Escape' });
 
         expect(screen.queryByRole('dialog', { name: 'Add Match' })).toBeNull();
         expect(document.body.style.overflow).toBe('');
+        expect(document.activeElement).toBe(opener);
     });
 
     it('uses the duplicate confirmation response to retry with confirmation', async () => {
@@ -102,6 +121,7 @@ describe('MatchesPage canonical match flows', () => {
         matchApi.list.mockResolvedValue({ matches: [], total: 60, limit: 25, offset: 0 });
         renderPage();
         await waitFor(() => expect(matchApi.list).toHaveBeenCalled());
+        fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
 
         fireEvent.change(screen.getByLabelText('Filter by rating category'), { target: { value: 'rapid' } });
         fireEvent.change(screen.getByLabelText('Filter by rated status'), { target: { value: 'rated' } });
@@ -110,7 +130,7 @@ describe('MatchesPage canonical match flows', () => {
         fireEvent.change(screen.getByLabelText('Sort matches'), { target: { value: 'playedAt-asc' } });
         await selectPlayer('Filter by player', 'White Player');
 
-        await waitFor(() => expect(matchApi.list).toHaveBeenLastCalledWith('club_1', expect.objectContaining({
+        await waitFor(() => expect(matchApi.list).toHaveBeenCalledWith('club_1', expect.objectContaining({
             playerId: 'player_white',
             ratingCategory: 'rapid',
             isRated: true,
@@ -123,6 +143,16 @@ describe('MatchesPage canonical match flows', () => {
         })));
 
         fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-        await waitFor(() => expect(matchApi.list).toHaveBeenLastCalledWith('club_1', expect.objectContaining({ offset: 25 })));
+        await waitFor(() => expect(matchApi.list).toHaveBeenCalledWith('club_1', expect.objectContaining({ offset: 25 })));
     });
+    it('keeps search visible and retries a failed list request', async () => {
+        matchApi.list.mockRejectedValueOnce(new Error('Connection lost'));
+        renderPage();
+        expect(screen.getByRole('textbox', { name: 'Search matches' })).toBeTruthy();
+        expect((await screen.findByRole('alert')).textContent).toContain('Connection lost');
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+        expect(matchApi.list).toHaveBeenCalledTimes(2);
+    });
+
 });

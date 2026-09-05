@@ -1,0 +1,67 @@
+.app-dialog-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 900;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgb(10 15 24 / 65%);
+    backdrop-filter: blur(5px);
+}
+.app-dialog {
+    width: min(100%, 580px);
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    background: var(--bg-surface);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: 0 24px 80px rgb(0 0 0 / 30%);
+}
+.app-dialog > .modal-header {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--bg-surface);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+}
+.app-dialog > .modal-header h3 { margin: 0; color: var(--text-strong); }
+.app-dialog .modal-body { padding: 24px; display: grid; gap: 20px; }
+.app-dialog .form-row { display: grid; gap: 8px; margin: 0; }
+.app-dialog .input {
+    width: 100%;
+    min-width: 0;
+    min-height: 44px;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg-muted);
+    color: var(--text);
+    font: inherit;
+    box-sizing: border-box;
+}
+.app-dialog .input:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.app-dialog textarea.input { min-height: 88px; resize: vertical; }
+.app-dialog .btn-secondary { background: var(--bg-muted); color: var(--text); border: 1px solid var(--border); border-radius: 10px; }
+.app-dialog .modal-footer {
+    position: sticky;
+    bottom: 0;
+    background: var(--bg-surface);
+    display: flex;
+    justify-content: flex-end;
+    gap: 12px;
+    padding: 16px 24px;
+    border-top: 1px solid var(--border);
+}
+@media (max-width: 600px) {
+    .app-dialog-backdrop { padding: 12px; }
+    .app-dialog { max-height: calc(100dvh - 24px); border-radius: 16px; }
+    .app-dialog > .modal-header, .app-dialog .modal-body, .app-dialog .modal-footer { padding: 16px; }
+}

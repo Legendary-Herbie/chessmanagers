@@ -5,14 +5,10 @@ import Button from '../../shared/common/Button.jsx';
 import { continuationFromParams, continuationQuery } from '../../features/auth/continuation.js';
 import { getFieldErrors, isValidationError } from '../../config/api.js';
 
-const FIELD_ORDER = ['username', 'fullName', 'email', 'password', 'confirmPassword'];
+const FIELD_ORDER = ['fullName', 'email', 'password', 'confirmPassword'];
 
 function validateRegistration(fields) {
     const errors = {};
-    if (!fields.username.trim()) errors.username = 'Enter a username.';
-    else if (!/^[A-Za-z0-9_]{3,30}$/.test(fields.username.trim())) {
-        errors.username = 'Use 3–30 letters, numbers, or underscores.';
-    }
     if (!fields.fullName.trim()) errors.fullName = 'Enter your full name.';
     if (!fields.email.trim()) errors.email = 'Enter your email address.';
     else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(fields.email.trim())) {
@@ -32,7 +28,8 @@ export default function RegisterView() {
     const destination = continuationFromParams(searchParams);
     const continuation = continuationQuery(destination);
 
-    const [fields, setFields] = useState({ username: '', fullName: '', email: '', password: '', confirmPassword: '' });
+    const [fields, setFields] = useState({ fullName: '', email: '', password: '', confirmPassword: '' });
+    const [showPasswords, setShowPasswords] = useState(false);
     const [error,  setError]  = useState('');
     const [fieldErrors, setFieldErrors] = useState({});
     const [busy,   setBusy]   = useState(false);
@@ -65,7 +62,6 @@ export default function RegisterView() {
         try {
             const normalizedEmail = fields.email.trim();
             await register({
-                username: fields.username.trim(),
                 fullName: fields.fullName.trim(),
                 email: normalizedEmail,
                 password: fields.password,
@@ -105,27 +101,7 @@ export default function RegisterView() {
 
             <form onSubmit={handleSubmit} noValidate className="auth-form">
                 <div className="auth-field">
-                    <label htmlFor="username" className="auth-label">Username</label>
-                    <input
-                        id="username"
-                        ref={element => { fieldRefs.current.username = element; }}
-                        name="username"
-                        type="text"
-                        autoComplete="username"
-                        required
-                        className="auth-input"
-                        placeholder="magnus_carlsen"
-                        value={fields.username}
-                        onChange={handleChange}
-                        disabled={busy}
-                        aria-invalid={Boolean(fieldErrors.username)}
-                        aria-describedby={fieldErrors.username ? 'register-username-error register-error' : undefined}
-                    />
-                    {fieldErrors.username && <span id="register-username-error" className="auth-field-error">{fieldErrors.username}</span>}
-                </div>
-
-                <div className="auth-field">
-                    <label htmlFor="fullName" className="auth-label">Full name</label>
+                    <label htmlFor="fullName" className="auth-label">Your name</label>
                     <input id="fullName" ref={element => { fieldRefs.current.fullName = element; }} name="fullName" type="text" autoComplete="name" required
                         className="auth-input" placeholder="Magnus Carlsen" value={fields.fullName}
                         onChange={handleChange} disabled={busy}
@@ -163,7 +139,7 @@ export default function RegisterView() {
                         id="password"
                         ref={element => { fieldRefs.current.password = element; }}
                         name="password"
-                        type="password"
+                        type={showPasswords ? 'text' : 'password'}
                         autoComplete="new-password"
                         required
                         minLength={8}
@@ -184,7 +160,7 @@ export default function RegisterView() {
                         id="confirmPassword"
                         ref={element => { fieldRefs.current.confirmPassword = element; }}
                         name="confirmPassword"
-                        type="password"
+                        type={showPasswords ? 'text' : 'password'}
                         autoComplete="new-password"
                         required
                         className="auth-input"
@@ -197,6 +173,12 @@ export default function RegisterView() {
                     />
                     {fieldErrors.confirmPassword && <span id="register-confirmPassword-error" className="auth-field-error">{fieldErrors.confirmPassword}</span>}
                 </div>
+
+                <label className="auth-password-toggle">
+                    <input type="checkbox" checked={showPasswords}
+                        onChange={event => setShowPasswords(event.target.checked)} />
+                    Show passwords
+                </label>
 
                 <Button
                     type="submit"

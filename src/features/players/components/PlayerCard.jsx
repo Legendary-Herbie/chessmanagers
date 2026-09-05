@@ -1,10 +1,12 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { playerRating } from '../roster/playerRating.js';
 import { resolveAssetUrl } from '../../../config/api.js';
 
 export default function PlayerCard({
     player,
     currentUser,
+    ratingCategory = 'blitz',
     currentLinkedPlayerId,
     isAdmin,
     onClaim,
@@ -17,7 +19,6 @@ export default function PlayerCard({
     const {
         id,
         name,
-        rating = 1500,
         bio,
         games = 0,
         wins = 0,
@@ -51,8 +52,8 @@ export default function PlayerCard({
                         {name}
                     </Link>
                     <div className="player-card__meta">
-                        <span className="rating-badge" title="ELO Rating">
-                            🏆 {rating}
+                        <span className="rating-badge" title={`${ratingCategory} Elo rating`}>
+                            {ratingCategory[0].toUpperCase() + ratingCategory.slice(1)} Elo: {playerRating(player, ratingCategory) ?? '—'}
                         </span>
                         {isLinked && <span className="link-badge link-badge--approved">✓ Claimed</span>}
                         {isPending && <span className="link-badge link-badge--pending">⏳ Pending Claim</span>}

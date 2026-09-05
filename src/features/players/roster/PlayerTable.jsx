@@ -1,8 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { playerRating } from '../roster/playerRating.js';
 
 export default function PlayerTable({
     players = [],
+    ratingCategory = 'blitz',
     currentLinkedPlayerId,
     isAdmin,
     onEdit,
@@ -16,7 +18,7 @@ export default function PlayerTable({
                 <thead>
                     <tr>
                         <th>Player</th>
-                        <th>ELO Rating</th>
+                        <th>{ratingCategory[0].toUpperCase() + ratingCategory.slice(1)} Elo rating</th>
                         <th>Account Link</th>
                         <th>Games</th>
                         <th>W / D / L</th>
@@ -29,7 +31,6 @@ export default function PlayerTable({
                         const {
                             id,
                             name,
-                            rating = 1500,
                             games = 0,
                             wins = 0,
                             draws = 0,
@@ -51,7 +52,7 @@ export default function PlayerTable({
                                     </Link>
                                 </td>
                                 <td>
-                                    <span className="rating-badge">🏆 {rating}</span>
+                                    <span className="rating-badge">🏆 {playerRating(player, ratingCategory) ?? '—'}</span>
                                 </td>
                                 <td>
                                     {isLinked && <span className="link-badge link-badge--approved">✓ Claimed</span>}

@@ -20,12 +20,9 @@ export default function VerifyEmailView() {
         let active = true;
 
         authApi.verifyEmail(token)
-            .then(response => {
+            .then(() => {
                 if (!active) return;
-                const message = response?.alreadyVerified
-                    ? 'Email already verified'
-                    : 'Email verified successfully';
-                setState({ loading: false, message, isError: false });
+                setState({ loading: false, message: 'Your email is verified. Your account is ready.', isError: false });
             })
             .catch(error => {
                 if (!active) return;
@@ -44,7 +41,7 @@ export default function VerifyEmailView() {
     return (
         <div className="auth-form-wrapper">
             <div className="auth-form-header">
-                <h1 className="auth-form-title">Email verification</h1>
+                <h1 className="auth-form-title">{state.loading ? 'Email verification' : state.isError ? 'We could not verify this link' : 'Verification complete'}</h1>
                 <p className="auth-form-subtitle">
                     {state.loading ? 'Verifying your email…' : state.message}
                 </p>

@@ -11,10 +11,6 @@ export function resolveAssetUrl(value) {
     }
 }
 
-if (!import.meta.env.VITE_API_URL) {
-    console.warn('[api] VITE_API_URL is not set; using fallback to /api/v1 for local proxying.');
-}
-
 // ─── Token helpers ─────────────────────────────────────────────────────────────
 
 const browserStorage = typeof localStorage !== 'undefined'
@@ -78,8 +74,8 @@ function createRequestAbort(externalSignal, timeoutMs = API_TIMEOUT_MS) {
 async function requestSessionRefresh() {
     const requestAbort = createRequestAbort();
     try {
-        let refreshCsrfToken = getCsrfToken();
-        if (!refreshCsrfToken) {
+        let refreshCsrfToken;
+        {
             const csrfResponse = await fetch(`${API_BASE}/auth/csrf`, {
                 method: 'GET',
                 credentials: 'include',
@@ -89,6 +85,7 @@ async function requestSessionRefresh() {
             const csrfData = await csrfResponse.json();
             setCsrfToken(csrfData.csrfToken);
             refreshCsrfToken = csrfData.csrfToken;
+            if (!refreshCsrfToken) throw new Error('No active session.');
         }
         const response = await fetch(`${API_BASE}/auth/refresh`, {
             method: 'POST',

@@ -73,7 +73,7 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                         <option value="">-- Select Player --</option>
                         {opponentOptions.map(p => (
                             <option key={p.id} value={p.id}>
-                                {p.name} ({p.rating} ELO)
+                                {p.name}
                             </option>
                         ))}
                     </select>

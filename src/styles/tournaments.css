@@ -34,6 +34,14 @@
     margin: 1.5rem 0;
 }
 
+.tournament-filters .input {
+    background: var(--bg-secondary);
+    color: var(--text);
+    border: 1px solid var(--border);
+    color-scheme: inherit;
+}
+.tournament-filters .input::placeholder { color: var(--text-placeholder); }
+
 .tournament-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
@@ -78,20 +86,20 @@
     width: max-content;
     padding: 0.25rem 0.6rem;
     border-radius: 999px;
-    background: rgba(59, 130, 246, 0.12);
-    color: #1d4ed8;
+    background: var(--status-info-bg);
+    color: var(--status-info-text);
     font-size: 0.82rem;
     font-weight: 700;
 }
 
 .tournament-status.active,
 .tournament-status.completed {
-    background: rgba(34, 197, 94, 0.12);
-    color: #15803d;
+    background: var(--status-success-bg);
+    color: var(--status-success-text);
 }
 
-.tournament-status.completed { background: rgba(100, 116, 139, 0.15); color: var(--text-muted); }
-.tournament-status.paired { background: rgba(245, 158, 11, 0.15); color: #b45309; }
+.tournament-status.completed { background: var(--status-neutral-bg); color: var(--status-neutral-text); }
+.tournament-status.paired { background: var(--status-warning-bg); color: var(--status-warning-text); }
 
 .empty-tournaments {
     padding: 2rem;

@@ -170,7 +170,7 @@ export default function PlayerRatingChart({ history = [], startRating = 1500, ca
                         <div>Rating: <strong>{hoverPoint.rating}</strong></div>
                         {hoverPoint.delta !== undefined && (
                             <div style={{ color: hoverPoint.delta >= 0 ? 'var(--accent)' : 'var(--danger)' }}>
-                                {hoverPoint.delta >= 0 ? `+${hoverPoint.delta}` : hoverPoint.delta} ELO
+                                {hoverPoint.delta >= 0 ? `+${hoverPoint.delta}` : hoverPoint.delta} Elo
                             </div>
                         )}
                         <div style={{ color: 'var(--text-muted)', fontSize: '0.7rem' }}>{hoverPoint.date}</div>

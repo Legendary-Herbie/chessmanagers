@@ -59,7 +59,7 @@ describe('AppRoutes route guards', () => {
         );
 
         expect(await screen.findByText('Email verification')).toBeTruthy();
-        expect(await screen.findByText('Email verified successfully')).toBeTruthy();
+        expect(await screen.findByText('Your email is verified. Your account is ready.')).toBeTruthy();
     });
 
     it('allows authenticated user to access /auth/verify without redirecting to dashboard', async () => {
@@ -73,7 +73,7 @@ describe('AppRoutes route guards', () => {
         );
 
         expect(await screen.findByText('Email verification')).toBeTruthy();
-        expect(await screen.findByText('Email verified successfully')).toBeTruthy();
+        expect(await screen.findByText('Your email is verified. Your account is ready.')).toBeTruthy();
     });
 
     it('redirects authenticated user accessing /auth/login to /dashboard', async () => {
@@ -88,6 +88,13 @@ describe('AppRoutes route guards', () => {
 
         // Authenticated user should be on dashboard, not login
         expect(screen.queryByRole('heading', { name: 'Welcome back' })).toBeNull();
+    });
+
+    it('redirects an authenticated user away from the landing page', async () => {
+        const mockUser = { id: 'user_1', email: 'user@example.com', name: 'User One' };
+        render(<TestProviders user={mockUser}><MemoryRouter initialEntries={['/']}><AppRoutes /></MemoryRouter></TestProviders>);
+        expect(await screen.findByRole('heading', { name: 'Build your club dashboard' }, { timeout: 5000 })).toBeTruthy();
+        expect(screen.queryByText('One result, reflected everywhere')).toBeNull();
     });
 
     it('redirects guest accessing /dashboard to /auth/login', async () => {

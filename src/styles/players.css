@@ -806,3 +806,5 @@
   margin: 0;
   max-width: 400px;
 }
+
+.empty-state__action { margin-top: 6px; }

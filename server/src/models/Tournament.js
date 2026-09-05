@@ -191,7 +191,7 @@ export const TournamentModel = {
             clubId,
             playerIds,
             eventType: 'tournament.status',
-            dedupeKey: `tournament:${id}:status:${status}`,
+            dedupeKey: `tournament:${id}:status:${status}:${new Date(tournament.updated_at).toISOString()}`,
             payload: { tournamentId: id, tournamentName: tournament.name, status },
         });
         return tournament;

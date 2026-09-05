@@ -8,7 +8,7 @@ import { playerApi } from '../../features/players/api/playerApi.js';
 import TournamentPage from './TournamentPage.jsx';
 
 vi.mock('../../features/tournaments/api/tournamentApi.js', () => ({
-    tournamentApi: { get: vi.fn(), recordResult: vi.fn(), archive: vi.fn() },
+    tournamentApi: { get: vi.fn(), recordResult: vi.fn(), setStatus: vi.fn(), archive: vi.fn() },
 }));
 vi.mock('../../features/players/api/playerApi.js', () => ({
     playerApi: { fetchPlayers: vi.fn() },
@@ -49,6 +49,26 @@ describe('TournamentPage duplicate result protection', () => {
     });
     afterEach(cleanup);
 
+    it('announces a load failure and allows retry', async () => {
+        tournamentApi.get.mockRejectedValueOnce(new Error('Offline'));
+        renderPage();
+        expect((await screen.findByRole('alert')).textContent).toBe('Offline');
+        expect(screen.getByRole('button', { name: 'Back to tournaments' })).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        expect(await screen.findByRole('heading', { name: 'Club Swiss' })).toBeTruthy();
+    });
+
+    it('closes the result dialog with Escape and restores focus', async () => {
+        renderPage();
+        const opener = await screen.findByRole('button', { name: 'Result' });
+        opener.focus();
+        fireEvent.click(opener);
+        expect(screen.getByRole('dialog', { name: 'Record result' })).toBeTruthy();
+        fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(document.activeElement).toBe(opener);
+    });
+
     it('does not retry a possible duplicate until the admin confirms', async () => {
         tournamentApi.recordResult
             .mockRejectedValueOnce({ code: 'POSSIBLE_DUPLICATE_MATCH' })
@@ -72,5 +92,37 @@ describe('TournamentPage duplicate result protection', () => {
         fireEvent.click(within(duplicateDialog).getByRole('button', { name: 'Cancel' }));
         expect(tournamentApi.recordResult).toHaveBeenCalledTimes(1);
         expect(screen.getByRole('button', { name: 'Save result' })).toBeTruthy();
+    });
+
+    it('archives only after confirmation in the shared dialog', async () => {
+        tournamentApi.archive.mockResolvedValue({});
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Archive' }));
+        const dialog = screen.getByRole('dialog', { name: 'Archive tournament?' });
+        expect(tournamentApi.archive).not.toHaveBeenCalled();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Archive tournament' }));
+        await waitFor(() => expect(tournamentApi.archive).toHaveBeenCalledWith('club_1', 'tour_1'));
+    });
+
+    it('lets an admin confirm resuming a completed tournament', async () => {
+        tournamentApi.get.mockResolvedValue({
+            ...detail,
+            tournament: { ...detail.tournament, status: 'completed' },
+        });
+        tournamentApi.setStatus.mockResolvedValue({});
+        renderPage();
+
+        fireEvent.click(await screen.findByRole('button', { name: 'Resume tournament' }));
+        const dialog = screen.getByRole('dialog', { name: 'Resume tournament?' });
+        expect(tournamentApi.setStatus).not.toHaveBeenCalled();
+        expect(within(dialog).getByText(/Existing rounds, results, standings, and linked matches will be preserved/)).toBeTruthy();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Resume tournament' }));
+        await waitFor(() => expect(tournamentApi.setStatus).toHaveBeenCalledWith(
+            'club_1', 'tour_1', 'active'
+        ));
+        expect((await screen.findByRole('status')).textContent).toContain('Tournament resumed');
     });
 });

@@ -1,11 +1,13 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import '../../styles/matches.css';
 import Button from '../../shared/common/Button.jsx';
+import Dialog from '../../shared/common/Dialog.jsx';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 import { useClub } from '../../app/contextHooks.js';
 import { matchApi } from '../../features/matches/api/matchApi.js';
 import PlayerSearchSelect from '../../features/players/components/PlayerSearchSelect.jsx';
 import { tournamentApi } from '../../features/tournaments/api/tournamentApi.js';
+import NoClubState from '../../shared/common/NoClubState.jsx';
 
 const CATEGORIES = ['blitz', 'rapid', 'classical'];
 const PAGE_SIZE = 25;
@@ -52,6 +54,7 @@ export default function MatchesPage() {
     const [dateFrom, setDateFrom] = useState('');
     const [dateTo, setDateTo] = useState('');
     const [sortOrder, setSortOrder] = useState('playedAt-desc');
+    const [filtersOpen, setFiltersOpen] = useState(false);
     const [page, setPage] = useState(0);
     const [total, setTotal] = useState(0);
     const [modalOpen, setModalOpen] = useState(false);
@@ -117,20 +120,6 @@ export default function MatchesPage() {
     useEffect(() => {
         void loadReferences();
     }, [loadReferences]);
-
-    useEffect(() => {
-        if (!modalOpen) return undefined;
-        const previousOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        const closeOnEscape = event => {
-            if (event.key === 'Escape') setModalOpen(false);
-        };
-        document.addEventListener('keydown', closeOnEscape);
-        return () => {
-            document.body.style.overflow = previousOverflow;
-            document.removeEventListener('keydown', closeOnEscape);
-        };
-    }, [modalOpen]);
 
     const refreshAll = useCallback(async () => {
         await Promise.all([loadMatches(), loadReferences()]);
@@ -248,18 +237,32 @@ export default function MatchesPage() {
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
     const firstResult = total === 0 ? 0 : page * PAGE_SIZE + 1;
     const lastResult = Math.min((page + 1) * PAGE_SIZE, total);
+    const activeFilterCount = [debouncedSearch, categoryFilter !== 'all', ratedFilter !== 'all',
+        statusFilter !== 'all', playerFilter, dateFrom, dateTo, sortOrder !== 'playedAt-desc'].filter(Boolean).length;
+
+    if (!club) return <NoClubState title="Keep every result in one reliable history"
+        feature="Record opponents, result, rating category, and when the game was played. Ratings and player statistics update from that shared record."
+        description="Create a club or join one before recording and reviewing matches." />;
 
     return (
         <div className="matches-page">
             <div className="page-header">
                 <h1>Matches</h1>
-                {isAdmin && <Button onClick={openAddModal}>Add Match</Button>}
+                <div className="matches-header-actions">
+                    <Button variant="secondary" aria-expanded={filtersOpen} aria-controls="match-filters"
+                        onClick={() => setFiltersOpen(open => !open)}>
+                        {filtersOpen ? 'Hide filters' : `Show filters${activeFilterCount ? ` (${activeFilterCount})` : ''}`}
+                    </Button>
+                    {isAdmin && <Button onClick={openAddModal}>Add Match</Button>}
+                </div>
             </div>
-            {error && !modalOpen && <div className="error" role="alert">{error}</div>}
+            {error && !modalOpen && <div className="error" role="alert"><p>{error}</p><Button variant="secondary" disabled={loading} onClick={() => refreshAll()}>Retry</Button></div>}
             {notice && <div className="match-notice" role="status">{notice}</div>}
             <div className="matches-controls">
                 <input className="input" placeholder="Search by player or notes" value={search}
                     onChange={event => { setSearch(event.target.value); setPage(0); }} aria-label="Search matches" />
+            </div>
+            {filtersOpen && <div className="matches-controls" id="match-filters">
                 <PlayerSearchSelect clubId={club.id} label="Filter by player" value={playerFilter}
                     onChange={playerId => { setPlayerFilter(playerId); setPage(0); }}
                     placeholder="All players" allowClear />
@@ -291,14 +294,14 @@ export default function MatchesPage() {
                     <option value="createdAt-desc">Recently added first</option>
                     <option value="createdAt-asc">Earliest added first</option>
                 </select>
-            </div>
+            </div>}
 
-            <div className="matches-list">
+            <div className="matches-list" role="region" aria-label="Match history" tabIndex={0}>
                 {loading ? <div className="muted">Loading...</div> : (
                     <table className="matches-table">
                         <thead><tr>
                             <th>Date</th><th>White</th><th>Black</th><th>Result</th>
-                            <th>Category</th><th>Rating</th><th>Status</th><th>Notes</th>
+                            <th>Rating category</th><th>Rated / Unrated</th><th>Status</th><th>Notes</th>
                             {isAdmin && <th>Actions</th>}
                         </tr></thead>
                         <tbody>
@@ -336,13 +339,8 @@ export default function MatchesPage() {
                 </div>
             </div>
 
-            {modalOpen && <div className="modal-backdrop match-modal-backdrop"
-                onMouseDown={event => event.target === event.currentTarget && setModalOpen(false)}>
-                <div className="modal-content small match-modal" role="dialog" aria-modal="true" aria-labelledby="match-form-title">
-                    <div className="modal-header">
-                        <h3 id="match-form-title">{editingMatch ? 'Edit Match' : 'Add Match'}</h3>
-                        <Button variant="secondary" onClick={() => setModalOpen(false)}>Close</Button>
-                    </div>
+            {modalOpen && <Dialog title={editingMatch ? 'Edit Match' : 'Add Match'} busy={saving}
+                onClose={() => setModalOpen(false)}>
                     <div className="modal-body">
                         {error && <div className="error" role="alert">{error}</div>}
                         <PlayerSearchSelect clubId={club.id} label="White" value={form.whitePlayerId}
@@ -392,13 +390,12 @@ export default function MatchesPage() {
                         </label>
                     </div>
                     <div className="modal-footer">
-                        <Button variant="secondary" onClick={() => setModalOpen(false)}>Cancel</Button>
+                        <Button variant="secondary" disabled={saving} onClick={() => setModalOpen(false)}>Cancel</Button>
                         <Button variant="primary" disabled={saving} onClick={() => saveMatch(false)}>
                             {saving ? 'Saving...' : editingMatch ? 'Save changes' : 'Create match'}
                         </Button>
                     </div>
-                </div>
-            </div>}
+            </Dialog>}
 
             <ConfirmDialog isOpen={Boolean(duplicateConfirmation)} title="Possible duplicate match"
                 message="A matching record exists within five minutes. Save this match anyway?"

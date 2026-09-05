@@ -66,4 +66,13 @@ describe('Dashboard membership queue', () => {
 
         await waitFor(() => expect(leaderboardApi.fetchDashboard).toHaveBeenCalledTimes(2));
     });
+    it('announces a load error and retries the dashboard', async () => {
+        leaderboardApi.fetchDashboard.mockRejectedValueOnce(new Error('Offline'));
+        renderDashboard({});
+        expect((await screen.findByRole('alert')).textContent).toContain('Offline');
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
+        expect(leaderboardApi.fetchDashboard).toHaveBeenCalledTimes(2);
+    });
+
 });

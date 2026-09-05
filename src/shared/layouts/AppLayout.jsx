@@ -3,6 +3,7 @@ import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useClub, useTheme } from '../../app/contextHooks.js';
 import { clubApi } from '../../features/clubs/api/clubApi.js';
 import NotificationTray from '../../features/notifications/components/NotificationTray.jsx';
+import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 import BrandLogo from '../common/BrandLogo.jsx';
 import '../../styles/layout.css';
 
@@ -21,7 +22,7 @@ const iconPaths = {
     leaderboard: <><path d="M5 21V11h4v10" /><path d="M10 21V3h4v18" /><path d="M15 21v-6h4v6" /></>,
     players: <><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6" /><path d="M14 15c3.8-.7 7 1 7 5" /></>,
     matches: <><path d="M7 3l10 18" /><path d="M17 3L7 21" /><circle cx="12" cy="12" r="2" /></>,
-    clubs: <><path d="M4 21V7l8-4 8 4v14" /><path d="M8 10h2M14 10h2M8 14h2M14 14h2" /><path d="M10 21v-4h4v4" /></>,
+    clubs: <><path d="M12 21s7-3.5 7-10V5l-7-2-7 2v6c0 6.5 7 10 7 10z" /><circle cx="12" cy="9" r="2" /><path d="M8.5 15c.7-2 2-3 3.5-3s2.8 1 3.5 3" /></>,
     tournaments: <><path d="M8 4h8v4a4 4 0 01-8 0V4z" /><path d="M8 6H4v1a5 5 0 005 5M16 6h4v1a5 5 0 01-5 5" /><path d="M12 12v5M8 21h8M9 17h6" /></>,
     announcements: <><path d="M4 13V8l13-4v13L4 13z" /><path d="M7 14l2 6h4l-2-7" /><path d="M20 8v5" /></>,
 };
@@ -63,6 +64,7 @@ export default function AppLayout() {
     const [restoringClubId, setRestoringClubId] = useState(null);
     const [restoreError, setRestoreError] = useState(null);
     const [leavingClub, setLeavingClub] = useState(false);
+    const [leaveConfirmationOpen, setLeaveConfirmationOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(storedSidebarPreference);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
@@ -154,11 +156,11 @@ export default function AppLayout() {
 
     const handleLeaveClub = async () => {
         if (!club || membership?.role === 'owner') return;
-        if (!confirm(`Leave ${club.name}? Your player and match history will be preserved.`)) return;
         setLeavingClub(true);
         setRestoreError(null);
         try {
             await clubApi.leave(club.id);
+            setLeaveConfirmationOpen(false);
             const nextClubId = await refreshClubs();
             setMenuOpen(false);
             navigate(nextClubId ? '/dashboard' : '/clubs');
@@ -174,18 +176,19 @@ export default function AppLayout() {
             <header className={`app-nav${sidebarCollapsed ? ' app-nav--collapsed' : ''}`}>
                 <div className="app-nav__inner">
                     <div className="app-nav__top">
-                        <NavLink className="app-nav__brand" to="/dashboard" aria-label="Chess Managers dashboard">
-                            <BrandLogo className="app-nav__brand-logo" collapse="phone" />
-                        </NavLink>
                         <button
                             type="button"
-                            className="app-nav__collapse-button"
+                            className="app-nav__brand app-nav__brand-toggle"
                             aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
                             aria-expanded={!sidebarCollapsed}
                             onClick={() => setSidebarCollapsed(current => !current)}
                         >
-                            <span aria-hidden="true">{sidebarCollapsed ? '›' : '‹'}</span>
+                            <BrandLogo className="app-nav__brand-logo" collapse="phone" />
+                            <span className="app-nav__brand-toggle-icon" aria-hidden="true">{sidebarCollapsed ? '›' : '‹'}</span>
                         </button>
+                        <NavLink className="app-nav__mobile-brand" to="/dashboard" aria-label="Chess Managers dashboard">
+                            <BrandLogo className="app-nav__brand-logo" collapse="phone" />
+                        </NavLink>
                         <button
                             type="button"
                             className="app-nav__mobile-toggle"
@@ -301,7 +304,7 @@ export default function AppLayout() {
                                         className="app-nav__dropdown-item app-nav__dropdown-item--danger"
                                         role="menuitem"
                                         disabled={leavingClub}
-                                        onClick={handleLeaveClub}
+                                        onClick={() => setLeaveConfirmationOpen(true)}
                                     >
                                         {leavingClub ? 'Leaving club...' : 'Leave active club'}
                                     </button>
@@ -336,6 +339,17 @@ export default function AppLayout() {
                     <Outlet key={`${location.pathname}${location.search}`} />
                 </div>
             </main>
+
+            <ConfirmDialog
+                isOpen={leaveConfirmationOpen}
+                title={`Leave ${club?.name || 'club'}?`}
+                message="Your player and match history will be preserved."
+                confirmLabel="Leave club"
+                variant="danger"
+                loading={leavingClub}
+                onClose={() => setLeaveConfirmationOpen(false)}
+                onConfirm={handleLeaveClub}
+            />
         </div>
     );
 }

@@ -101,9 +101,13 @@ export async function setTournamentStatus(req, res, next) {
     try {
         const existing = await TournamentModel.findById(req.params.tournamentId, req.params.clubId);
         if (!existing) return res.status(404).json({ error: 'Tournament not found.' });
+        if (existing.status === req.validated.status) {
+            return res.json({ tournament: existing });
+        }
         const allowed = existing.status === req.validated.status
             || (existing.status === 'upcoming' && req.validated.status === 'active')
-            || (existing.status === 'active' && req.validated.status === 'completed');
+            || (existing.status === 'active' && req.validated.status === 'completed')
+            || (existing.status === 'completed' && req.validated.status === 'active');
         if (!allowed) {
             return res.status(409).json({ error: `Cannot change a ${existing.status} tournament to ${req.validated.status}.` });
         }

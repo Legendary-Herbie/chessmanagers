@@ -21,13 +21,14 @@ export default function ConfirmDialog({
     // Scroll lock & Escape key
     useEffect(() => {
         if (!isOpen) return;
+        const previousOverflow = document.body.style.overflow;
         document.body.style.overflow = 'hidden';
         const handleEscape = (e) => {
             if (e.key === 'Escape' && !loading && onClose) onClose();
         };
         window.addEventListener('keydown', handleEscape);
         return () => {
-            document.body.style.overflow = '';
+            document.body.style.overflow = previousOverflow;
             window.removeEventListener('keydown', handleEscape);
         };
     }, [isOpen, loading, onClose]);

@@ -68,8 +68,23 @@
 .create-club .btn-primary { background: var(--primary); color: var(--primary-contrast); }
 .create-club .emblem-preview img { max-width: 140px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 
+.create-club__identity-grid,
+.rating-parameter-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
+.create-club__badge-field { display: grid; grid-template-columns: 76px minmax(0, 1fr); align-items: center; gap: 12px; }
+.create-club__badge-field img,
+.create-club__badge-placeholder { width: 76px; height: 76px; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--bg-muted); object-fit: cover; }
+.create-club__badge-placeholder { display: grid; place-items: center; color: var(--primary); font-size: 2rem; }
+.rating-parameter-grid__system { grid-column: 1 / -1; }
+.rating-parameter-grid__system input { font-weight: 700; background: color-mix(in srgb, var(--primary) 8%, var(--bg-muted)); }
+
 @media (max-width: 600px) {
   .create-club { width: min(100% - 24px, 820px); margin: 12px auto; }
   .create-club .stepper, .create-club .controls { align-items: stretch; flex-direction: column; }
   .create-club .form-row { grid-template-columns: 1fr; }
+  .create-club__identity-grid,
+  .rating-parameter-grid { grid-template-columns: 1fr; }
+  .rating-parameter-grid__system { grid-column: auto; }
+  .create-club__badge-field { grid-template-columns: 64px minmax(0, 1fr); }
+  .create-club__badge-field img,
+  .create-club__badge-placeholder { width: 64px; height: 64px; }
 }

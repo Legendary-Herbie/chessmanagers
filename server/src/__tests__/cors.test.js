@@ -3,6 +3,17 @@ import request from 'supertest';
 import app, { createOriginMatcher } from '../../index.js';
 
 describe('CORS origin handling', () => {
+    it('serves an explicit restrictive content security policy', async () => {
+        const response = await request(app).get('/health').expect(200);
+        const policy = response.headers['content-security-policy'];
+
+        expect(policy).toContain("default-src 'self'");
+        expect(policy).toContain("script-src 'self'");
+        expect(policy).toContain("object-src 'none'");
+        expect(policy).toContain("frame-ancestors 'none'");
+        expect(policy).not.toContain("'unsafe-eval'");
+    });
+
     it('matches exact and explicitly wildcarded origins without accepting lookalikes', () => {
         const matches = createOriginMatcher([
             'https://app.example.com',

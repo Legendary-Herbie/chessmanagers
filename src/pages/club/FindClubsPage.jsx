@@ -13,6 +13,7 @@ export default function FindClubsPage() {
     const [error, setError] = useState(null);
     const [joinCode, setJoinCode] = useState('');
     const [joiningByCode, setJoiningByCode] = useState(false);
+    const [joinMessage, setJoinMessage] = useState(null);
     const [searchParams, setSearchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
     const [draftQuery, setDraftQuery] = useState(query);
@@ -60,8 +61,9 @@ export default function FindClubsPage() {
 
     async function handleJoinCode(event) {
         event.preventDefault();
+        setJoinMessage(null);
         if (!/^\d{6}$/.test(joinCode)) {
-            notify('Enter the six-digit club join code.', 'error');
+            setJoinMessage({ type: 'error', text: 'Enter the complete six-digit club join code.' });
             return;
         }
         if (!user) {
@@ -73,9 +75,11 @@ export default function FindClubsPage() {
             const result = await clubApi.joinByCode(joinCode);
             await refreshClubs(result.clubId);
             notify('You joined the club.', 'success');
-            navigate('/dashboard');
+            navigate('/dashboard', { state: { joinMessage: 'You joined the club successfully.' } });
         } catch (requestError) {
-            notify(requestError.message || 'Unable to join with that code.', 'error');
+            const text = requestError.message || 'Unable to join with that code.';
+            setJoinMessage({ type: 'error', text });
+            notify(text, 'error');
         } finally {
             setJoiningByCode(false);
         }
@@ -88,9 +92,13 @@ export default function FindClubsPage() {
 
     return <div className="public-page">
         <header className="public-page__header">
-            <h1>Find clubs</h1>
-            <p>Discover public chess clubs, or use a six-digit code to join a private club.</p>
+            <div><h1>Find clubs</h1>
+                <p>Discover public chess clubs, or use a six-digit code to join a private club.</p></div>
+            {user && <Link className="public-link-button" to="/create-club">Create a club</Link>}
         </header>
+
+        {joinMessage && <section className={`public-panel public-join-message public-join-message--${joinMessage.type}`}
+            role={joinMessage.type === 'error' ? 'alert' : 'status'}>{joinMessage.text}</section>}
 
         <div className="public-discovery-tools">
             <section className="public-panel" aria-labelledby="club-search-heading">

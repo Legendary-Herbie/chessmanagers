@@ -6,6 +6,7 @@ import { tournamentApi } from '../../features/tournaments/api/tournamentApi.js';
 import { playerApi } from '../../features/players/api/playerApi.js';
 import Button from '../../shared/common/Button.jsx';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
+import Dialog from '../../shared/common/Dialog.jsx';
 
 function localDateTime(value = new Date()) {
     const date = new Date(value);
@@ -37,6 +38,8 @@ export default function TournamentPage() {
     const [notice, setNotice] = useState('');
     const [resultPairing, setResultPairing] = useState(null);
     const [duplicateConfirmation, setDuplicateConfirmation] = useState(false);
+    const [archiveConfirmation, setArchiveConfirmation] = useState(false);
+    const [resumeConfirmation, setResumeConfirmation] = useState(false);
     const [resultForm, setResultForm] = useState({ result: 'white', playedAt: localDateTime(), notes: '' });
 
     const load = useCallback(async () => {
@@ -77,11 +80,21 @@ export default function TournamentPage() {
             await action();
             setNotice(successMessage);
             await load();
+            return true;
         } catch (requestError) {
             setError(requestError.message || 'Tournament operation failed.');
+            return false;
         } finally {
             setSaving(false);
         }
+    }
+
+    async function resumeTournament() {
+        const resumed = await runAction(
+            () => tournamentApi.setStatus(club.id, tournamentId, 'active'),
+            'Tournament resumed. You can add players or generate the next round.'
+        );
+        if (resumed) setResumeConfirmation(false);
     }
 
     async function addPlayer() {
@@ -136,10 +149,10 @@ export default function TournamentPage() {
     }
 
     async function archiveTournament() {
-        if (!window.confirm('Archive this tournament? Its rounds and results will be preserved.')) return;
         setSaving(true);
         try {
             await tournamentApi.archive(club.id, tournamentId);
+            setArchiveConfirmation(false);
             navigate('/tournaments');
         } catch (requestError) {
             setError(requestError.message || 'Unable to archive tournament.');
@@ -148,7 +161,11 @@ export default function TournamentPage() {
     }
 
     if (loading && !detail) return <div className="tournament-detail-page"><p className="muted">Loading...</p></div>;
-    if (!detail) return <div className="tournament-detail-page">{error && <div className="error">{error}</div>}</div>;
+    if (!detail) return <div className="tournament-detail-page">
+        {error && <div className="error" role="alert">{error}</div>}
+        <Button onClick={load} disabled={loading}>Retry</Button>
+        <Button variant="secondary" onClick={() => navigate('/tournaments')}>Back to tournaments</Button>
+    </div>;
     const { tournament, participants, rounds, standings } = detail;
 
     return (
@@ -161,7 +178,8 @@ export default function TournamentPage() {
                 {isAdmin && <div className="tournament-actions">
                     {tournament.status === 'upcoming' && <Button loading={saving} onClick={() => runAction(() => tournamentApi.setStatus(club.id, tournamentId, 'active'), 'Tournament started.')}>Start</Button>}
                     {tournament.status === 'active' && <Button variant="secondary" loading={saving} onClick={() => runAction(() => tournamentApi.setStatus(club.id, tournamentId, 'completed'), 'Tournament completed.')}>Complete</Button>}
-                    <Button variant="danger" disabled={saving} onClick={archiveTournament}>Archive</Button>
+                    {tournament.status === 'completed' && <Button loading={saving} onClick={() => setResumeConfirmation(true)}>Resume tournament</Button>}
+                    <Button variant="danger" disabled={saving} onClick={() => setArchiveConfirmation(true)}>Archive</Button>
                 </div>}
             </div>
             {error && <div className="error" role="alert">{error}</div>}
@@ -211,8 +229,8 @@ export default function TournamentPage() {
                 </table></div>
             </section>
 
-            {resultPairing && <div className="modal-backdrop"><div className="modal-content small" role="dialog" aria-modal="true">
-                <div className="modal-header"><h3>{resultPairing.status === 'completed' ? 'Edit result' : 'Record result'}</h3><Button variant="secondary" onClick={() => setResultPairing(null)}>Close</Button></div>
+            {resultPairing && <Dialog title={resultPairing.status === 'completed' ? 'Edit result' : 'Record result'}
+                busy={saving} onClose={() => setResultPairing(null)}>
                 <div className="modal-body">
                     {error && <div className="error" role="alert">{error}</div>}
                     <p><strong>{resultPairing.whitePlayerName || participants.find(player => player.id === resultPairing.whitePlayerId)?.name}</strong> vs <strong>{resultPairing.blackPlayerName || participants.find(player => player.id === resultPairing.blackPlayerId)?.name}</strong></p>
@@ -223,12 +241,20 @@ export default function TournamentPage() {
                 <div className="modal-footer"><Button variant="secondary" disabled={saving}
                     onClick={() => { setResultPairing(null); setDuplicateConfirmation(false); }}>Cancel</Button>
                     <Button loading={saving} disabled={saving} onClick={() => saveResult(false)}>Save result</Button></div>
-            </div></div>}
+            </Dialog>}
 
             <ConfirmDialog isOpen={duplicateConfirmation} title="Possible duplicate result"
                 message="A matching result already exists within five minutes. Save this result anyway?"
                 confirmLabel="Save anyway" variant="warning" loading={saving}
                 onClose={() => setDuplicateConfirmation(false)} onConfirm={() => saveResult(true)} />
+            <ConfirmDialog isOpen={archiveConfirmation} title="Archive tournament?"
+                message="Its rounds and results will be preserved."
+                confirmLabel="Archive tournament" variant="danger" loading={saving}
+                onClose={() => setArchiveConfirmation(false)} onConfirm={archiveTournament} />
+            <ConfirmDialog isOpen={resumeConfirmation} title="Resume tournament?"
+                message="The tournament will become active again. Existing rounds, results, standings, and linked matches will be preserved."
+                confirmLabel="Resume tournament" loading={saving}
+                onClose={() => setResumeConfirmation(false)} onConfirm={resumeTournament} />
         </div>
     );
 }

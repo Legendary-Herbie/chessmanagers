@@ -4,7 +4,9 @@ import { useClub } from '../../app/contextHooks.js';
 import { announcementApi } from '../../features/announcements/api/announcementApi.js';
 import RichTextEditor from '../../features/announcements/components/RichTextEditor.jsx';
 import Button from '../../shared/common/Button.jsx';
+import Dialog from '../../shared/common/Dialog.jsx';
 import '../../styles/announcements.css';
+import NoClubState from '../../shared/common/NoClubState.jsx';
 
 export default function AnnouncementsPage() {
     const { club, capabilities } = useClub();
@@ -53,7 +55,9 @@ export default function AnnouncementsPage() {
         }
     };
 
-    if (!club) return <p>Select a club to view announcements.</p>;
+    if (!club) return <NoClubState title="Keep everyone informed"
+        feature="Announcements give a club one place for news, event details, rich text, and shared files."
+        description="Create a club or join one to publish and read its updates." />;
 
     return (
         <div className="announcements-page">
@@ -67,8 +71,10 @@ export default function AnnouncementsPage() {
             </header>
 
             {showComposer && canManage && (
-                <form className="announcement-composer card" onSubmit={create}>
-                    <h2>Create draft</h2>
+                <Dialog title="New announcement" busy={creating} onClose={() => setShowComposer(false)}>
+                <form className="announcement-composer" onSubmit={create}>
+                    <p className="muted">Share an update with {club.name}. Save a draft to add files and review it before publishing.</p>
+                    {error && <p className="announcement-error" role="alert">{error}</p>}
                     <label>Title<input className="input" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} required /></label>
                     <label>Content</label>
                     <RichTextEditor value={contentHtml} onChange={setContentHtml} />
@@ -77,6 +83,7 @@ export default function AnnouncementsPage() {
                         <Button variant="secondary" onClick={() => setShowComposer(false)}>Cancel</Button>
                     </div>
                 </form>
+                </Dialog>
             )}
 
             <div className="announcement-filters">
@@ -93,17 +100,27 @@ export default function AnnouncementsPage() {
 
             {error && <p className="announcement-error" role="alert">{error}</p>}
             {loading && <p>Loading announcements…</p>}
-            {!loading && !error && announcements.length === 0 && <div className="announcement-empty">No announcements found.</div>}
+            {!loading && !error && announcements.length === 0 && <section className="announcement-empty">
+                <span className="announcement-empty__icon" aria-hidden="true">◈</span>
+                <h2>{query || status ? 'No announcements match these filters' : 'A quieter feed—for now'}</h2>
+                <p>{query || status ? 'Try a different search or status.'
+                    : 'Published updates, event details, and shared club files will appear here in one easy-to-find place.'}</p>
+                {canManage && !query && !status && <Button onClick={() => setShowComposer(true)}>Create the first announcement</Button>}
+            </section>}
             <div className="announcement-grid">
                 {announcements.map(announcement => (
-                    <Link className="announcement-card" to={`/announcements/${announcement.id}`} key={announcement.id}>
-                        <div className="announcement-card__meta">
-                            <span className={`announcement-status announcement-status--${announcement.status}`}>{announcement.status}</span>
-                            <time>{new Date(announcement.publishedAt || announcement.updatedAt).toLocaleDateString()}</time>
-                        </div>
-                        <h2>{announcement.title}</h2>
-                        <p>{announcement.contentText}</p>
-                    </Link>
+                    <article className="announcement-card" key={announcement.id}>
+                        <header className="announcement-post-header">
+                            <span className="announcement-avatar" aria-hidden="true">{club.name?.slice(0, 1).toUpperCase()}</span>
+                            <div className="announcement-post-author"><strong>{club.name}</strong>
+                                <time dateTime={announcement.publishedAt || announcement.updatedAt}>{new Date(announcement.publishedAt || announcement.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time>
+                            </div>
+                            {announcement.status !== 'published' && <span className={`announcement-status announcement-status--${announcement.status}`}>{announcement.status}</span>}
+                        </header>
+                        <h2><Link to={`/announcements/${announcement.id}`}>{announcement.title}</Link></h2>
+                        <p className="announcement-post-text">{announcement.contentText}</p>
+                        <footer className="announcement-post-footer"><Link to={`/announcements/${announcement.id}`}>View announcement <span aria-hidden="true">→</span></Link></footer>
+                    </article>
                 ))}
             </div>
         </div>

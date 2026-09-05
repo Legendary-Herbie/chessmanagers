@@ -238,3 +238,6 @@
     border-radius: var(--radius-md);
     background: var(--bg-muted);
 }
+.membership-request-links { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; margin: 4px 0 16px; }
+.membership-request-links a { color: var(--primary); font-weight: 700; text-decoration: none; }
+.membership-request-links span { color: var(--text-muted); font-size: var(--font-size-sm); }

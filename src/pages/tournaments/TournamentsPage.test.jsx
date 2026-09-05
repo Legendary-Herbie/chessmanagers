@@ -68,4 +68,20 @@ describe('TournamentsPage', () => {
         await screen.findByText('Club Swiss');
         expect(screen.queryByRole('button', { name: 'New tournament' })).toBeNull();
     });
+    it('traps focus, closes with Escape, and restores the opener', async () => {
+        renderPage();
+        const opener = await screen.findByRole('button', { name: 'New tournament' });
+        opener.focus();
+        fireEvent.click(opener);
+        const dialog = screen.getByRole('dialog', { name: 'New tournament' });
+        const last = screen.getByRole('button', { name: 'Create tournament' });
+        last.focus();
+        fireEvent.keyDown(last, { key: 'Tab' });
+        expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }));
+        fireEvent.keyDown(dialog, { key: 'Escape' });
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(document.activeElement).toBe(opener);
+        expect(document.body.style.overflow).toBe('');
+    });
+
 });

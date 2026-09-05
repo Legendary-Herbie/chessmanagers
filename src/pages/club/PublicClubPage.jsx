@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { useAuth, useNotifications } from '../../app/contextHooks.js';
+import { useAuth, useClub, useNotifications } from '../../app/contextHooks.js';
 import { resolveAssetUrl } from '../../config/api.js';
 import { clubApi } from '../../features/clubs/api/clubApi.js';
 import { leaderboardApi } from '../../features/leaderboard/api/leaderboardApi.js';
+import { websiteUrl } from '../../shared/websiteUrl.js';
 
 const CATEGORIES = ['blitz', 'rapid', 'classical'];
 
@@ -11,6 +12,9 @@ export default function PublicClubPage() {
     const { clubId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
+    const { selectClub } = useClub();
+    const [opening, setOpening] = useState(false);
+    const [openError, setOpenError] = useState('');
     const { notify } = useNotifications();
     const [club, setClub] = useState(null);
     const [loading, setLoading] = useState(true);
@@ -49,6 +53,19 @@ export default function PublicClubPage() {
         return () => { active = false; };
     }, [club, clubId, category]);
 
+    async function openDashboard() {
+        setOpening(true);
+        setOpenError('');
+        try {
+            if (!await selectClub(clubId)) throw new Error('Couldn’t open this club. Try again.');
+            navigate('/dashboard');
+        } catch (error) {
+            setOpenError(error.message || 'Couldn’t open this club. Try again.');
+        } finally {
+            setOpening(false);
+        }
+    }
+
     async function handleRequestJoin() {
         if (!user) return;
         setJoining(true);
@@ -84,6 +101,11 @@ export default function PublicClubPage() {
     const authQuery = `?returnTo=${encodeURIComponent(`/clubs/${clubId}`)}`;
     const metrics = club.metrics || {};
     const contacts = club.contacts || {};
+    const website = websiteUrl(contacts.website);
+    const hasMetrics = Boolean(metrics.memberCount || metrics.rosterPlayers || metrics.totalGames
+        || CATEGORIES.some(item => metrics.averageRatings?.[item] != null));
+    const hasAbout = Boolean(club.description || club.contact_info || contacts.email
+        || contacts.phone || contacts.website || contacts.address);
 
     return (
         <div className="public-page">
@@ -98,7 +120,9 @@ export default function PublicClubPage() {
                 </div>
                 <div className="public-club-hero__actions">
                     {isMember ? (
-                        <span className="public-membership-state public-membership-state--success">You are a member</span>
+                        <><span className="public-membership-state public-membership-state--success">You are a member</span>
+                        <button type="button" className="public-button" disabled={opening} onClick={openDashboard}>{opening ? 'Opening…' : 'Open dashboard'}</button>
+                        {openError && <p role="alert">{openError}</p>}</>
                     ) : membershipStatus === 'PENDING_APPROVAL' ? (
                         <span className="public-membership-state">Join request pending</span>
                     ) : membershipStatus === 'REJECTED' && !club.can_request_join ? (
@@ -114,7 +138,7 @@ export default function PublicClubPage() {
                 </div>
             </header>
 
-            {club.visibility === 'public' && <section className="public-club-metrics" aria-label="Club statistics">
+            {club.visibility === 'public' && hasMetrics && <section className="public-club-metrics" aria-label="Club statistics">
                 <div><strong>{metrics.memberCount ?? 0}</strong><span>Members</span></div>
                 <div><strong>{metrics.rosterPlayers ?? 0}</strong><span>Players</span></div>
                 <div><strong>{metrics.totalGames ?? 0}</strong><span>Games recorded</span></div>
@@ -124,22 +148,21 @@ export default function PublicClubPage() {
                 </div>)}
             </section>}
 
-            <div className="public-content-grid">
-                <section className="public-card public-section">
+            {(hasAbout || leaderboardLoading || topPlayers.length > 0) && <div className="public-content-grid">
+                {hasAbout && <section className="public-card public-section">
                     <h2>About</h2>
-                    <p>{club.description || 'This club has not added a description yet.'}</p>
+                    {club.description && <p>{club.description}</p>}
                     {(club.contact_info || contacts.email || contacts.phone || contacts.website || contacts.address) && <div>
                         <h3>Contact and location</h3>
                         {contacts.address && <p>{contacts.address}</p>}
                         {contacts.email && <p><a href={`mailto:${contacts.email}`}>{contacts.email}</a></p>}
                         {contacts.phone && <p><a href={`tel:${contacts.phone}`}>{contacts.phone}</a></p>}
-                        {contacts.website && <p><a href={contacts.website} target="_blank" rel="noreferrer">Visit club website</a></p>}
+                        {website && <p><a href={website} target="_blank" rel="noopener noreferrer">Visit club website</a></p>}
                         {club.contact_info && <p>{club.contact_info}</p>}
                     </div>}
-                    <Link className="public-back-link" to="/clubs">← Back to clubs</Link>
-                </section>
+                </section>}
 
-                {club.visibility === 'public' && club.public_leaderboard && <section className="public-card public-section">
+                {club.visibility === 'public' && club.public_leaderboard && (leaderboardLoading || topPlayers.length > 0) && <section className="public-card public-section">
                     <h2>Top players</h2>
                     <div className="public-category-tabs" aria-label="Leaderboard category">
                         {CATEGORIES.map(item => <button key={item} type="button" className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>
@@ -151,9 +174,10 @@ export default function PublicClubPage() {
                             <Link to={`/clubs/${clubId}/players/${player.publicPlayerId}`}>{player.playerName}</Link>
                             <strong>{player.selectedRating}</strong>
                         </li>)}</ol>
-                    ) : <p>No eligible players yet.</p>}
+                    ) : null}
                 </section>}
-            </div>
+            </div>}
+            <Link className="public-back-link public-club-back" to="/clubs">← Back to clubs</Link>
         </div>
     );
 }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { getToken, setToken, setCsrfToken, clearToken, refreshAccessToken } from '../config/api.js';
 import { authApi } from '../features/auth/api/authApi.js';
 import { AuthContext } from './contextHooks.js';
@@ -6,6 +6,7 @@ import { AuthContext } from './contextHooks.js';
 export function AuthProvider({ children }) {
     const [user, setUser]       = useState(null);
     const [loading, setLoading] = useState(true);
+    const [sessionNotice, setSessionNotice] = useState(null);
 
     // On mount: validate stored JWT against the server.
     useEffect(() => {
@@ -33,6 +34,7 @@ export function AuthProvider({ children }) {
         const data = await authApi.login({ email, password });
         setToken(data.accessToken);
         setCsrfToken(data.csrfToken);
+        setSessionNotice(null);
         setUser(data.user);
         return data.user;
     }, []);
@@ -41,16 +43,18 @@ export function AuthProvider({ children }) {
         return authApi.register(payload);
     }, []);
 
-    const logout = useCallback(async (revokeServer = true) => {
+    const logout = useCallback(async (revokeServer = true, notice = null) => {
         if (revokeServer) {
             try { await authApi.logout(); } catch { /* local logout still succeeds */ }
         }
         clearToken();
+        setSessionNotice(notice);
         setUser(null);
     }, []);
 
     const establishSession = useCallback(async () => {
         const data = await refreshAccessToken();
+        setSessionNotice(null);
         setUser(data.user);
         return data.user;
     }, []);
@@ -59,12 +63,13 @@ export function AuthProvider({ children }) {
     // (e.g. creating a club promotes the user to admin).
     const updateSession = useCallback((token, freshUser) => {
         setToken(token);
+        setSessionNotice(null);
         setUser(freshUser);
     }, []);
 
     return (
         <AuthContext.Provider value={{
-            user, loading, login, register, logout, updateSession, establishSession,
+            user, loading, sessionNotice, login, register, logout, updateSession, establishSession,
         }}>
             {children}
         </AuthContext.Provider>

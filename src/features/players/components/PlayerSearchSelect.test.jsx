@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { playerApi } from '../api/playerApi.js';
 import PlayerSearchSelect from './PlayerSearchSelect.jsx';
@@ -37,4 +37,23 @@ describe('PlayerSearchSelect', () => {
         expect(input.value).toBe('Remote Roster Player');
         expect(input.getAttribute('aria-expanded')).toBe('false');
     });
+    it('shows pending search during debounce and ignores an obsolete response', async () => {
+        vi.useFakeTimers();
+        try {
+            let resolveOld;
+            playerApi.searchPlayers.mockImplementationOnce(() => new Promise(resolve => { resolveOld = resolve; }));
+            render(<PlayerSearchSelect clubId="club_1" label="Player" value="" onChange={vi.fn()} />);
+            const input = screen.getByRole('combobox');
+            fireEvent.focus(input);
+            expect(screen.getByText('Searching…')).toBeTruthy();
+            expect(screen.queryByText('No players found.')).toBeNull();
+            await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+            fireEvent.change(input, { target: { value: 'Remote' } });
+            await act(async () => resolveOld({ players: [{ id: 'old', name: 'Obsolete player' }] }));
+            expect(screen.queryByRole('option')).toBeNull();
+            await act(async () => { await vi.advanceTimersByTimeAsync(250); });
+            expect(screen.getByRole('option', { name: 'Remote Roster Player' })).toBeTruthy();
+        } finally { cleanup(); vi.useRealTimers(); }
+    });
+
 });

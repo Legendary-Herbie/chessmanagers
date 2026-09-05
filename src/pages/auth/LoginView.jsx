@@ -6,7 +6,7 @@ import { authApi } from '../../features/auth/api/authApi.js';
 import { continuationFromParams, continuationQuery } from '../../features/auth/continuation.js';
 
 export default function LoginView() {
-    const { login }   = useAuth();
+    const { login, sessionNotice }   = useAuth();
     const navigate    = useNavigate();
     const [searchParams] = useSearchParams();
     const destination = continuationFromParams(searchParams);
@@ -63,6 +63,8 @@ export default function LoginView() {
                 <h1 className="auth-form-title">Welcome back</h1>
                 <p className="auth-form-subtitle">Sign in to your account</p>
             </div>
+
+            {sessionNotice === 'passwordChanged' && <div className="success-banner" role="status">Password changed successfully. All sessions were ended. Sign in with your new password.</div>}
 
             {error && (
                 <div id="login-error" className="auth-error" role="alert">

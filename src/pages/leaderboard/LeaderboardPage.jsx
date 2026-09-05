@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import '../../styles/leaderboard.css';
 import Button from '../../shared/common/Button.jsx';
+import Dialog from '../../shared/common/Dialog.jsx';
 import { playerApi } from '../../features/players/api/playerApi.js';
 import { useClub } from '../../app/contextHooks.js';
 import { leaderboardApi } from '../../features/leaderboard/api/leaderboardApi.js';
+import NoClubState from '../../shared/common/NoClubState.jsx';
 
 const CATEGORIES = ['blitz', 'rapid', 'classical'];
 const PAGE_SIZE = 25;
@@ -26,7 +28,7 @@ function Sparkline({ points = [] }) {
     )).join(' ');
     return (
         <svg className="sparkline-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-            <path d={path} fill="none" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+            <path d={path} fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     );
 }
@@ -40,7 +42,7 @@ function RatingCells({ entry, selectedCategory }) {
 }
 
 export default function LeaderboardPage() {
-    const { club } = useClub();
+    const { club, capabilities = {} } = useClub();
     const [searchParams, setSearchParams] = useSearchParams();
     const requestedCategory = searchParams.get('category');
     const selectedCategory = CATEGORIES.includes(requestedCategory) ? requestedCategory : 'blitz';
@@ -49,8 +51,26 @@ export default function LeaderboardPage() {
     const [leaderboard, setLeaderboard] = useState({ entries: [], total: 0 });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [refreshKey, setRefreshKey] = useState(0);
     const [selectedPlayer, setSelectedPlayer] = useState(null);
     const [ratingHistory, setRatingHistory] = useState([]);
+    const [historyLoading, setHistoryLoading] = useState(false);
+    const [historyError, setHistoryError] = useState('');
+
+    useEffect(() => { setSelectedPlayer(null); }, [club?.id, selectedCategory]);
+
+    useEffect(() => {
+        if (!selectedPlayer || selectedPlayer.clubId !== club?.id || selectedPlayer.category !== selectedCategory) return;
+        let active = true;
+        setRatingHistory([]);
+        setHistoryError('');
+        setHistoryLoading(true);
+        playerApi.fetchRatingHistory(club.id, selectedPlayer.playerId, selectedCategory)
+            .then(data => { if (active) setRatingHistory(data); })
+            .catch(error => { if (active) setHistoryError(error.message || 'Unable to load rating history.'); })
+            .finally(() => { if (active) setHistoryLoading(false); });
+        return () => { active = false; };
+    }, [club?.id, selectedCategory, selectedPlayer]);
 
     const updateQuery = useCallback((changes) => {
         const next = new URLSearchParams(searchParams);
@@ -76,21 +96,22 @@ export default function LeaderboardPage() {
             if (active) setLoading(false);
         });
         return () => { active = false; };
-    }, [club?.id, selectedCategory, page, search]);
+    }, [club?.id, selectedCategory, page, search, refreshKey]);
 
     function selectCategory(category) {
         updateQuery({ category, page: null });
     }
 
     function openPlayer(entry) {
-        setSelectedPlayer(entry);
+        setSelectedPlayer({ ...entry, clubId: club.id, category: selectedCategory });
         setRatingHistory([]);
-        playerApi.fetchRatingHistory(club.id, entry.playerId, selectedCategory)
-            .then(setRatingHistory)
-            .catch(() => setRatingHistory([]));
     }
 
     const totalPages = Math.max(1, Math.ceil(leaderboard.total / PAGE_SIZE));
+
+    if (!club) return <NoClubState title="Turn results into a clear leaderboard"
+        feature="Every rated match updates the selected Blitz, Rapid, or Classical ranking while keeping all three ratings visible."
+        description="Create a club or join one, then record rated matches to build the first standings." />;
 
     return (
         <div className="leaderboard-page">
@@ -111,24 +132,30 @@ export default function LeaderboardPage() {
                 </div>
             </div>
 
-            {error && <div className="error-banner">{error}</div>}
+            {error && <div className="error-banner" role="alert"><p>Couldn’t load leaderboard. Try again. {error}</p><Button variant="secondary" disabled={loading} onClick={() => setRefreshKey(current => current + 1)}>Retry</Button></div>}
             <div className="leaderboard-list" aria-busy={loading}>
                 {loading ? <div className="muted">Loading...</div> : (
                     <>
-                        <table className="leaderboard-table">
+                        {leaderboard.entries.length > 0 ? <table className="leaderboard-table">
                             <thead><tr><th>Rank</th><th>Player</th><th>Blitz</th><th>Rapid</th><th>Classical</th><th>Total Games</th></tr></thead>
                             <tbody>
                                 {leaderboard.entries.map(entry => (
                                     <tr key={entry.playerId} className="leaderboard-row" onClick={() => openPlayer(entry)}>
                                         <td className={`rank ${entry.rank <= 3 ? `top${entry.rank}` : ''}`}>{entry.rank}</td>
-                                        <td>{entry.playerName}</td>
+                                        <td><button type="button" className="btn-secondary"
+                                            onClick={event => { event.stopPropagation(); openPlayer(entry); }}
+                                            aria-label={`View ${entry.playerName} rating history`}>{entry.playerName}</button></td>
                                         <RatingCells entry={entry} selectedCategory={selectedCategory} />
                                         <td>{entry.totalGames}</td>
                                     </tr>
                                 ))}
-                                {!leaderboard.entries.length && <tr><td colSpan={6} className="muted">No eligible players found.</td></tr>}
                             </tbody>
-                        </table>
+                        </table> : <section className="leaderboard-empty">
+                            <span aria-hidden="true">♜</span>
+                            <h2>The first ranking is one rated result away</h2>
+                            <p>Players appear here after they complete a rated match in the selected {label(selectedCategory)} category.</p>
+                            <Link className="btn-primary" to="/matches">{capabilities.canManageMatches ? 'Record a rated match' : 'View club matches'}</Link>
+                        </section>}
                         <div className="leaderboard-cards">
                             {leaderboard.entries.map(entry => (
                                 <button type="button" className="leaderboard-card" key={entry.playerId} onClick={() => openPlayer(entry)}>
@@ -143,16 +170,14 @@ export default function LeaderboardPage() {
                 )}
             </div>
 
-            <div className="leaderboard-pagination" aria-label="Leaderboard pagination">
+            {leaderboard.total > 0 && <div className="leaderboard-pagination" aria-label="Leaderboard pagination">
                 <Button variant="secondary" disabled={page === 1} onClick={() => updateQuery({ page: page - 1 })}>Previous</Button>
                 <span>Page {page} of {totalPages}</span>
                 <Button variant="secondary" disabled={page >= totalPages} onClick={() => updateQuery({ page: page + 1 })}>Next</Button>
-            </div>
+            </div>}
 
-            {selectedPlayer && (
-                <div className="modal-backdrop" onMouseDown={event => event.target === event.currentTarget && setSelectedPlayer(null)}>
-                    <div className="modal-content small" role="dialog" aria-modal="true">
-                        <div className="modal-header"><h3>{selectedPlayer.playerName}</h3><Button variant="secondary" onClick={() => setSelectedPlayer(null)}>Close</Button></div>
+            {selectedPlayer && selectedPlayer.clubId === club?.id && selectedPlayer.category === selectedCategory && (
+                <Dialog title={selectedPlayer.playerName} onClose={() => setSelectedPlayer(null)}>
                         <div className="modal-body">
                             <div className="player-summary">
                                 <div><strong>{label(selectedCategory)} Elo:</strong> {selectedPlayer.selectedRating}</div>
@@ -160,10 +185,11 @@ export default function LeaderboardPage() {
                                 <div><strong>Peak:</strong> {selectedPlayer.peakRating}</div>
                                 <div><strong>Weighted win rate:</strong> {Math.round(selectedPlayer.weightedWinRate * 100)}%</div>
                             </div>
-                            <div className="rating-history"><h4>{label(selectedCategory)} rating history</h4><Sparkline points={ratingHistory} /></div>
+                            <div className="rating-history"><h4>{label(selectedCategory)} rating history</h4>
+                                {historyLoading ? <p role="status">Loading rating history…</p>
+                                    : historyError ? <p role="alert">{historyError}</p> : <Sparkline points={ratingHistory} />}</div>
                         </div>
-                    </div>
-                </div>
+                </Dialog>
             )}
         </div>
     );

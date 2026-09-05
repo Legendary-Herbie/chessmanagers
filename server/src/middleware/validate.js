@@ -132,11 +132,10 @@ export const registerSchema = z.object({
     password: z.string().min(8, 'Password must be at least 8 characters.').max(200),
     continuation: continuationSchema,
 }).strict().superRefine((value, context) => {
-    if (!value.username && !value.name) context.addIssue({ code: 'custom', path: ['name'], message: 'Username is required.' });
     if (!value.fullName && !value.name) context.addIssue({ code: 'custom', path: ['fullName'], message: 'Full name is required.' });
 }).transform(value => ({
     email: value.email,
-    username: value.username || value.name,
+    username: value.username,
     fullName: value.fullName || value.name,
     password: value.password,
     continuation: value.continuation || '',
@@ -356,7 +355,7 @@ export const clubStructuredSettingsSchema = z.object({
 
 export const updateClubSchema = z.object({
     name:        z.string().trim().min(1, 'Club name is required.').max(150, 'Club name must be 150 characters or fewer.').optional(),
-    federation:  z.string().trim().min(1, 'Federation is required.').max(100, 'Federation must be 100 characters or fewer.').optional(),
+    federation:  z.string().trim().min(1, 'Federation is required.').max(5, 'Federation must be 5 characters or fewer.').optional(),
     description: z.string().trim().max(1000, 'Description must be 1,000 characters or fewer.').optional().nullable(),
     contactInfo: z.string().trim().max(500, 'Contact information must be 500 characters or fewer.').optional().nullable(),
     visibility: z.enum(['public', 'private']).optional(),
@@ -368,7 +367,7 @@ export const updateClubSchema = z.object({
 });
 
 export const updateClubPresentationSchema = z.object({
-    federation: z.string().trim().min(1, 'Federation is required.').max(100, 'Federation must be 100 characters or fewer.').optional(),
+    federation: z.string().trim().min(1, 'Federation is required.').max(5, 'Federation must be 5 characters or fewer.').optional(),
     description: z.string().trim().max(1000, 'Description must be 1,000 characters or fewer.').optional().nullable(),
     contactInfo: z.string().trim().max(500, 'Contact information must be 500 characters or fewer.').optional().nullable(),
     settings: z.object({
@@ -382,7 +381,7 @@ export const updateClubPresentationSchema = z.object({
 
 export const createClubSchema = z.object({
     name:        z.string().trim().min(1, 'Club name is required.').max(150, 'Club name must be 150 characters or fewer.'),
-    federation:  z.string().trim().min(1, 'Federation is required.').max(100, 'Federation must be 100 characters or fewer.'),
+    federation:  z.string().trim().min(1, 'Federation is required.').max(5, 'Federation must be 5 characters or fewer.'),
     description: z.string().trim().max(1000, 'Description must be 1,000 characters or fewer.').optional().nullable(),
     contactInfo: z.string().trim().max(500, 'Contact information must be 500 characters or fewer.').optional().nullable(),
     // Previously accepted by the frontend (CreateClub.jsx) but silently

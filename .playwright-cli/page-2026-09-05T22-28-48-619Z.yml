@@ -1,0 +1,130 @@
+- generic [ref=f1e2]:
+  - navigation [ref=f1e3]:
+    - button "matches" [ref=f1e4]
+    - button "players" [active] [ref=f1e5]
+    - button "tournaments" [ref=f1e6]
+    - button "login" [ref=f1e7]
+  - main [ref=f1e8]:
+    - generic [ref=f1e86]:
+      - generic [ref=f1e87]:
+        - generic [ref=f1e88]:
+          - heading "Club Players" [level=1] [ref=f1e89]
+          - paragraph [ref=f1e90]:
+            - text: Manage player rosters, Elo ratings, and account linkage for
+            - strong [ref=f1e91]: Central Chess Club
+            - text: .
+        - button "Add players" [ref=f1e93] [cursor=pointer]
+      - generic [ref=f1e94]:
+        - generic [ref=f1e95]:
+          - generic [ref=f1e96]: Total Roster
+          - generic [ref=f1e97]: "2"
+          - generic [ref=f1e98]: Registered club players
+        - generic [ref=f1e99]:
+          - generic [ref=f1e100]: Average ratings
+          - generic "Average club ratings by category" [ref=f1e101]:
+            - generic [ref=f1e102]:
+              - generic [ref=f1e103]: Blitz
+              - text: "1575"
+            - generic [ref=f1e104]:
+              - generic [ref=f1e105]: Rapid
+              - text: "1650"
+            - generic [ref=f1e106]:
+              - generic [ref=f1e107]: Classical
+              - text: "1625"
+          - generic [ref=f1e108]: All active roster players
+        - generic [ref=f1e109]:
+          - generic [ref=f1e110]: Active Players
+          - generic [ref=f1e111]: "2"
+          - generic [ref=f1e112]: Played at least 1 match
+      - generic [ref=f1e113]:
+        - generic [ref=f1e114]:
+          - generic: 🔍
+          - textbox "Search players" [ref=f1e115]:
+            - /placeholder: Search players by name or bio...
+        - generic [ref=f1e116]:
+          - generic [ref=f1e117]:
+            - text: Rating category
+            - combobox "Rating category" [ref=f1e118] [cursor=pointer]:
+              - option "Blitz" [selected]
+              - option "Rapid"
+              - option "Classical"
+          - combobox "Filter by link status" [ref=f1e119] [cursor=pointer]:
+            - option "All Statuses" [selected]
+            - option "Claimed Only"
+            - option "Pending Claim"
+            - option "Unlinked Only"
+          - combobox "Sort players" [ref=f1e120] [cursor=pointer]:
+            - option "Highest Elo rating first" [selected]
+            - option "Lowest Elo rating first"
+            - option "Name (A-Z)"
+            - option "Most Games Played"
+            - option "Highest Win Rate"
+          - generic [ref=f1e121]:
+            - button "▦ Grid" [ref=f1e122] [cursor=pointer]
+            - button "≡ List" [ref=f1e123] [cursor=pointer]
+      - paragraph [ref=f1e124]: Elo ratings use the selected rating category. Game totals and win rates include all categories.
+      - generic [ref=f1e125]:
+        - generic [ref=f1e126]:
+          - generic [ref=f1e127]:
+            - generic [ref=f1e128]: KB
+            - generic [ref=f1e129]:
+              - link "Kwame Boateng" [ref=f1e130] [cursor=pointer]:
+                - /url: /players/b
+              - generic [ref=f1e131]:
+                - generic "blitz Elo rating" [ref=f1e132]: "Blitz Elo: 1750"
+                - generic [ref=f1e133]: Unlinked
+          - paragraph [ref=f1e134]: No bio provided.
+          - generic [ref=f1e135]:
+            - generic [ref=f1e136]:
+              - generic [ref=f1e137]: "10"
+              - generic [ref=f1e138]: Played
+            - generic [ref=f1e139]:
+              - generic [ref=f1e140]: "5"
+              - generic [ref=f1e141]: Wins
+            - generic [ref=f1e142]:
+              - generic [ref=f1e143]: "3"
+              - generic [ref=f1e144]: Draws
+            - generic [ref=f1e145]:
+              - generic [ref=f1e146]: "2"
+              - generic [ref=f1e147]: Losses
+            - generic [ref=f1e148]:
+              - generic [ref=f1e149]: 65%
+              - generic [ref=f1e150]: Win %
+          - generic [ref=f1e151]:
+            - link "View Details" [ref=f1e152] [cursor=pointer]:
+              - /url: /players/b
+            - generic [ref=f1e153]:
+              - button "Edit Player" [ref=f1e154] [cursor=pointer]: ✏️
+              - button "Archive Player" [ref=f1e155] [cursor=pointer]: 🗑️
+        - generic [ref=f1e156]:
+          - generic [ref=f1e157]:
+            - generic [ref=f1e158]: AM
+            - generic [ref=f1e159]:
+              - link "Ada Mensah" [ref=f1e160] [cursor=pointer]:
+                - /url: /players/a
+              - generic [ref=f1e161]:
+                - generic "blitz Elo rating" [ref=f1e162]: "Blitz Elo: 1400"
+                - generic [ref=f1e163]: Unlinked
+          - paragraph [ref=f1e164]: No bio provided.
+          - generic [ref=f1e165]:
+            - generic [ref=f1e166]:
+              - generic [ref=f1e167]: "12"
+              - generic [ref=f1e168]: Played
+            - generic [ref=f1e169]:
+              - generic [ref=f1e170]: "8"
+              - generic [ref=f1e171]: Wins
+            - generic [ref=f1e172]:
+              - generic [ref=f1e173]: "2"
+              - generic [ref=f1e174]: Draws
+            - generic [ref=f1e175]:
+              - generic [ref=f1e176]: "2"
+              - generic [ref=f1e177]: Losses
+            - generic [ref=f1e178]:
+              - generic [ref=f1e179]: 75%
+              - generic [ref=f1e180]: Win %
+          - generic [ref=f1e181]:
+            - link "View Details" [ref=f1e182] [cursor=pointer]:
+              - /url: /players/a
+            - generic [ref=f1e183]:
+              - button "Edit Player" [ref=f1e184] [cursor=pointer]: ✏️
+              - button "Archive Player" [ref=f1e185] [cursor=pointer]: 🗑️

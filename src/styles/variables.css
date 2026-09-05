@@ -11,6 +11,16 @@
   --accent-light: #34d399;
   --danger: #f43f5e;
   --warning: #f59e0b;
+  --status-error-text: #991b1b;
+  --status-error-bg: #fee2e2;
+  --status-success-text: #166534;
+  --status-success-bg: #dcfce7;
+  --status-warning-text: #92400e;
+  --status-warning-bg: #fef3c7;
+  --status-info-text: #1e40af;
+  --status-info-bg: #dbeafe;
+  --status-neutral-text: #374151;
+  --status-neutral-bg: #e5e7eb;
 
   /* Surfaces */
   --bg-page: #f7f8fa;
@@ -101,6 +111,16 @@
 
 /* Dark theme overrides */
 [data-theme='dark'] {
+  --status-error-text: #fca5a5;
+  --status-error-bg: #450a0a;
+  --status-success-text: #86efac;
+  --status-success-bg: #052e16;
+  --status-warning-text: #fcd34d;
+  --status-warning-bg: #451a03;
+  --status-info-text: #93c5fd;
+  --status-info-bg: #172554;
+  --status-neutral-text: #d1d5db;
+  --status-neutral-bg: #374151;
   --bg-page: #0a0f1e;
   --bg-surface: #111827;
   --bg-muted: #1f2937;

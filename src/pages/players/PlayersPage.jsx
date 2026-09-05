@@ -10,6 +10,7 @@ import EditPlayerForm from '../../features/players/admin/EditPlayerForm.jsx';
 import PendingLinksList from '../../features/players/admin/PendingLinksList.jsx';
 import { runPlayerAction } from '../../features/players/playerActionFeedback.js';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
+import NoClubState from '../../shared/common/NoClubState.jsx';
 
 import '../../styles/players.css';
 
@@ -25,6 +26,8 @@ export default function PlayersPage() {
         stats,
         loading,
         error,
+        ratingCategory,
+        setRatingCategory,
         searchTerm,
         setSearchTerm,
         statusFilter,
@@ -40,7 +43,7 @@ export default function PlayersPage() {
         restorePlayer,
     } = usePlayers(club?.id, { includeInactive: isAdmin });
 
-    // Inline add form toggle
+    // Player creation lives in a focused modal so the roster stays uncluttered.
     const [showInlineAddForm, setShowInlineAddForm] = useState(false);
     const [editingPlayer, setEditingPlayer] = useState(null);
 
@@ -122,20 +125,9 @@ export default function PlayersPage() {
     }
 
     if (!club) {
-        return (
-            <div className="players-container">
-                <div className="empty-state">
-                    <span className="empty-state__icon">♟️</span>
-                    <h2 className="empty-state__title">No Club Selected</h2>
-                    <p className="empty-state__description">
-                        You need to belong to or create a chess club to manage players.
-                    </p>
-                    <Link to="/create-club" className="btn-primary">
-                        Create a Club
-                    </Link>
-                </div>
-            </div>
-        );
+        return <NoClubState title="Create a roster people can trust"
+            feature="Players can exist with or without accounts, keep separate Blitz, Rapid, and Classical ratings, and retain their match history."
+            description="Create a new club or join one to view and manage its players." />;
     }
 
     return (
@@ -145,7 +137,7 @@ export default function PlayersPage() {
                 <div className="players-header__title-group">
                     <h1>Club Players</h1>
                     <p className="players-header__subtitle">
-                        Manage player rosters, ELO ratings, and account linkage for <strong>{club.name}</strong>.
+                        Manage player rosters, Elo ratings, and account linkage for <strong>{club.name}</strong>.
                     </p>
                 </div>
 
@@ -157,24 +149,11 @@ export default function PlayersPage() {
                             className="btn-primary"
                             onClick={() => setShowInlineAddForm((prev) => !prev)}
                         >
-                            {showInlineAddForm ? '✕ Close Form' : '➕ Add Player Form'}
+                            Add players
                         </button>
                     </div>
                 )}
             </div>
-
-            {/* Integrated Inline Add Player Form (Admin only) */}
-            {isAdmin && showInlineAddForm && (
-                <AddPlayerForm
-                    isInline={true}
-                    clubId={club.id}
-                    ratingSettings={club.rating_settings}
-                    onPlayerAdded={() => {
-                        refetch();
-                    }}
-                    onClose={() => setShowInlineAddForm(false)}
-                />
-            )}
 
             {/* Admin Pending Requests Banner */}
             {isAdmin && <PendingLinksList clubId={club.id} onActionComplete={refetch} />}
@@ -210,12 +189,17 @@ export default function PlayersPage() {
                         type="text"
                         className="players-toolbar__search-input"
                         placeholder="Search players by name or bio..."
+                        aria-label="Search players"
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
                 </div>
 
                 <div className="players-toolbar__filters">
+                    <label>Rating category <select className="players-filter-select" value={ratingCategory}
+                        onChange={event => setRatingCategory(event.target.value)}>
+                        <option value="blitz">Blitz</option><option value="rapid">Rapid</option><option value="classical">Classical</option>
+                    </select></label>
                     <select
                         className="players-filter-select"
                         value={statusFilter}
@@ -234,8 +218,8 @@ export default function PlayersPage() {
                         onChange={(e) => setSortBy(e.target.value)}
                         aria-label="Sort players"
                     >
-                        <option value="rating_desc">Highest ELO First</option>
-                        <option value="rating_asc">Lowest ELO First</option>
+                        <option value="rating_desc">Highest Elo rating first</option>
+                        <option value="rating_asc">Lowest Elo rating first</option>
                         <option value="name_asc">Name (A-Z)</option>
                         <option value="games_desc">Most Games Played</option>
                         <option value="winrate_desc">Highest Win Rate</option>
@@ -260,15 +244,17 @@ export default function PlayersPage() {
                 </div>
             </div>
 
+            <p className="muted">Elo ratings use the selected rating category. Game totals and win rates include all categories.</p>
+
             {/* Error banner */}
-            {error && <div className="error-box">{error}</div>}
+            {error && <div className="error-box" role="alert"><p>Couldn’t load players. Try again. {error}</p><button type="button" className="btn-secondary" disabled={loading} onClick={() => refetch()}>Retry</button></div>}
 
             {/* Loading & Empty states */}
             {loading ? (
                 <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
                     Fetching player records...
                 </div>
-            ) : processedPlayers.length === 0 ? (
+            ) : error ? null : processedPlayers.length === 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
                     <div className="empty-state">
                         <span className="empty-state__icon">👥</span>
@@ -280,14 +266,8 @@ export default function PlayersPage() {
                         </p>
                     </div>
 
-                    {isAdmin && !showInlineAddForm && !searchTerm && (
-                        <AddPlayerForm
-                            isInline={true}
-                            clubId={club.id}
-                            ratingSettings={club.rating_settings}
-                            onPlayerAdded={refetch}
-                        />
-                    )}
+                    {isAdmin && !searchTerm && statusFilter === 'all' && <button type="button" className="btn-primary empty-state__action"
+                        onClick={() => setShowInlineAddForm(true)}>Add your first players</button>}
                 </div>
             ) : viewMode === 'grid' ? (
                 /* Grid View */
@@ -296,6 +276,7 @@ export default function PlayersPage() {
                         <PlayerCard
                             key={player.id}
                             player={player}
+                            ratingCategory={ratingCategory}
                             currentUser={user}
                             currentLinkedPlayerId={linkedPlayer?.id}
                             isAdmin={isAdmin}
@@ -310,6 +291,7 @@ export default function PlayersPage() {
                 /* Table View */
                 <PlayerTable
                     players={processedPlayers}
+                    ratingCategory={ratingCategory}
                     currentLinkedPlayerId={linkedPlayer?.id}
                     isAdmin={isAdmin}
                     onEdit={(p) => setEditingPlayer(p)}
@@ -326,6 +308,10 @@ export default function PlayersPage() {
                 isAdmin={isAdmin}
                 onPlayerUpdated={refetch}
             />
+
+            {isAdmin && <AddPlayerForm isOpen={showInlineAddForm} clubId={club.id}
+                ratingSettings={club.rating_settings} onPlayerAdded={refetch}
+                onClose={() => setShowInlineAddForm(false)} />}
 
             {isAdmin && inactivePlayers.length > 0 && (
                 <section className="players-table-wrapper" style={{ marginTop: '24px', padding: '16px' }}>

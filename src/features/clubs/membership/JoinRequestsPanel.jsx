@@ -3,6 +3,7 @@ import { clubApi } from '../api/clubApi.js';
 import { useNotifications } from '../../../app/contextHooks.js';
 import Button from '../../../shared/common/Button.jsx';
 import ConfirmDialog from '../../../components/ConfirmDialog.jsx';
+import { Link } from 'react-router-dom';
 
 export default function JoinRequestsPanel({ clubId, onQueueChanged }) {
     const { notify } = useNotifications();
@@ -82,6 +83,11 @@ export default function JoinRequestsPanel({ clubId, onQueueChanged }) {
                     <p className="muted" style={{ marginTop: 0 }}>Approve or reject people waiting to join this club.</p>
                 </div>
                 {!loading && <strong aria-label={`${requests.length} pending membership requests`}>{requests.length} pending</strong>}
+            </div>
+
+            <div className="membership-request-links">
+                <Link to="/club?tab=members">Manage invites and member access →</Link>
+                <span>Invite people directly or review the club join code.</span>
             </div>
 
             {error && <div className="error" role="alert">{error}</div>}

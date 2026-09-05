@@ -61,11 +61,11 @@ function sessionResponse(res, result, status = 200) {
 }
 
 export function getCsrfToken(req, res) {
+    res.set('Cache-Control', 'no-store');
     const csrfToken = req.cookies?.[CSRF_COOKIE];
     if (!req.cookies?.[REFRESH_COOKIE] || !csrfToken) {
-        return res.status(401).json({ error: 'Session cookie is unavailable.', code: 'REFRESH_REQUIRED' });
+        return res.json({ csrfToken: null });
     }
-    res.set('Cache-Control', 'no-store');
     return res.json({ csrfToken });
 }
 

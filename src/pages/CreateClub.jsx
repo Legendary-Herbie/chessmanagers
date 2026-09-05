@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getFieldErrors, isValidationError } from '../config/api.js';
 import { useAuth, useClub } from '../app/contextHooks.js';
 import { clubApi } from '../features/clubs/api/clubApi.js';
+import { FEDERATION_CODES } from '../features/clubs/federations.js';
 import '../styles/create-club.css';
 
 export default function CreateClub() {
@@ -26,12 +27,26 @@ export default function CreateClub() {
 
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState({});
+  const [messageIsError, setMessageIsError] = useState(false);
   const [message, setMessage] = useState(null);
+  const [badgePreview, setBadgePreview] = useState('');
+
+  useEffect(() => {
+    if (!badgeFile) {
+      setBadgePreview('');
+      return undefined;
+    }
+    if (typeof URL.createObjectURL !== 'function') return undefined;
+    const preview = URL.createObjectURL(badgeFile);
+    setBadgePreview(preview);
+    return () => URL.revokeObjectURL(preview);
+  }, [badgeFile]);
 
   function validateStep1() {
     const errs = {};
     if (!name.trim()) errs.name = 'Name is required.';
     if (!federation.trim()) errs.federation = 'Federation is required.';
+    else if (federation.trim().length > 5) errs.federation = 'Use a federation code of no more than 5 characters.';
     return errs;
   }
 
@@ -60,6 +75,7 @@ export default function CreateClub() {
   function handleBack() {
     setErrors({});
     setMessage(null);
+    setMessageIsError(false);
     setStep((s) => Math.max(1, s - 1));
   }
 
@@ -68,6 +84,7 @@ export default function CreateClub() {
     setLoading(true);
     setErrors({});
     setMessage(null);
+    setMessageIsError(false);
     const payload = {
       name: name.trim(),
       federation: federation.trim(),
@@ -82,8 +99,10 @@ export default function CreateClub() {
       }])),
     };
 
+    let createdClub = null;
     try {
       const data = await clubApi.create(payload);
+      createdClub = data.club;
 
       // Refresh the account session returned alongside the new club. Club
       // permissions remain scoped to the membership loaded by ClubProvider.
@@ -91,16 +110,26 @@ export default function CreateClub() {
         updateSession(data.token, data.user);
       }
 
+      let badgeUploadFailed = false;
       if (badgeFile) {
-        await clubApi.uploadBadge(data.club.id, badgeFile);
+        try {
+          await clubApi.uploadBadge(data.club.id, badgeFile);
+        } catch {
+          badgeUploadFailed = true;
+        }
       }
 
       await refreshClubs(data.club.id);
 
-      setMessage('Club created! Redirecting…');
+      setMessage(badgeUploadFailed
+        ? 'Club created, but the badge could not be uploaded. You can add it later. Redirecting…'
+        : 'Club created! Redirecting…');
       setTimeout(() => navigate('/dashboard'), 1200);
     } catch (apiErr) {
-      if (isValidationError(apiErr)) {
+      setMessageIsError(true);
+      if (createdClub) {
+        setMessage('Club created, but the dashboard could not be refreshed. Reload the page to continue.');
+      } else if (isValidationError(apiErr)) {
         setErrors(getFieldErrors(apiErr));
       } else {
         setMessage(apiErr.message || 'Failed to create club.');
@@ -124,31 +153,39 @@ export default function CreateClub() {
           <section>
             <h2 style={{ marginTop: 0 }}>Core Identity</h2>
 
-            <label>Name</label>
-            <input className="" placeholder="e.g. Royal Gambit Chess Academy" value={name} onChange={(e) => setName(e.target.value)} />
-            {errors.name && <div className="error">{errors.name}</div>}
+            <label htmlFor="create-name">Name</label>
+            <input id="create-name" className="" placeholder="e.g. Royal Gambit Chess Academy" value={name} onChange={(e) => setName(e.target.value)} />
+            {errors.name && <div className="error" role="alert">{errors.name}</div>}
 
-            <label style={{ marginTop: 12 }}>Federation</label>
-            <input placeholder="e.g. USCF" value={federation} onChange={(e) => setFederation(e.target.value)} />
-            {errors.federation && <div className="error">{errors.federation}</div>}
-
-            <label style={{ marginTop: 12 }}>Club badge</label>
-            <input type="file" accept="image/jpeg,image/png,image/webp" onChange={e => setBadgeFile(e.target.files?.[0] || null)} />
-            <div className="form-helper" style={{ marginTop: 4, fontSize: 13, color: '#6b7280' }}>
-              {badgeFile ? `${badgeFile.name} selected` : 'JPEG, PNG, or WebP; maximum 5 MB.'}
+            <div className="create-club__identity-grid">
+              <div>
+                <label htmlFor="create-federation">Federation</label>
+                <select id="create-federation" value={federation} onChange={(e) => setFederation(e.target.value)}>
+                  <option value="">Select federation</option>
+                  {FEDERATION_CODES.map(code => <option value={code} key={code}>{code}</option>)}
+                </select>
+                {errors.federation && <div className="error" role="alert">{errors.federation}</div>}
+              </div>
+              <div>
+                <label htmlFor="create-visibility">Visibility</label>
+                <select id="create-visibility" value={isPublic ? 'public' : 'private'} onChange={(e) => setIsPublic(e.target.value === 'public')}>
+                  <option value="public">Public (listed)</option>
+                  <option value="private">Private (invite-only)</option>
+                </select>
+                <div className="form-helper">{isPublic
+                  ? 'Listed publicly so people can discover and request to join.'
+                  : 'Hidden from discovery; people join with an invite or code.'}</div>
+              </div>
             </div>
 
-            <label style={{ marginTop: 12 }}>Visibility</label>
-            <select value={isPublic ? 'public' : 'private'} onChange={(e) => setIsPublic(e.target.value === 'public')}>
-              <option value="public">Public (listed)</option>
-              <option value="private">Private (invite-only)</option>
-            </select>
-            <div className="form-helper" style={{ marginTop: 4, fontSize: 13, color: '#6b7280' }}>
-              {isPublic
-                ? 'Anyone can find this club on the Find Clubs page and request to join.'
-                : "This club won't appear on the Find Clubs page. People can still join via an invite link, or by requesting to join if they have the club's direct URL."}
+            <label htmlFor="create-badge" style={{ marginTop: 16 }}>Club badge</label>
+            <div className="create-club__badge-field">
+              {badgePreview ? <img src={badgePreview} alt="Club badge preview" />
+                : <span className="create-club__badge-placeholder" aria-hidden="true">♜</span>}
+              <div><input id="create-badge" type="file" accept="image/jpeg,image/png,image/webp"
+                onChange={e => setBadgeFile(e.target.files?.[0] || null)} />
+                <div className="form-helper">{badgeFile ? `${badgeFile.name} selected` : 'JPEG, PNG, or WebP; maximum 5 MB.'}</div></div>
             </div>
-
             <div className="controls">
               <button type="button" className="btn btn-secondary" onClick={handleNext}>Proceed to Rating</button>
             </div>
@@ -159,34 +196,31 @@ export default function CreateClub() {
           <section>
             <h2 style={{ marginTop: 0 }}>Rating Parameters</h2>
 
-            <div className="form-row">
-              <div>
-                <label>Rating system</label>
-                <input value="Elo" disabled />
+            <div className="rating-parameter-grid">
+              <div className="rating-parameter-grid__system">
+                <label htmlFor="create-system">Rating system</label>
+                <input id="create-system" value="Elo" readOnly aria-describedby="rating-system-help" />
+                <div id="rating-system-help" className="form-helper">Chess Managers uses Elo for Blitz, Rapid, and Classical ratings.</div>
               </div>
 
               <div>
-                <label>Initial rating</label>
-                <input type="number" value={initialRating} onChange={(e) => setInitialRating(e.target.value)} />
-                {errors.initialRating && <div className="error">{errors.initialRating}</div>}
+                <label htmlFor="create-initialRating">Initial rating</label>
+                <input id="create-initialRating" type="number" value={initialRating} onChange={(e) => setInitialRating(e.target.value)} />
+                {errors.initialRating && <div className="error" role="alert">{errors.initialRating}</div>}
               </div>
+              <div><label htmlFor="create-ratingFloor">Rating floor</label>
+                <input id="create-ratingFloor" type="number" value={ratingFloor} onChange={(e) => setRatingFloor(e.target.value)} />
+                {errors.ratingFloor && <div className="error" role="alert">{errors.ratingFloor}</div>}</div>
+              <div><label htmlFor="create-kFactor">K-factor</label>
+                <input id="create-kFactor" type="number" value={kFactor} onChange={(e) => setKFactor(e.target.value)} />
+                {errors.kFactor && <div className="error" role="alert">{errors.kFactor}</div>}</div>
+              <div><label htmlFor="create-provisionalKFactor">Provisional K-factor</label>
+                <input id="create-provisionalKFactor" type="number" value={provisionalKFactor} onChange={(e) => setProvisionalKFactor(e.target.value)} />
+                {errors.provisionalKFactor && <div className="error" role="alert">{errors.provisionalKFactor}</div>}</div>
+              <div><label htmlFor="create-provisionalGames">Provisional games</label>
+                <input id="create-provisionalGames" type="number" value={provisionalGames} onChange={(e) => setProvisionalGames(e.target.value)} />
+                {errors.provisionalGames && <div className="error" role="alert">{errors.provisionalGames}</div>}</div>
             </div>
-
-            <label style={{ marginTop: 12 }}>K-factor</label>
-            <input type="number" value={kFactor} onChange={(e) => setKFactor(e.target.value)} />
-            {errors.kFactor && <div className="error">{errors.kFactor}</div>}
-
-            <label style={{ marginTop: 12 }}>Rating floor</label>
-            <input type="number" value={ratingFloor} onChange={(e) => setRatingFloor(e.target.value)} />
-            {errors.ratingFloor && <div className="error">{errors.ratingFloor}</div>}
-
-            <label style={{ marginTop: 12 }}>Provisional K-factor</label>
-            <input type="number" value={provisionalKFactor} onChange={(e) => setProvisionalKFactor(e.target.value)} />
-            {errors.provisionalKFactor && <div className="error">{errors.provisionalKFactor}</div>}
-
-            <label style={{ marginTop: 12 }}>Provisional games</label>
-            <input type="number" value={provisionalGames} onChange={(e) => setProvisionalGames(e.target.value)} />
-            {errors.provisionalGames && <div className="error">{errors.provisionalGames}</div>}
 
             <div className="controls">
               <button type="button" className="btn btn-secondary" onClick={handleBack}>Back</button>
@@ -196,7 +230,7 @@ export default function CreateClub() {
         )}
       </form>
 
-      {message && <div className="message">{message}</div>}
+      {message && <div className="message" role={messageIsError ? 'alert' : 'status'}>{message}</div>}
     </div>
   );
 }

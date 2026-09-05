@@ -37,7 +37,25 @@ async function registerAndVerify(agent, values, ip) {
 }
 
 describe('authentication lifecycle', () => {
+    it('returns a quiet, uncacheable bootstrap response for anonymous visitors', async () => {
+        const response = await request(app).get('/api/v1/auth/csrf').expect(200);
+        expect(response.body).toEqual({ csrfToken: null });
+        expect(response.headers['cache-control']).toBe('no-store');
+        await request(app).post('/api/v1/auth/refresh').send({}).expect(403);
+    });
     beforeEach(() => { consumeTestEmails(); });
+
+    it('creates the required internal username when registration only asks for a full name', async () => {
+        const response = await request(app).post('/api/v1/auth/register')
+            .set('X-Forwarded-For', '198.51.100.8')
+            .send({ email: 'friendly-signup@example.test', fullName: 'Friendly Player', password: 'CorrectHorse123!' })
+            .expect(201);
+        expect(response.body.user).toMatchObject({ fullName: 'Friendly Player' });
+        expect(response.body.user.username).toMatch(/^Friendly_Player_[A-Za-z0-9]{8}$/);
+        const message = consumeTestEmails().find(email => email.type === 'verification');
+        expect(message.html).toContain('Verify email address');
+        expect(message.html).toContain('href=');
+    });
 
     it('accepts Google callback metadata while still validating code and state', async () => {
         const response = await request(app).get('/api/v1/auth/google/callback')

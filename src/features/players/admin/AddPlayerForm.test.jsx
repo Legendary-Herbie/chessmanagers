@@ -91,4 +91,17 @@ describe('AddPlayerForm rating defaults', () => {
             },
         ]));
     });
+
+    it('locks background scrolling while the player modal is open and closes with Escape', () => {
+        const onClose = vi.fn();
+        document.body.style.overflow = 'auto';
+        const { unmount } = render(<AddPlayerForm isOpen clubId="club_1" onClose={onClose} />);
+        expect(screen.getByRole('dialog', { name: 'Add players' })).toBeTruthy();
+        expect(document.body.style.overflow).toBe('hidden');
+        fireEvent.keyDown(window, { key: 'Escape' });
+        expect(onClose).toHaveBeenCalledOnce();
+        unmount();
+        expect(document.body.style.overflow).toBe('auto');
+        document.body.style.overflow = '';
+    });
 });

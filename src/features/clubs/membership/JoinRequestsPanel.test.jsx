@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { NotificationsContext } from '../../../app/contextHooks.js';
 import { clubApi } from '../api/clubApi.js';
 import JoinRequestsPanel from './JoinRequestsPanel.jsx';
+import { MemoryRouter } from 'react-router-dom';
 
 vi.mock('../api/clubApi.js', () => ({
     clubApi: {
@@ -16,7 +17,7 @@ vi.mock('../api/clubApi.js', () => ({
 function renderPanel(props = {}) {
     return render(
         <NotificationsContext.Provider value={{ notify: vi.fn() }}>
-            <JoinRequestsPanel clubId="club_1" {...props} />
+            <MemoryRouter><JoinRequestsPanel clubId="club_1" {...props} /></MemoryRouter>
         </NotificationsContext.Provider>
     );
 }
@@ -39,6 +40,7 @@ describe('JoinRequestsPanel', () => {
 
         expect(await screen.findByText('Ada Player')).toBeTruthy();
         expect(screen.getByText('I play rapid.')).toBeTruthy();
+        expect(screen.getByRole('link', { name: /Manage invites and member access/ }).getAttribute('href')).toBe('/club?tab=members');
         fireEvent.click(screen.getByRole('button', { name: 'Approve' }));
 
         await waitFor(() => expect(clubApi.approveJoinRequest).toHaveBeenCalledWith('club_1', 'request_1'));

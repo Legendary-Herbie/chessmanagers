@@ -148,3 +148,8 @@
     .category-switcher { width: 100%; }
     .category-switcher button { flex: 1; }
 }
+.leaderboard-empty { padding: clamp(28px, 6vw, 52px); border: 1px dashed var(--border-emphasis); border-radius: var(--radius-xl); background: var(--bg-surface); text-align: center; }
+.leaderboard-empty > span { color: var(--primary); font-size: 2.25rem; }
+.leaderboard-empty h2 { margin: 10px 0 8px; color: var(--text-strong); }
+.leaderboard-empty p { max-width: 560px; margin: 0 auto 20px; color: var(--text-muted); line-height: 1.6; }
+.leaderboard-empty a { display: inline-flex; min-height: 44px; align-items: center; padding-inline: 18px; text-decoration: none; }

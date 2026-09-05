@@ -1,5 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useClub } from '../../../app/contextHooks.js';
 import { notificationApi } from '../api/notificationApi.js';
+import { notificationDestination } from '../notificationDestination.js';
 
 const EVENT_COPY = {
     'membership.request_pending': 'A membership request needs review.',
@@ -25,11 +28,11 @@ const EVENT_COPY = {
 function notificationDetail(notification) {
     const payload = notification.payload || {};
     if (notification.eventType.startsWith('match.')) {
-        return `${payload.whitePlayerName} vs ${payload.blackPlayerName}`;
+        return `${payload.whitePlayerName || 'White player'} vs ${payload.blackPlayerName || 'Black player'}`;
     }
     if (notification.eventType.startsWith('tournament.')) return payload.tournamentName;
     if (notification.eventType === 'membership.request_pending') return payload.applicantName;
-    if (notification.eventType === 'player_claim.pending') return `${payload.applicantName} · ${payload.playerName}`;
+    if (notification.eventType === 'player_claim.pending') return `${payload.applicantName || 'Applicant'} · ${payload.playerName || 'Player'}`;
     if (notification.eventType === 'announcement.published') return payload.title;
     if (notification.eventType.startsWith('player_')) return payload.playerName;
     return null;
@@ -44,15 +47,22 @@ function BellIcon() {
 }
 
 export default function NotificationTray() {
+    const navigate = useNavigate();
+    const { selectClub, activeClubs = [] } = useClub();
     const trayRef = useRef(null);
     const [open, setOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [loading, setLoading] = useState(false);
     const [deletingId, setDeletingId] = useState(null);
+    const [mutating, setMutating] = useState(false);
+    const mutationPending = useRef(false);
+    const loadVersion = useRef({ value: 0 });
     const [error, setError] = useState(null);
 
     const load = useCallback(async () => {
+        if (mutationPending.current) return;
+        const version = ++loadVersion.current.value;
         setLoading(true);
         setError(null);
         try {
@@ -60,19 +70,21 @@ export default function NotificationTray() {
                 notificationApi.list({ limit: 30 }),
                 notificationApi.unreadCount(),
             ]);
+            if (version !== loadVersion.current.value) return;
             setNotifications(list.notifications);
             setUnreadCount(unread.count);
         } catch (loadError) {
-            setError(loadError.message || 'Could not load notifications.');
+            if (version === loadVersion.current.value) setError(loadError.message || 'Could not load notifications.');
         } finally {
-            setLoading(false);
+            if (version === loadVersion.current.value) setLoading(false);
         }
     }, []);
 
     useEffect(() => {
+        const requestState = loadVersion.current;
         load();
         const timer = setInterval(load, 60_000);
-        return () => clearInterval(timer);
+        return () => { clearInterval(timer); requestState.value++; };
     }, [load]);
 
     useEffect(() => {
@@ -97,34 +109,59 @@ export default function NotificationTray() {
         if (next) await load();
     };
 
-    const markRead = async notification => {
-        if (notification.readAt) return;
-        await notificationApi.markRead(notification.id);
-        setNotifications(current => current.map(item => (
-            item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item
-        )));
-        setUnreadCount(current => Math.max(0, current - 1));
+    const runMutation = async (request, update, fallback) => {
+        if (mutationPending.current) return;
+        mutationPending.current = true;
+        loadVersion.current.value++;
+        setLoading(false);
+        setMutating(true);
+        setError(null);
+        try {
+            await request();
+            update();
+            return true;
+        } catch (requestError) {
+            setError(requestError.message || fallback);
+            return false;
+        } finally {
+            mutationPending.current = false;
+            setMutating(false);
+        }
     };
 
-    const markAllRead = async () => {
-        await notificationApi.markAllRead();
+    const markRead = notification => {
+        if (notification.readAt) return true;
+        return runMutation(() => notificationApi.markRead(notification.id), () => {
+            setNotifications(current => current.map(item => (
+                item.id === notification.id ? { ...item, readAt: new Date().toISOString() } : item
+            )));
+            setUnreadCount(current => Math.max(0, current - 1));
+        }, 'Could not mark the notification as read. Please try again.');
+    };
+
+    const markAllRead = () => runMutation(() => notificationApi.markAllRead(), () => {
         const readAt = new Date().toISOString();
         setNotifications(current => current.map(item => ({ ...item, readAt: item.readAt || readAt })));
         setUnreadCount(0);
+    }, 'Could not mark notifications as read. Please try again.');
+
+    const openNotification = async notification => {
+        const marked = await markRead(notification);
+        if (marked === false) return;
+        const canSelectClub = activeClubs.some(entry => entry.club.id === notification.clubId);
+        if (notification.clubId && canSelectClub) await selectClub(notification.clubId);
+        setOpen(false);
+        navigate(notificationDestination(notification));
     };
 
     const dismiss = async notification => {
+        if (mutationPending.current) return;
         setDeletingId(notification.id);
-        setError(null);
-        try {
-            await notificationApi.dismiss(notification.id);
+        await runMutation(() => notificationApi.dismiss(notification.id), () => {
             setNotifications(current => current.filter(item => item.id !== notification.id));
             if (!notification.readAt) setUnreadCount(current => Math.max(0, current - 1));
-        } catch (dismissError) {
-            setError(dismissError.message || 'Could not delete the notification.');
-        } finally {
-            setDeletingId(null);
-        }
+        }, 'Could not delete the notification.');
+        setDeletingId(null);
     };
 
     return (
@@ -153,7 +190,7 @@ export default function NotificationTray() {
                             <span>{unreadCount ? `${unreadCount} unread` : 'All caught up'}</span>
                         </div>
                         {unreadCount > 0 && (
-                            <button type="button" onClick={markAllRead}>Mark all read</button>
+                            <button type="button" disabled={mutating} onClick={markAllRead}>Mark all read</button>
                         )}
                     </div>
 
@@ -172,18 +209,20 @@ export default function NotificationTray() {
                                         <button
                                             type="button"
                                             className={`notification-tray__item${notification.readAt ? '' : ' notification-tray__item--unread'}`}
-                                            onClick={() => markRead(notification)}
+                                            onClick={() => openNotification(notification)}
+                                            disabled={mutating}
                                         >
                                             <span className="notification-tray__item-copy">
                                                 <strong>{EVENT_COPY[notification.eventType] || 'Club update'}</strong>
                                                 {notificationDetail(notification) && <span>{notificationDetail(notification)}</span>}
                                                 <small>{notification.clubName}</small>
+                                                <span className="notification-tray__action">Open relevant page →</span>
                                             </span>
                                             {!notification.readAt && <span className="notification-tray__unread-dot" aria-label="Unread" />}
                                         </button>
                                         <button type="button" className="notification-tray__delete"
                                             aria-label={`Delete notification: ${EVENT_COPY[notification.eventType] || 'Club update'}`}
-                                            disabled={deletingId === notification.id}
+                                            disabled={mutating || deletingId === notification.id}
                                             onClick={() => dismiss(notification)}>
                                             <span aria-hidden="true">×</span>
                                         </button>

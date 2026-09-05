@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { playerApi } from '../api/playerApi.js';
+import { playerRating } from '../roster/playerRating.js';
 import { isCancelledError } from '../../../config/api.js';
 
 export function usePlayers(clubId, { includeInactive = false } = {}) {
@@ -15,6 +16,7 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
 
     // Toolbar filtering & sorting state
     const [searchTerm, setSearchTerm] = useState('');
+    const [ratingCategory, setRatingCategory] = useState('blitz');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'claimed' | 'pending' | 'unlinked'
     const [sortBy, setSortBy] = useState('rating_desc');     // 'rating_desc' | 'rating_asc' | 'name_asc' | 'games_desc' | 'winrate_desc'
     const [viewMode, setViewMode] = useState('grid');       // 'grid' | 'table'
@@ -124,8 +126,14 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
         }
 
         result.sort((a, b) => {
-            if (sortBy === 'rating_desc') return (b.rating || 1500) - (a.rating || 1500);
-            if (sortBy === 'rating_asc') return (a.rating || 1500) - (b.rating || 1500);
+            if (sortBy === 'rating_desc' || sortBy === 'rating_asc') {
+                const first = playerRating(a, ratingCategory);
+                const second = playerRating(b, ratingCategory);
+                if (first == null && second != null) return 1;
+                if (second == null && first != null) return -1;
+                const difference = sortBy === 'rating_desc' ? second - first : first - second;
+                return difference || (a.name || '').localeCompare(b.name || '') || a.id.localeCompare(b.id);
+            }
             if (sortBy === 'name_asc') return (a.name || '').localeCompare(b.name || '');
             if (sortBy === 'games_desc') return (b.games || 0) - (a.games || 0);
             if (sortBy === 'winrate_desc') {
@@ -137,7 +145,7 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
         });
 
         return result;
-    }, [players, statusFilter, sortBy]);
+    }, [players, statusFilter, sortBy, ratingCategory]);
 
     return {
         players,
@@ -148,6 +156,8 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
         error,
         searchTerm,
         setSearchTerm,
+        ratingCategory,
+        setRatingCategory,
         statusFilter,
         setStatusFilter,
         sortBy,

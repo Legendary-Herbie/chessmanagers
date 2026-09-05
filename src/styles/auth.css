@@ -377,6 +377,18 @@
     opacity: 0.7;
 }
 
+.auth-password-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    width: max-content;
+    color: var(--text-muted);
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+}
+
+.auth-password-toggle input { accent-color: var(--primary); }
+
 .auth-google {
     width: 100%;
     min-height: 44px;

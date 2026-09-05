@@ -87,7 +87,23 @@ const isOriginAllowed = createOriginMatcher(CORS_ORIGIN, {
 app.set('trust proxy', 1);
 
 app.use(helmet({
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+        directives: {
+            defaultSrc: ["'self'"],
+            baseUri: ["'self'"],
+            objectSrc: ["'none'"],
+            frameAncestors: ["'none'"],
+            scriptSrc: ["'self'"],
+            // React style props are still used in several existing components.
+            styleSrc: ["'self'", "'unsafe-inline'"],
+            imgSrc: ["'self'", 'data:', 'blob:'],
+            fontSrc: ["'self'", 'data:'],
+            connectSrc: ["'self'"],
+            formAction: ["'self'"],
+            // Do not upgrade local HTTP development requests to HTTPS.
+            upgradeInsecureRequests: NODE_ENV === 'production' ? [] : null,
+        },
+    },
 }));
 
 app.use(cors({

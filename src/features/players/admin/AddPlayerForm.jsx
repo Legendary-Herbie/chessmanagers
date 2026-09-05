@@ -33,13 +33,14 @@ export default function AddPlayerForm({
     // Scroll Lock when modal is open
     useEffect(() => {
         if (!isInline && isOpen) {
+            const previousOverflow = document.body.style.overflow;
             document.body.style.overflow = 'hidden';
             const handleEscape = (e) => {
                 if (e.key === 'Escape' && onClose) onClose();
             };
             window.addEventListener('keydown', handleEscape);
             return () => {
-                document.body.style.overflow = '';
+                document.body.style.overflow = previousOverflow;
                 window.removeEventListener('keydown', handleEscape);
             };
         }
@@ -173,7 +174,7 @@ export default function AddPlayerForm({
     const formContent = (
         <>
             <div className="modal-card__header">
-                <h2 className="modal-card__title">Add New Player(s)</h2>
+                <h2 className="modal-card__title" id="add-player-title">Add players</h2>
                 {!isInline && onClose && (
                     <button type="button" className="modal-card__close" onClick={onClose} aria-label="Close modal">
                         ✕
@@ -198,7 +199,7 @@ export default function AddPlayerForm({
                 </button>
             </div>
 
-            {error && <div className="error-box">{error}</div>}
+            {error && <div className="error-box" role="alert">{error}</div>}
             {bulkSuccessMsg && <div className="success-box">{bulkSuccessMsg}</div>}
 
             {tab === 'single' ? (
@@ -335,8 +336,9 @@ export default function AddPlayerForm({
     }
 
     return (
-        <div className="modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-            <div className="modal-card" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-overlay" onMouseDown={event => event.target === event.currentTarget && onClose?.()}>
+            <div className="modal-card" role="dialog" aria-modal="true" aria-labelledby="add-player-title"
+                onMouseDown={(e) => e.stopPropagation()}>
                 {formContent}
             </div>
         </div>

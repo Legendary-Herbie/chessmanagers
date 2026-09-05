@@ -80,7 +80,8 @@ npm run dev
 
 This concurrently starts:
 - **Client**: http://localhost:3000 (Vite dev server)
-- **Server**: http://localhost:3000/api/v1 (Express via proxy)
+- **API through Vite**: http://localhost:3000/api/v1 (proxied to Express on port 5000)
+- **Express directly**: http://localhost:5000 (with `PORT=5000` from `server/.env.example`)
 
 ### 5. Open Browser
 
@@ -137,7 +138,6 @@ JWT_EXPIRES_IN=7d                           # JWT expiration time (default: 7 da
 REFRESH_TOKEN_EXPIRY_DAYS=30                # Refresh token expiry (default: 30 days)
 
 # Club Configuration
-MAX_CLUBS_PER_USER=2                        # Max clubs a user can own (default: 2)
 
 # Frontend Serving (production only)
 SERVE_FRONTEND=false                        # Set true to serve built frontend from server
@@ -179,7 +179,7 @@ npm run dev
 
 Access:
 - **Client**: http://localhost:3000
-- **API Health**: http://localhost:3000/api/v1/health
+- **API Health**: http://localhost:5000/health (direct Express URL; Vite does not proxy `/health`)
 
 ### Run Components Separately
 
@@ -193,7 +193,7 @@ npm start
 **Server only:**
 ```bash
 npm run server:dev
-# Runs on port (default 3000) with nodemon auto-reload
+# Runs on PORT (5000 in server/.env.example) with nodemon auto-reload
 # Good for backend-only development
 ```
 
@@ -231,8 +231,8 @@ Update `server/.env`:
 
 ```bash
 NODE_ENV=production
+PORT=5000
 SERVE_FRONTEND=true                  # Enable serving frontend from server
-VITE_API_URL=                        # Same-origin API when Express serves the frontend
 CORS_ORIGIN=https://example.com      # Your production domain
 FRONTEND_URL=https://example.com     # OAuth returns here after the callback
 GOOGLE_REDIRECT_URI=https://example.com/api/v1/auth/google/callback
@@ -249,7 +249,9 @@ npm start                  # Start production server
 # Serves frontend from dist/ + API on /api/v1
 ```
 
-Server listens on `PORT` (default 3000) and serves:
+Set `VITE_API_URL` in the root build environment before building, not in `server/.env`. Leave it empty for this same-origin deployment.
+
+Server listens on `PORT` (5000 above; code fallback is 3000 if unset) and serves:
 - Static frontend files from `dist/`
 - API routes at `/api/v1/*`
 - Health check at `/health`
@@ -257,20 +259,24 @@ Server listens on `PORT` (default 3000) and serves:
 ### 4. Deployment Options
 
 **Option A: Docker**
-```dockerfile
-FROM node:20-alpine
-WORKDIR /app
-COPY package*.json ./
-RUN npm ci --omit=dev
-COPY . .
-EXPOSE 3000
-CMD ["npm", "start"]
+The checked-in `Dockerfile` builds the frontend in one stage, installs production server dependencies in another, and starts Express. `.dockerignore` excludes local secrets and uploads.
+
+```bash
+docker build -t chessmanagers .
+docker run -d --name chessmanagers --env-file server/.env \
+  -e NODE_ENV=production -e SERVE_FRONTEND=true -e PORT=5000 \
+  -p 5000:5000 -v chessmanagers-uploads:/app/server/uploads chessmanagers
+curl http://localhost:5000/health
 ```
+
+Supply production database, JWT, domain, and email settings through the environment. The database must be reachable from the container; `localhost` inside it is not the host database. Keep the uploads volume for durable attachments. Use an HTTPS reverse proxy for the public domain and secure production cookies.
 
 **Option B: Traditional VPS/Railway/Heroku**
 - Push to git repo
 - Set environment variables (avoid committing `.env`)
-- Run `npm install && npm run build:prod && npm start`
+- Build: `npm ci && npm run build && npm --prefix server ci --omit=dev`
+- Start: `npm --prefix server start` with `NODE_ENV=production` and `SERVE_FRONTEND=true`
+- Health: `/health`; API: `/api/v1`; frontend: `/`
 
 ---
 
@@ -336,7 +342,8 @@ npm run server:dev   # Auto-initializes schema
 ### Base URL
 
 - **Development**: `http://localhost:3000/api/v1`
-- **Production**: `https://api.example.com/api/v1`
+- **Production, same origin**: `https://example.com/api/v1`
+- **Production, separate API**: `https://api.example.com/api/v1` (set `VITE_API_URL` at build time)
 
 ### Health Check
 

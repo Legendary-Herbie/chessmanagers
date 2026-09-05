@@ -74,7 +74,7 @@ describe('announcement workflows', () => {
         await screen.findByText('Pairing night');
         expect(screen.getByLabelText('Status')).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: 'New announcement' }));
-        expect(screen.getByRole('heading', { name: 'Create draft' })).toBeTruthy();
+        expect(screen.getByRole('dialog', { name: 'New announcement' })).toBeTruthy();
         expect(screen.getByRole('textbox', { name: 'Announcement content' })).toBeTruthy();
     });
 

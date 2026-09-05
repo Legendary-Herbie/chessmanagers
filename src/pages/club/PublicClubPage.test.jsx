@@ -2,7 +2,7 @@ import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { AuthContext, NotificationsContext } from '../../app/contextHooks.js';
+import { AuthContext, ClubContext, NotificationsContext } from '../../app/contextHooks.js';
 import { clubApi } from '../../features/clubs/api/clubApi.js';
 import { leaderboardApi } from '../../features/leaderboard/api/leaderboardApi.js';
 import PublicClubPage from './PublicClubPage.jsx';
@@ -18,18 +18,21 @@ vi.mock('../../features/leaderboard/api/leaderboardApi.js', () => ({
     leaderboardApi: { fetchPublicLeaderboard: vi.fn(), fetchStats: vi.fn() },
 }));
 
+const selectClub = vi.fn().mockResolvedValue(true);
+
 function renderClub(club, user = { id: 'user_1' }) {
     clubApi.fetchPresentation.mockResolvedValue(club);
     return render(
-        <AuthContext.Provider value={{ user }}>
+        <ClubContext.Provider value={{ selectClub }}><AuthContext.Provider value={{ user }}>
             <NotificationsContext.Provider value={{ notify: vi.fn() }}>
                 <MemoryRouter initialEntries={['/clubs/club_1']}>
                     <Routes>
+                        <Route path="/dashboard" element={<h1>Selected club dashboard</h1>} />
                         <Route path="/clubs/:clubId" element={<PublicClubPage />} />
                     </Routes>
                 </MemoryRouter>
             </NotificationsContext.Provider>
-        </AuthContext.Provider>
+        </AuthContext.Provider></ClubContext.Provider>
     );
 }
 
@@ -43,6 +46,12 @@ describe('PublicClubPage membership states', () => {
         leaderboardApi.fetchPublicLeaderboard.mockResolvedValue({ entries: [] });
     });
     afterEach(cleanup);
+
+    it('turns a protocol-less club website into an external HTTPS link', async () => {
+        renderClub({ id: 'club_1', name: 'Test Club', contacts: { website: 'example.com/chess' } });
+        expect((await screen.findByRole('link', { name: 'Visit club website' })).getAttribute('href'))
+            .toBe('https://example.com/chess');
+    });
 
     it('shows a pending request without another join action', async () => {
         renderClub({
@@ -82,6 +91,15 @@ describe('PublicClubPage membership states', () => {
             .toBe('/auth/register?returnTo=%2Fclubs%2Fclub_1');
     });
 
+    it('keeps an unpopulated public club page intentionally minimal', async () => {
+        renderClub({ id: 'club_1', name: 'New Club', visibility: 'public', public_leaderboard: true,
+            metrics: { memberCount: 0, rosterPlayers: 0, totalGames: 0, averageRatings: {} }, contacts: {} });
+        expect(await screen.findByRole('heading', { name: 'New Club' })).toBeTruthy();
+        expect(screen.queryByText('Members')).toBeNull();
+        expect(screen.queryByRole('heading', { name: 'About' })).toBeNull();
+        expect(screen.queryByRole('heading', { name: 'Top players' })).toBeNull();
+    });
+
     it('shows public contacts, club-wide metrics, and category-specific top players', async () => {
         leaderboardApi.fetchPublicLeaderboard.mockResolvedValue({
             entries: [{ publicPlayerId: 'public_1', playerName: 'Ada Player', selectedRating: 1810 }],
@@ -110,4 +128,19 @@ describe('PublicClubPage membership states', () => {
             'club_1', { category: 'rapid', limit: 5 }
         ));
     });
+    it('selects the public club before opening the member dashboard', async () => {
+        renderClub({ id: 'club_1', name: 'Test Club', is_member: true });
+        fireEvent.click(await screen.findByRole('button', { name: 'Open dashboard' }));
+        expect(await screen.findByRole('heading', { name: 'Selected club dashboard' })).toBeTruthy();
+        expect(selectClub).toHaveBeenCalledWith('club_1');
+    });
+
+    it('stays on the public page if selecting the club fails', async () => {
+        selectClub.mockResolvedValueOnce(false);
+        renderClub({ id: 'club_1', name: 'Test Club', is_member: true });
+        fireEvent.click(await screen.findByRole('button', { name: 'Open dashboard' }));
+        expect((await screen.findByRole('alert')).textContent).toContain('Couldn’t open this club');
+        expect(screen.queryByRole('heading', { name: 'Selected club dashboard' })).toBeNull();
+    });
+
 });

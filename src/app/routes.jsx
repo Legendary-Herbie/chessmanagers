@@ -80,7 +80,7 @@ export default function AppRoutes() {
     return (
         <Routes>
             {/* ── Public ───────────────────────────────────────────────── */}
-            <Route path="/" element={<Landing />} />
+            <Route path="/" element={<RequireGuest><Landing /></RequireGuest>} />
 
             {/* Find clubs (public) */}
             <Route element={<PublicLayout />}>

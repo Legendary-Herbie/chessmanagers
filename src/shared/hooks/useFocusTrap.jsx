@@ -1,5 +1,7 @@
 import { useEffect } from 'react';
 
+const activeTraps = [];
+
 /**
  * Traps focus within the ref element while active.
  * Restores focus to the previously focused element on cleanup.
@@ -12,6 +14,9 @@ export function useFocusTrap(ref, active = true) {
         if (!active || !ref.current) return;
 
         const element = ref.current;
+        const trap = { element };
+        activeTraps.push(trap);
+        const isTopTrap = () => activeTraps[activeTraps.length - 1] === trap;
 
         // Save the element that was focused before the trap activated
         // so we can restore focus when the trap is released (e.g. modal closes).
@@ -39,7 +44,7 @@ export function useFocusTrap(ref, active = true) {
             );
 
         const handleKeyDown = (e) => {
-            if (e.key !== 'Tab') return;
+            if (e.key !== 'Tab' || !isTopTrap()) return;
 
             const focusable = getFocusableItems();
             if (focusable.length === 0) {
@@ -67,7 +72,7 @@ export function useFocusTrap(ref, active = true) {
         // pull it back to the first focusable item.
         // Note: `active` is not checked here — if this effect is running, active is true.
         const handleFocusIn = (e) => {
-            if (element && !element.contains(e.target)) {
+            if (isTopTrap() && element && !element.contains(e.target)) {
                 const focusable = getFocusableItems();
                 if (focusable.length > 0) focusable[0].focus();
             }
@@ -85,9 +90,12 @@ export function useFocusTrap(ref, active = true) {
         return () => {
             element.removeEventListener('keydown', handleKeyDown);
             document.removeEventListener('focusin', handleFocusIn);
+            const wasTopTrap = isTopTrap();
+            const trapIndex = activeTraps.indexOf(trap);
+            if (trapIndex !== -1) activeTraps.splice(trapIndex, 1);
 
             // Restore focus to the element that was active before the trap
-            if (previouslyFocused && typeof previouslyFocused.focus === 'function') {
+            if (wasTopTrap && previouslyFocused && typeof previouslyFocused.focus === 'function') {
                 previouslyFocused.focus();
             }
         };

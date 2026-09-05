@@ -62,3 +62,27 @@ select {
     .brand-logo--collapse-phone .brand-logo__lockup { display: none; }
     .brand-logo--collapse-phone .brand-logo__icon { display: block; }
 }
+html[data-theme='dark'] { color-scheme: dark; }
+html[data-theme='light'] { color-scheme: light; }
+
+.no-club-state {
+    width: min(720px, calc(100% - 32px));
+    margin: clamp(32px, 10vh, 96px) auto;
+    padding: clamp(28px, 6vw, 52px);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-xl);
+    background: linear-gradient(145deg, color-mix(in srgb, var(--primary) 8%, var(--bg-surface)), var(--bg-surface));
+    box-shadow: var(--shadow-sm);
+    text-align: center;
+}
+.no-club-state__eyebrow { color: var(--primary); font-size: var(--font-size-xs); font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+.no-club-state h1 { margin: 10px 0 14px; color: var(--text-strong); font-size: clamp(1.8rem, 4vw, 2.7rem); }
+.no-club-state p { max-width: 610px; margin: 10px auto 0; color: var(--text-muted); line-height: 1.65; }
+.no-club-state .no-club-state__feature { color: var(--text); font-size: 1.05rem; }
+.no-club-state__actions { margin-top: 26px; display: flex; justify-content: center; flex-wrap: wrap; gap: 10px; }
+.no-club-state__actions a { min-height: 44px; display: inline-flex; align-items: center; justify-content: center; padding: 0 18px; text-decoration: none; }
+.success-banner { padding: 12px 14px; border: 1px solid color-mix(in srgb, var(--success) 40%, transparent); border-radius: var(--radius-md); background: var(--status-success-bg); color: var(--status-success-text); }
+
+@media (max-width: 480px) {
+    .no-club-state__actions { flex-direction: column; }
+}

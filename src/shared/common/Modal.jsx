@@ -31,7 +31,7 @@ export default function Modal({ modal, modalInput, setModalInput, closeModal }) 
         <div className="modal-backdrop opacity-90" role="presentation" onClick={() => closeModal(false)}>
             <div
                 className="modal-content"
-                role="alertdialog"
+                role={modal.type === 'alert' ? 'alertdialog' : 'dialog'}
                 aria-modal="true"
                 aria-labelledby="modal-title"
                 aria-describedby="modal-body"

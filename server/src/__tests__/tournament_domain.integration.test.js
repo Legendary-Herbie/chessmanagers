@@ -18,6 +18,25 @@ async function registerPlayers(base, token, players) {
 }
 
 describe('tournament domain lifecycle', () => {
+    it('lets an admin resume a completed tournament without removing its history', async () => {
+        const owner = await createUser();
+        const club = await createClub(owner);
+        const tournament = await createTournament(club, { status: 'completed' });
+        const token = authorization(owner);
+        const base = `/api/v1/clubs/${club.id}/tournaments/${tournament.id}`;
+
+        const response = await request(app).patch(`${base}/status`)
+            .set('Authorization', token)
+            .send({ status: 'active' })
+            .expect(200);
+
+        expect(response.body.tournament.status).toBe('active');
+        expect((await db.query(
+            'SELECT status FROM tournaments WHERE id = $1 AND club_id = $2',
+            [tournament.id, club.id]
+        )).first.status).toBe('active');
+    });
+
     it('accepts only Swiss and Round-Robin tournaments and provides searchable pagination', async () => {
         const owner = await createUser();
         const club = await createClub(owner);

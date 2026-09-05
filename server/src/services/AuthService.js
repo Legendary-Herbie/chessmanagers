@@ -14,6 +14,17 @@ import {
 const failure = (code, details = {}) => ({ ok: false, code, ...details });
 const DUMMY_HASH = '$2b$12$invalidhashfortimingprotection';
 
+async function availableUsername(input, trx) {
+    if (input.username) return input.username;
+    const readableBase = input.fullName.normalize('NFKD').replace(/[^A-Za-z0-9_]/g, '_')
+        .replace(/_+/g, '_').replace(/^_|_$/g, '').slice(0, 21) || 'member';
+    for (let attempt = 0; attempt < 10; attempt += 1) {
+        const candidate = `${readableBase}_${randomToken().replace(/[^A-Za-z0-9]/g, '').slice(0, 8)}`;
+        if (!await UserModel.findByUsername(candidate, { includeDeleted: true, trx })) return candidate;
+    }
+    throw new Error('Unable to allocate a unique account identifier.');
+}
+
 async function deliverSafely(delivery) {
     try { await delivery; }
     catch (error) { console.error('[AUTH EMAIL] Delivery failed:', error.message); }
@@ -59,13 +70,14 @@ export async function registerAccount(input, meta = {}) {
         if (await UserModel.findByEmail(input.email, { includeDeleted: true, trx })) {
             return failure('EMAIL_ALREADY_EXISTS');
         }
-        if (await UserModel.findByUsername(input.username, { includeDeleted: true, trx })) {
+        if (input.username && await UserModel.findByUsername(input.username, { includeDeleted: true, trx })) {
             return failure('USERNAME_ALREADY_EXISTS');
         }
+        const username = await availableUsername(input, trx);
         const passwordHash = await bcrypt.hash(input.password, 12);
         const user = await UserModel.create({
             email: input.email,
-            username: input.username,
+            username,
             fullName: input.fullName,
             passwordHash,
         }, trx);

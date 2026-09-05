@@ -83,4 +83,12 @@ describe('API request lifecycle', () => {
         expect(fetch.mock.calls[1][1].headers['x-csrf-token']).toBe('csrf-from-api');
         expect(fetch.mock.calls[1][1].credentials).toBe('include');
     });
+    it('does not attempt refresh when the server reports an anonymous visitor', async () => {
+        fetch.mockResolvedValueOnce(new Response(JSON.stringify({ csrfToken: null }), {
+            status: 200, headers: { 'Content-Type': 'application/json' },
+        }));
+        await expect(refreshAccessToken()).rejects.toThrow('No active session.');
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(fetch.mock.calls[0][0]).toBe('/api/v1/auth/csrf');
+    });
 });

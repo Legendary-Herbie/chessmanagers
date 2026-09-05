@@ -1,0 +1,23 @@
+- generic [ref=f1e2]:
+  - navigation [ref=f1e3]:
+    - button "matches" [ref=f1e4]
+    - button "players" [ref=f1e5]
+    - button "tournaments" [active] [ref=f1e6]
+    - button "login" [ref=f1e7]
+  - main [ref=f1e8]:
+    - generic [ref=f1e188]:
+      - generic [ref=f1e189]:
+        - generic [ref=f1e190]:
+          - heading "Tournaments" [level=1] [ref=f1e191]
+          - paragraph [ref=f1e192]: Run deterministic Swiss and Round-Robin events.
+        - button "New tournament" [ref=f1e193] [cursor=pointer]
+      - generic [ref=f1e194]:
+        - textbox "Search tournaments" [ref=f1e195]
+        - combobox "Filter tournament status" [ref=f1e196]:
+          - option "All statuses" [selected]
+          - option "Upcoming"
+          - option "Active"
+          - option "Completed"
+      - generic [ref=f1e198]:
+        - heading "No tournaments found" [level=2] [ref=f1e199]
+        - paragraph [ref=f1e200]: Create an event or adjust the filters.

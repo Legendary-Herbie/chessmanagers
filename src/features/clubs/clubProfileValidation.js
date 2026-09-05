@@ -31,7 +31,7 @@ const ratingCategorySchema = z.object({
 
 const profileSchema = z.object({
     name: z.string().trim().min(1, 'Club name is required.').max(150, 'Club name must be 150 characters or fewer.'),
-    federation: z.string().trim().min(1, 'Federation is required.').max(100, 'Federation must be 100 characters or fewer.'),
+    federation: z.string().trim().min(1, 'Federation is required.').max(5, 'Federation must be 5 characters or fewer.'),
     description: z.string().trim().max(1000, 'Description must be 1,000 characters or fewer.'),
     contactInfo: z.string().trim().max(500, 'Contact information must be 500 characters or fewer.'),
     website: optionalWebsite,

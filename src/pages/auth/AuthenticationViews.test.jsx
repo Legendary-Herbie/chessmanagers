@@ -10,7 +10,7 @@ import OAuthCallbackView from './OAuthCallbackView.jsx';
 afterEach(cleanup);
 
 describe('authentication views', () => {
-    it('registers distinct username/full-name fields and preserves invite continuation', async () => {
+    it('registers with a human name and preserves invite continuation', async () => {
         const register = vi.fn().mockResolvedValue({ requiresVerification: true });
         render(<MemoryRouter initialEntries={['/auth/register?inviteToken=invite_123']}>
             <AuthContext.Provider value={{ register }}>
@@ -20,14 +20,12 @@ describe('authentication views', () => {
                 </Routes>
             </AuthContext.Provider>
         </MemoryRouter>);
-        fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'chess_user' } });
-        fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Chess User' } });
+        fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Chess User' } });
         fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'chess@example.test' } });
         fireEvent.change(screen.getByLabelText(/Password/, { selector: '#password' }), { target: { value: 'StrongPassword123!' } });
         fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'StrongPassword123!' } });
         fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
         await waitFor(() => expect(register).toHaveBeenCalledWith(expect.objectContaining({
-            username: 'chess_user',
             fullName: 'Chess User',
             continuation: '/clubs/join?token=invite_123',
         })));
@@ -41,21 +39,29 @@ describe('authentication views', () => {
                 <RegisterView />
             </AuthContext.Provider>
         </MemoryRouter>);
-        fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'bad name' } });
-        fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Test User' } });
+        fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Test User' } });
         fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'not-an-email' } });
         fireEvent.change(screen.getByLabelText(/Password/, { selector: '#password' }), { target: { value: 'short' } });
         fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'different' } });
         fireEvent.click(screen.getByRole('button', { name: 'Create account' }));
 
-        const username = screen.getByLabelText('Username');
-        await waitFor(() => expect(document.activeElement).toBe(username));
-        expect(username.getAttribute('aria-invalid')).toBe('true');
-        expect(screen.getByText('Use 3–30 letters, numbers, or underscores.')).toBeTruthy();
+        const email = screen.getByLabelText('Email');
+        await waitFor(() => expect(document.activeElement).toBe(email));
+        expect(email.getAttribute('aria-invalid')).toBe('true');
         expect(screen.getByText('Enter a valid email address.')).toBeTruthy();
         expect(screen.getByText('Use at least 8 characters.')).toBeTruthy();
         expect(screen.getByText('Passwords do not match.')).toBeTruthy();
         expect(register).not.toHaveBeenCalled();
+    });
+
+    it('can reveal both registration password fields', () => {
+        render(<MemoryRouter><AuthContext.Provider value={{ register: vi.fn() }}><RegisterView /></AuthContext.Provider></MemoryRouter>);
+        const password = screen.getByLabelText(/Password/, { selector: '#password' });
+        const confirmation = screen.getByLabelText('Confirm password');
+        expect(password.type).toBe('password');
+        fireEvent.click(screen.getByLabelText('Show passwords'));
+        expect(password.type).toBe('text');
+        expect(confirmation.type).toBe('text');
     });
 
     it('finishes the cookie-backed OAuth session and restores its continuation', async () => {
@@ -93,8 +99,7 @@ describe('authentication views', () => {
                 <Route path="/auth/verification-pending" element={<div>Verification pending</div>} />
             </Routes></AuthContext.Provider>
         </MemoryRouter>);
-        fireEvent.change(screen.getByLabelText('Username'), { target: { value: 'club_user' } });
-        fireEvent.change(screen.getByLabelText('Full name'), { target: { value: 'Club User' } });
+        fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Club User' } });
         fireEvent.change(screen.getByLabelText('Email'), { target: { value: 'club@example.test' } });
         fireEvent.change(screen.getByLabelText(/Password/, { selector: '#password' }), { target: { value: 'StrongPassword123!' } });
         fireEvent.change(screen.getByLabelText('Confirm password'), { target: { value: 'StrongPassword123!' } });
@@ -143,12 +148,12 @@ describe('authentication views', () => {
             <VerifyEmailView />
         </MemoryRouter>);
 
-        expect(await screen.findByText('Email verified successfully')).toBeTruthy();
+        expect(await screen.findByText('Your email is verified. Your account is ready.')).toBeTruthy();
         expect(screen.getByRole('link', { name: 'Continue to sign in' })).toBeTruthy();
         spy.mockRestore();
     });
 
-    it('renders VerifyEmailView and displays already verified status', async () => {
+    it('renders the same successful state when verification was already complete', async () => {
         const { authApi } = await import('../../features/auth/api/authApi.js');
         const spy = vi.spyOn(authApi, 'verifyEmail').mockResolvedValue({
             ok: true,
@@ -161,7 +166,7 @@ describe('authentication views', () => {
             <VerifyEmailView />
         </MemoryRouter>);
 
-        expect(await screen.findByText('Email already verified')).toBeTruthy();
+        expect(await screen.findByText('Your email is verified. Your account is ready.')).toBeTruthy();
         expect(screen.getByRole('link', { name: 'Continue to sign in' })).toBeTruthy();
         spy.mockRestore();
     });

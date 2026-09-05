@@ -1,9 +1,10 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, ClubContext, ThemeContext } from '../../app/contextHooks.js';
 import { notificationApi } from '../../features/notifications/api/notificationApi.js';
+import { clubApi } from '../../features/clubs/api/clubApi.js';
 import AppLayout from './AppLayout.jsx';
 
 vi.mock('../../features/notifications/api/notificationApi.js', () => ({
@@ -15,18 +16,21 @@ vi.mock('../../features/notifications/api/notificationApi.js', () => ({
         dismiss: vi.fn(),
     },
 }));
+vi.mock('../../features/clubs/api/clubApi.js', () => ({
+    clubApi: { leave: vi.fn(), restore: vi.fn() },
+}));
 
-function renderLayout() {
+function renderLayout({ role = 'owner', refreshClubs = vi.fn() } = {}) {
     return render(
         <AuthContext.Provider value={{ user: { id: 'user_1', name: 'Club Owner' }, logout: vi.fn() }}>
             <ClubContext.Provider value={{
                 club: { id: 'club_1', name: 'Downtown Chess' },
                 clubs: [],
-                activeClubs: [{ club: { id: 'club_1', name: 'Downtown Chess' }, membership: { role: 'owner' } }],
+                activeClubs: [{ club: { id: 'club_1', name: 'Downtown Chess' }, membership: { role } }],
                 selectedClubId: 'club_1',
-                membership: { role: 'owner' },
+                membership: { role },
                 selectClub: vi.fn(),
-                refreshClubs: vi.fn(),
+                refreshClubs,
                 capabilities: { canManageMemberships: true, canManageClubSettings: true },
                 loading: false,
             }}>
@@ -49,6 +53,7 @@ describe('AppLayout navigation', () => {
     const stored = new Map();
 
     beforeEach(() => {
+        vi.clearAllMocks();
         stored.clear();
         notificationApi.list.mockResolvedValue({ notifications: [{
             id: 'notification_1',
@@ -104,5 +109,19 @@ describe('AppLayout navigation', () => {
         expect(await screen.findByRole('dialog', { name: 'Notifications' })).toBeTruthy();
         expect(screen.getByText('A membership request needs review.')).toBeTruthy();
         expect(screen.getByText('Waiting Player')).toBeTruthy();
+    });
+
+    it('leaves a club only after confirmation in the shared dialog', async () => {
+        const refreshClubs = vi.fn().mockResolvedValue(null);
+        clubApi.leave.mockResolvedValue({});
+        renderLayout({ role: 'member', refreshClubs });
+
+        fireEvent.click(screen.getByRole('button', { name: /Club Owner/ }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Leave active club' }));
+        const dialog = screen.getByRole('dialog', { name: 'Leave Downtown Chess?' });
+        expect(clubApi.leave).not.toHaveBeenCalled();
+
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Leave club' }));
+        await waitFor(() => expect(clubApi.leave).toHaveBeenCalledWith('club_1'));
     });
 });

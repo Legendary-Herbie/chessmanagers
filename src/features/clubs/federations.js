@@ -1,0 +1,20 @@
+// Federation codes transcribed from the user-provided federation selection chart.
+export const FEDERATION_CODES = [
+    'ACC', 'ACF', 'AFG', 'ALB', 'ALG', 'AND', 'ANG', 'ANT', 'ARG', 'ARM', 'ARU', 'AUS', 'AUT',
+    'WIEN', 'NÖ', 'BGD', 'OÖ', 'SBG', 'TIROL', 'VBG', 'STMK', 'KNT', 'ÜRE',
+    'AZE', 'BAH', 'BAN', 'BAR', 'BD', 'BEL', 'BEN', 'BHU', 'BIH', 'BLR', 'BOL', 'BOT', 'BRA',
+    'BRN', 'BRU', 'BUL', 'BUR', 'CAF', 'CAM', 'CAN', 'CAT', 'CAY', 'CCA', 'CHI', 'CHN', 'CIV',
+    'CMR', 'COL', 'CPV', 'CRC', 'CRO', 'CUB', 'CUR', 'CYP', 'CZE', 'DEN', 'DJI', 'DOM', 'ECU',
+    'EGY', 'ENG', 'ESA', 'ESP', 'EST', 'ETH', 'FAI', 'FIDE', 'FIJ', 'FIN', 'FRA', 'GAB', 'GAM',
+    'GCI', 'GEO', 'GEQ', 'GER', 'GHA', 'GRE', 'GUA', 'GUI', 'GUM', 'GUY', 'HAI', 'HKG', 'HON',
+    'HUN', 'INA', 'IND', 'IOM', 'IRI', 'IRL', 'IRQ', 'ISL', 'ISR', 'ISV', 'ITA', 'IVB', 'JAM',
+    'JCI', 'JOR', 'JPN', 'KAZ', 'KEN', 'KGZ', 'KIR', 'KOR', 'KOS', 'KSA', 'KUW', 'LAO', 'LAT',
+    'LBA', 'LBN', 'LBR', 'LCA', 'LES', 'LIE', 'LTU', 'LUX', 'MAC', 'MAD', 'MAR', 'MAS', 'MAW',
+    'MDA', 'MDV', 'MEX', 'MGL', 'MHL', 'MKD', 'MLI', 'MLT', 'MNC', 'MNE', 'MOZ', 'MRI', 'MTN',
+    'MYA', 'NAM', 'NCA', 'NCL', 'NED', 'NEP', 'NGR', 'NIG', 'NOR', 'NRU', 'NZL', 'OMA', 'ONL',
+    'PAK', 'PAN', 'PAR', 'PER', 'PHI', 'PLE', 'PLW', 'PNG', 'POL', 'POR', 'PUR', 'QAT', 'ROU',
+    'RSA', 'RUS', 'RWA', 'SCG', 'SCO', 'SEN', 'SEY', 'SGP', 'SLE', 'SLO', 'SMR', 'SOL', 'SOM',
+    'SRB', 'SRI', 'SSD', 'STF', 'SUD', 'SUI', 'SUR', 'SVK', 'SWE', 'SWZ', 'SYR', 'TAN', 'THA',
+    'TJK', 'TKM', 'TLS', 'TOG', 'TON', 'TPE', 'TTO', 'TUN', 'TUR', 'UAE', 'UGA', 'UKR', 'URU',
+    'USA', 'UZB', 'VAN', 'VEN', 'VIE', 'WFC', 'CWLS', 'WLS', 'YEM', 'ZAM', 'ZIM',
+];

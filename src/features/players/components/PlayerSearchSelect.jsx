@@ -35,9 +35,11 @@ export default function PlayerSearchSelect({
         if (!open || !clubId) return undefined;
         const controller = new AbortController();
         const sequence = ++requestSequence.current;
+        setLoading(true);
+        setLoadError(false);
+        setResults([]);
+        setActiveIndex(-1);
         const timer = setTimeout(async () => {
-            setLoading(true);
-            setLoadError(false);
             try {
                 const response = await playerApi.searchPlayers(clubId, {
                     q: query.trim(),
@@ -100,7 +102,8 @@ export default function PlayerSearchSelect({
         } else if (event.key === 'Enter' && open && activeIndex >= 0 && results[activeIndex]) {
             event.preventDefault();
             choose(results[activeIndex]);
-        } else if (event.key === 'Escape') {
+        } else if (event.key === 'Escape' && open) {
+            event.stopPropagation();
             setOpen(false);
             setActiveIndex(-1);
         }

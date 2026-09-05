@@ -96,11 +96,6 @@ const envSchema = z.object({
         .string()
         .min(1, 'DATABASE_URL is required'),
 
-    // Club limits
-    MAX_CLUBS_PER_USER: z
-        .preprocess(toNumber, z.number().int().positive())
-        .default(2),
-
     // SMTP — all optional; email features are disabled if not set
     SMTP_HOST:   z.string().optional(),
     SMTP_PORT:   z.preprocess(toNumber, z.number().int().positive()).default(587),

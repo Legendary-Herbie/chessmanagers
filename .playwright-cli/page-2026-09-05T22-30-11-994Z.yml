@@ -1,0 +1,56 @@
+- generic [ref=f1e1]:
+  - generic [ref=f1e2]:
+    - navigation [ref=f1e3]:
+      - button "matches" [ref=f1e4]
+      - button "players" [ref=f1e5]
+      - button "tournaments" [ref=f1e6]
+      - button "login" [ref=f1e7]
+    - main [ref=f1e8]:
+      - generic [ref=f1e188]:
+        - generic [ref=f1e189]:
+          - generic [ref=f1e190]:
+            - heading "Tournaments" [level=1] [ref=f1e191]
+            - paragraph [ref=f1e192]: Run deterministic Swiss and Round-Robin events.
+          - button "New tournament" [ref=f1e193] [cursor=pointer]
+        - generic [ref=f1e194]:
+          - textbox "Search tournaments" [ref=f1e195]
+          - combobox "Filter tournament status" [ref=f1e196]:
+            - option "All statuses" [selected]
+            - option "Upcoming"
+            - option "Active"
+            - option "Completed"
+        - generic [ref=f1e198]:
+          - heading "No tournaments found" [level=2] [ref=f1e199]
+          - paragraph [ref=f1e200]: Create an event or adjust the filters.
+  - dialog [ref=f1e202]:
+    - generic [ref=f1e203]:
+      - heading "New tournament" [level=3] [ref=f1e204]
+      - button "Close" [active] [ref=f1e205] [cursor=pointer]
+    - generic [ref=f1e206]:
+      - generic [ref=f1e207]:
+        - generic [ref=f1e208]:
+          - generic [ref=f1e209]: Name
+          - textbox "Name" [ref=f1e210]
+        - generic [ref=f1e211]:
+          - generic [ref=f1e212]: Format
+          - combobox "Format" [ref=f1e213]:
+            - option "Swiss" [selected]
+            - option "Round Robin"
+        - generic [ref=f1e214]:
+          - generic [ref=f1e215]: Rating category
+          - combobox "Rating category" [ref=f1e216]:
+            - option "Blitz" [selected]
+            - option "Rapid"
+            - option "Classical"
+        - generic [ref=f1e217]:
+          - checkbox "Rated tournament" [checked] [ref=f1e218]
+          - text: Rated tournament
+        - generic [ref=f1e219]:
+          - generic [ref=f1e220]: Starts
+          - textbox "Starts" [ref=f1e221]: 2026-09-05T22:30
+        - generic [ref=f1e222]:
+          - generic [ref=f1e223]: Ends (optional)
+          - textbox "Ends (optional)" [ref=f1e224]
+      - generic [ref=f1e225]:
+        - button "Cancel" [ref=f1e226] [cursor=pointer]
+        - button "Create tournament" [ref=f1e227] [cursor=pointer]
