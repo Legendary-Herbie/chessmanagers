@@ -176,3 +176,15 @@
     .pairing-row { grid-template-columns: 1.5rem 1fr 3.5rem 1fr; padding: 0.5rem 0; }
     .pairing-row .btn { grid-column: 2 / -1; }
 }
+
+.pairing-score-buttons { display: flex; flex-wrap: wrap; gap: 6px; }
+.pairing-result-details { margin: 8px 0 16px; }
+.pairing-result-details summary { cursor: pointer; color: var(--text-muted); }
+.pairing-result-details label { display: grid; gap: 6px; margin-top: 12px; }
+.pairing-result-details .input { width: 100%; min-width: 0; }
+.pairing-duplicate { padding: 12px; border: 1px solid var(--border); border-radius: 10px; }
+.pairing-duplicate .btn { margin-right: 8px; }
+@media (max-width: 800px) {
+    .pairing-score-buttons { grid-column: 2 / -1; }
+    .pairing-score-buttons .btn { flex: 1; }
+}

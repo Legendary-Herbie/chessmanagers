@@ -182,7 +182,7 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                                                     {matchResultLabel(m.result)}
                                                 </span>
                                             </td>
-                                            <td style={{ textTransform: 'capitalize' }}>{m.ratingCategory}</td>
+                                            <td>{m.ratingCategory[0].toUpperCase() + m.ratingCategory.slice(1)}</td>
                                         </tr>
                                     ))}
                                 </tbody>

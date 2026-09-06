@@ -75,4 +75,31 @@ describe('Dashboard membership queue', () => {
         expect(leaderboardApi.fetchDashboard).toHaveBeenCalledTimes(2);
     });
 
+    it.each([true, false])('makes metrics actionable with membership access %s', async canManageMemberships => {
+        leaderboardApi.fetchDashboard.mockResolvedValue({
+            metrics: {
+                activeMembers: 4,
+                rosterPlayers: 6,
+                activePlayers: 5,
+                totalGames: 12,
+                ratedGames: 10,
+                totalTournaments: 2,
+                gamesByCategory: { blitz: 7, rapid: 4, classical: 1 },
+            },
+            admin: {},
+            topPlayers: [],
+            recentMatches: [],
+            selectedCategory: 'blitz',
+        });
+        renderDashboard({ canManageMemberships });
+
+        expect((await screen.findByRole('link', { name: 'Members: 4' })).getAttribute('href')).toBe(canManageMemberships ? '/club?tab=members' : '/club');
+        expect(screen.getByRole('link', { name: 'Players: 6' }).getAttribute('href')).toBe('/players');
+        expect(screen.getByRole('link', { name: 'Games: 12' }).getAttribute('href')).toBe('/matches');
+        expect(screen.getByRole('link', { name: 'Tournaments: 2' }).getAttribute('href')).toBe('/tournaments');
+        expect(screen.getAllByText('Blitz').length).toBeGreaterThan(0);
+        expect(screen.getAllByText('Rapid')[0]).toBeTruthy();
+        expect(screen.getAllByText('Classical')[0]).toBeTruthy();
+    });
+
 });

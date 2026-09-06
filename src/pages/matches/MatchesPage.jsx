@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import '../../styles/matches.css';
 import Button from '../../shared/common/Button.jsx';
 import Dialog from '../../shared/common/Dialog.jsx';
@@ -6,7 +6,6 @@ import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 import { useClub } from '../../app/contextHooks.js';
 import { matchApi } from '../../features/matches/api/matchApi.js';
 import PlayerSearchSelect from '../../features/players/components/PlayerSearchSelect.jsx';
-import { tournamentApi } from '../../features/tournaments/api/tournamentApi.js';
 import NoClubState from '../../shared/common/NoClubState.jsx';
 
 const CATEGORIES = ['blitz', 'rapid', 'classical'];
@@ -27,7 +26,6 @@ function emptyForm() {
         ratingCategory: 'blitz',
         isRated: true,
         playedAt: localDateTime(),
-        tournamentId: '',
         notes: '',
     };
 }
@@ -42,7 +40,6 @@ export default function MatchesPage() {
     const { club, capabilities } = useClub();
     const isAdmin = Boolean(capabilities.canManageMatches);
     const [matches, setMatches] = useState([]);
-    const [tournaments, setTournaments] = useState([]);
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [search, setSearch] = useState('');
@@ -101,34 +98,13 @@ export default function MatchesPage() {
         }
     }, [club, debouncedSearch, categoryFilter, ratedFilter, statusFilter, playerFilter, dateFrom, dateTo, sortOrder, page]);
 
-    const loadReferences = useCallback(async () => {
-        if (!club) return;
-        try {
-            const tournamentResponse = await tournamentApi.list(club.id, { limit: 100 });
-            setTournaments(tournamentResponse.tournaments);
-        } catch (requestError) {
-            setError(requestError.message || 'Failed to load match form options.');
-        }
-    }, [club]);
-
     useEffect(() => {
         const controller = new AbortController();
         void loadMatches(controller.signal);
         return () => controller.abort();
     }, [loadMatches]);
 
-    useEffect(() => {
-        void loadReferences();
-    }, [loadReferences]);
-
-    const refreshAll = useCallback(async () => {
-        await Promise.all([loadMatches(), loadReferences()]);
-    }, [loadMatches, loadReferences]);
-
-    const compatibleTournaments = useMemo(() => tournaments.filter(tournament => (
-        tournament.rating_category === form.ratingCategory
-        && tournament.is_rated === form.isRated
-    )), [tournaments, form.ratingCategory, form.isRated]);
+    const refreshAll = () => loadMatches();
 
     function openAddModal() {
         setEditingMatch(null);
@@ -146,7 +122,6 @@ export default function MatchesPage() {
             ratingCategory: match.ratingCategory,
             isRated: match.isRated,
             playedAt: localDateTime(match.playedAt),
-            tournamentId: match.tournamentId || '',
             notes: match.notes || '',
         });
         setError(null);
@@ -154,7 +129,7 @@ export default function MatchesPage() {
     }
 
     function setRatingField(field, value) {
-        setForm(current => ({ ...current, [field]: value, tournamentId: '' }));
+        setForm(current => ({ ...current, [field]: value }));
     }
 
     function payload(confirmDuplicate = false) {
@@ -165,7 +140,6 @@ export default function MatchesPage() {
             ratingCategory: form.ratingCategory,
             isRated: form.isRated,
             playedAt: new Date(form.playedAt).toISOString(),
-            tournamentId: form.tournamentId || null,
             notes: form.notes || null,
             confirmDuplicate,
         };
@@ -249,11 +223,11 @@ export default function MatchesPage() {
             <div className="page-header">
                 <h1>Matches</h1>
                 <div className="matches-header-actions">
+                    {isAdmin && <Button onClick={openAddModal}>Add Match</Button>}
                     <Button variant="secondary" aria-expanded={filtersOpen} aria-controls="match-filters"
                         onClick={() => setFiltersOpen(open => !open)}>
                         {filtersOpen ? 'Hide filters' : `Show filters${activeFilterCount ? ` (${activeFilterCount})` : ''}`}
                     </Button>
-                    {isAdmin && <Button onClick={openAddModal}>Add Match</Button>}
                 </div>
             </div>
             {error && !modalOpen && <div className="error" role="alert"><p>{error}</p><Button variant="secondary" disabled={loading} onClick={() => refreshAll()}>Retry</Button></div>}
@@ -378,13 +352,6 @@ export default function MatchesPage() {
                             <input type="datetime-local" className="input" required value={form.playedAt}
                                 onChange={event => setForm({ ...form, playedAt: event.target.value })} />
                         </label>
-                        {compatibleTournaments.length > 0 && <label className="form-row"><span className="label">Tournament (optional)</span>
-                            <select className="input" value={form.tournamentId}
-                                onChange={event => setForm({ ...form, tournamentId: event.target.value })}>
-                                <option value="">Not a tournament match</option>
-                                {compatibleTournaments.map(tournament => <option key={tournament.id} value={tournament.id}>{tournament.name}</option>)}
-                            </select>
-                        </label>}
                         <label className="form-row"><span className="label">Notes (optional)</span>
                             <textarea className="input" value={form.notes} onChange={event => setForm({ ...form, notes: event.target.value })} />
                         </label>

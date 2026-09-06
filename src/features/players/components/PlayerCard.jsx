@@ -52,7 +52,7 @@ export default function PlayerCard({
                         {name}
                     </Link>
                     <div className="player-card__meta">
-                        <span className="rating-badge" title={`${ratingCategory} Elo rating`}>
+                        <span className="rating-badge" title={`${ratingCategory[0].toUpperCase() + ratingCategory.slice(1)} Elo rating`}>
                             {ratingCategory[0].toUpperCase() + ratingCategory.slice(1)} Elo: {playerRating(player, ratingCategory) ?? '—'}
                         </span>
                         {isLinked && <span className="link-badge link-badge--approved">✓ Claimed</span>}

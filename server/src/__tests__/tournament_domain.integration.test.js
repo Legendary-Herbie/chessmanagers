@@ -97,9 +97,14 @@ describe('tournament domain lifecycle', () => {
                 .send({
                     result: index === 0 ? 'white' : 'draw',
                     playedAt: `2026-09-01T1${index}:00:00.000Z`,
+                    notes: 'Original tournament notes',
                 }).expect(201);
             expect(response.body.match.tournament_id).toBe(tournament.id);
         }
+        const withMetadata = await request(app).get(base).set('Authorization', token).expect(200);
+        expect(withMetadata.body.rounds[0].pairings[0]).toMatchObject({
+            playedAt: '2026-09-01T10:00:00.000Z', notes: 'Original tournament notes',
+        });
         const persistedRound = await db.query(
             'SELECT status FROM tournament_rounds WHERE id = $1', [first.body.round.id]
         );

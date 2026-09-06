@@ -33,6 +33,8 @@ function toPairing(row) {
         blackPlayerName: row.black_player_name,
         result: row.result,
         matchId: row.match_id,
+        playedAt: row.match_played_at ?? null,
+        notes: row.match_notes ?? null,
         isBye: row.is_bye,
         status: row.status,
     };

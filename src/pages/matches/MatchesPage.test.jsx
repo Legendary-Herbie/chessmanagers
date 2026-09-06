@@ -71,6 +71,8 @@ describe('MatchesPage canonical match flows', () => {
         fireEvent.click(await screen.findByRole('button', { name: 'Add Match' }));
 
         expect(screen.getByLabelText('Played at').value).toBeTruthy();
+        expect(screen.queryByLabelText('Tournament (optional)')).toBeNull();
+        expect(api.get.mock.calls.some(([endpoint]) => endpoint.includes('/tournaments'))).toBe(false);
         expect(screen.getByLabelText('Rated match').checked).toBe(true);
         expect(screen.getByRole('group', { name: 'Rating category' })).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Blitz' }).className).toContain('active');
@@ -109,6 +111,7 @@ describe('MatchesPage canonical match flows', () => {
         expect(await screen.findByRole('dialog', { name: 'Possible duplicate match' })).toBeTruthy();
         fireEvent.click(screen.getByRole('button', { name: 'Save anyway' }));
         await waitFor(() => expect(matchApi.create).toHaveBeenCalledTimes(2));
+        expect(matchApi.create.mock.calls[1][1]).not.toHaveProperty('tournamentId');
         expect(matchApi.create.mock.calls[1][1]).toMatchObject({
             whitePlayerId: 'player_white',
             blackPlayerId: 'player_black',

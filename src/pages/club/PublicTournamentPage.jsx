@@ -23,7 +23,7 @@ export default function PublicTournamentPage() {
     </section>;
     return <div className="public-page">
         <header className="public-page__header"><h1>{data.tournament.name}</h1>
-            <p>{data.tournament.ratingCategory} · {data.tournament.isRated ? 'Rated' : 'Unrated'}</p></header>
+            <p>{data.tournament.ratingCategory[0].toUpperCase() + data.tournament.ratingCategory.slice(1)} · {data.tournament.isRated ? 'Rated' : 'Unrated'}</p></header>
         <section className="public-card public-section"><h2>Standings</h2>
             {data.standings.length ? <div className="public-table-wrap"><table className="public-table">
                 <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Score</th></tr></thead>

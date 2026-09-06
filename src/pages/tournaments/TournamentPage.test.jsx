@@ -32,10 +32,10 @@ const detail = {
     }],
 };
 
-function renderPage() {
+function renderPage(canManageMatches = true) {
     return render(<MemoryRouter initialEntries={['/tournaments/tour_1']}>
         <ClubContext.Provider value={{
-            club: { id: 'club_1' }, capabilities: { canManageMatches: true },
+            club: { id: 'club_1' }, capabilities: { canManageMatches },
         }}><Routes><Route path="/tournaments/:tournamentId" element={<TournamentPage />} /></Routes>
         </ClubContext.Provider>
     </MemoryRouter>);
@@ -58,15 +58,36 @@ describe('TournamentPage duplicate result protection', () => {
         expect(await screen.findByRole('heading', { name: 'Club Swiss' })).toBeTruthy();
     });
 
-    it('closes the result dialog with Escape and restores focus', async () => {
+    it.each([['1–0', 'white'], ['½–½', 'draw'], ['0–1', 'black']])('records %s inline without a result modal', async (label, result) => {
+        tournamentApi.recordResult.mockResolvedValue({ ratingStatus: 'complete' });
         renderPage();
-        const opener = await screen.findByRole('button', { name: 'Result' });
-        opener.focus();
-        fireEvent.click(opener);
-        expect(screen.getByRole('dialog', { name: 'Record result' })).toBeTruthy();
-        fireEvent.keyDown(document.activeElement, { key: 'Escape' });
+        fireEvent.click(await screen.findByRole('button', { name: label }));
+        await waitFor(() => expect(tournamentApi.recordResult).toHaveBeenCalledWith('club_1', 'tour_1', 'pairing_1', expect.objectContaining({ result, confirmDuplicate: false })));
         expect(screen.queryByRole('dialog')).toBeNull();
-        expect(document.activeElement).toBe(opener);
+    });
+
+    it('preserves the exact original timestamp and notes when correcting a score', async () => {
+        tournamentApi.get.mockResolvedValue({ ...detail, rounds: [{ ...detail.rounds[0], pairings: [{
+            ...detail.rounds[0].pairings[0], result: 'white', status: 'completed',
+            playedAt: '2026-09-01T10:13:37.789Z', notes: 'Original notes',
+        }] }] });
+        tournamentApi.recordResult.mockResolvedValue({ ratingStatus: 'recalculation_pending' });
+        renderPage();
+        fireEvent.click(await screen.findByRole('button', { name: '0–1' }));
+        await waitFor(() => expect(tournamentApi.recordResult).toHaveBeenCalledWith('club_1', 'tour_1', 'pairing_1', {
+            result: 'black', playedAt: '2026-09-01T10:13:37.789Z', notes: 'Original notes', confirmDuplicate: false,
+        }));
+    });
+
+    it('does not offer result entry to members or for byes', async () => {
+        const member = renderPage(false);
+        await screen.findByRole('heading', { name: 'Club Swiss' });
+        expect(screen.queryByRole('button', { name: '1–0' })).toBeNull();
+        member.unmount();
+        tournamentApi.get.mockResolvedValue({ ...detail, rounds: [{ ...detail.rounds[0], pairings: [{ ...detail.rounds[0].pairings[0], isBye: true }] }] });
+        renderPage();
+        await screen.findByRole('heading', { name: 'Club Swiss' });
+        expect(screen.queryByRole('button', { name: '1–0' })).toBeNull();
     });
 
     it('does not retry a possible duplicate until the admin confirms', async () => {
@@ -74,24 +95,23 @@ describe('TournamentPage duplicate result protection', () => {
             .mockRejectedValueOnce({ code: 'POSSIBLE_DUPLICATE_MATCH' })
             .mockResolvedValueOnce({ ratingStatus: 'complete' });
         renderPage();
-        fireEvent.click(await screen.findByRole('button', { name: 'Result' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Save result' }));
-        expect(await screen.findByRole('dialog', { name: 'Possible duplicate result' })).toBeTruthy();
+        fireEvent.click(await screen.findByRole('button', { name: '1–0' }));
+        expect((await screen.findByRole('alert')).textContent).toContain('matching result');
         expect(tournamentApi.recordResult).toHaveBeenCalledTimes(1);
         fireEvent.click(screen.getByRole('button', { name: 'Save anyway' }));
         await waitFor(() => expect(tournamentApi.recordResult).toHaveBeenCalledTimes(2));
         expect(tournamentApi.recordResult.mock.calls[1][3]).toMatchObject({ confirmDuplicate: true });
     });
 
-    it('keeps the editor open and makes no retry when the warning is cancelled', async () => {
+    it('keeps inline controls and makes no retry when the warning is cancelled', async () => {
         tournamentApi.recordResult.mockRejectedValueOnce({ code: 'POSSIBLE_DUPLICATE_MATCH' });
         renderPage();
-        fireEvent.click(await screen.findByRole('button', { name: 'Result' }));
-        fireEvent.click(screen.getByRole('button', { name: 'Save result' }));
-        const duplicateDialog = await screen.findByRole('dialog', { name: 'Possible duplicate result' });
+        fireEvent.click(await screen.findByRole('button', { name: '1–0' }));
+        const duplicateDialog = await screen.findByRole('alert');
         fireEvent.click(within(duplicateDialog).getByRole('button', { name: 'Cancel' }));
         expect(tournamentApi.recordResult).toHaveBeenCalledTimes(1);
-        expect(screen.getByRole('button', { name: 'Save result' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: '1–0' }).disabled).toBe(false);
+        expect(screen.queryByRole('dialog')).toBeNull();
     });
 
     it('archives only after confirmation in the shared dialog', async () => {

@@ -56,7 +56,7 @@ export default function Dashboard() {
         )}
         {loading && <div className="muted">Loading dashboard...</div>}
         {error && <div className="error-banner" role="alert"><p>Couldn’t load dashboard. Try again. {error}</p><button type="button" className="btn-secondary" disabled={loading} onClick={() => setRefreshKey(current => current + 1)}>Retry</button></div>}
-        {!loading && dashboard && <ClubDashboard data={dashboard} onCategoryChange={changeCategory} />}
+        {!loading && dashboard && <ClubDashboard data={dashboard} onCategoryChange={changeCategory} canManageMemberships={Boolean(capabilities.canManageMemberships)} />}
         {capabilities.canManagePlayers && club?.id && (
             <PendingLinksList
                 clubId={club.id}

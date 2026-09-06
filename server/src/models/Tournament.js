@@ -72,13 +72,15 @@ export const TournamentModel = {
     getPairings: async (tournamentId, clubId, trx = null) => queryFor(trx)(
         `SELECT pairing.*,
                 white_player.name AS white_player_name,
-                black_player.name AS black_player_name
+                black_player.name AS black_player_name,
+                match.played_at AS match_played_at, match.notes AS match_notes
          FROM tournament_pairings pairing
          JOIN tournament_rounds round ON round.id = pairing.round_id
            AND round.tournament_id = pairing.tournament_id
            AND round.club_id = pairing.club_id
          LEFT JOIN players white_player ON white_player.id = pairing.white_player_id
          LEFT JOIN players black_player ON black_player.id = pairing.black_player_id
+         LEFT JOIN matches match ON match.id = pairing.match_id AND match.club_id = pairing.club_id
          WHERE pairing.tournament_id = $1 AND pairing.club_id = $2
          ORDER BY pairing.round_number, pairing.board`,
         [tournamentId, clubId]

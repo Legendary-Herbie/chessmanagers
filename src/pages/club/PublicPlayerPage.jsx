@@ -28,7 +28,7 @@ export default function PublicPlayerPage() {
             {player.photoUrl && <img className="public-profile__photo" src={resolveAssetUrl(player.photoUrl)} alt={`${player.name} profile`} />}
             <div><h1>{player.name}</h1>{player.bio && <p>{player.bio}</p>}</div>
             <dl className="public-ratings">{Object.entries(player.ratings).map(([category, rating]) =>
-                <div className="public-rating" key={category}><dt>{category}</dt><dd>{rating}</dd></div>
+                <div className="public-rating" key={category}><dt>{category[0].toUpperCase() + category.slice(1)}</dt><dd>{rating}</dd></div>
             )}</dl>
         </article>
         <div><Link className="public-back-link" to={`/clubs/${clubId}`}>← Back to club</Link></div>

@@ -55,6 +55,7 @@ export default function AppLayout() {
         refreshClubs,
         capabilities,
         loading: clubLoading,
+        error: clubError,
     } = useClub();
     const { theme, toggleTheme } = useTheme();
     const location = useLocation();
@@ -67,10 +68,17 @@ export default function AppLayout() {
     const [leaveConfirmationOpen, setLeaveConfirmationOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(storedSidebarPreference);
     const [mobileNavOpen, setMobileNavOpen] = useState(false);
+    const [switchingClubId, setSwitchingClubId] = useState(null);
 
     const displayName = user?.name || user?.email || 'Member';
     const initial = displayName.trim().charAt(0).toUpperCase() || 'M';
-    const clubName = clubLoading ? 'Loading club...' : club?.name || 'No club selected';
+    const selectedClubName = activeClubs.find(entry => entry.club.id === (switchingClubId || selectedClubId))?.club.name;
+    const loadingMessage = selectedClubName ? `Opening ${selectedClubName}…` : 'Loading your clubs…';
+    const clubName = clubLoading || switchingClubId ? loadingMessage : club?.name || 'No club selected';
+    const isClubWorkspace = ['/dashboard', '/players', '/matches', '/leaderboard', '/club', '/tournaments', '/announcements']
+        .some(path => location.pathname === path || location.pathname.startsWith(`${path}/`));
+    const workspaceLoading = isClubWorkspace && (clubLoading || switchingClubId !== null);
+    const workspaceError = isClubWorkspace && !club && clubError;
 
     useEffect(() => {
         setMenuOpen(false);
@@ -130,9 +138,15 @@ export default function AppLayout() {
     };
 
     const handleClubChange = async (event) => {
-        const selection = selectClub(event.target.value);
+        const nextClubId = event.target.value;
+        setSwitchingClubId(nextClubId);
+        setMobileNavOpen(false);
         navigate('/dashboard');
-        await selection;
+        try {
+            await selectClub(nextClubId);
+        } finally {
+            setSwitchingClubId(null);
+        }
     };
 
     const handleRestoreClub = async (clubId) => {
@@ -201,11 +215,14 @@ export default function AppLayout() {
                     </div>
 
                     <label className={`app-nav__club-switcher${mobileNavOpen ? ' app-nav__club-switcher--mobile-open' : ''}`}>
-                        <span className="app-nav__club-switcher-label">Active club</span>
+                        <span className="app-nav__club-switcher-label">
+                            {switchingClubId ? 'Switching club...' : 'Active club'}
+                        </span>
                         <select
                             value={selectedClubId ?? ''}
                             onChange={handleClubChange}
-                            disabled={clubLoading || activeClubs.length === 0}
+                            disabled={clubLoading || switchingClubId !== null || activeClubs.length === 0}
+                            aria-busy={switchingClubId !== null}
                             aria-label="Switch active club"
                         >
                             {activeClubs.length === 0 ? (
@@ -248,6 +265,8 @@ export default function AppLayout() {
                             type="button"
                             className="app-nav__menu-button"
                             aria-haspopup="menu"
+                            aria-controls="account-menu"
+                            aria-label={`${menuOpen ? 'Close' : 'Open'} account menu for ${displayName}`}
                             aria-expanded={menuOpen}
                             onClick={() => setMenuOpen(open => !open)}
                         >
@@ -260,7 +279,7 @@ export default function AppLayout() {
                         </button>
 
                         {menuOpen && (
-                            <div className="app-nav__dropdown app-nav__dropdown--open" role="menu" aria-label="Account menu">
+                            <div id="account-menu" className="app-nav__dropdown app-nav__dropdown--open" role="menu" aria-label="Account menu">
                                 <div className="app-nav__dropdown-header">
                                     <strong>{displayName}</strong>
                                     <span>{clubName}</span>
@@ -336,7 +355,19 @@ export default function AppLayout() {
 
             <main className="app-main">
                 <div className="app-main__inner">
-                    <Outlet key={`${location.pathname}${location.search}`} />
+                    <div role="status" aria-live="polite" aria-atomic="true">
+                        {workspaceLoading && <div className="club-workspace-state">
+                            <h1>{loadingMessage}</h1>
+                            <p>Loading this club’s workspace. Please wait.</p>
+                        </div>}
+                    </div>
+                    <div aria-busy={Boolean(workspaceLoading)}>
+                        {!workspaceLoading && (workspaceError ? <div className="club-workspace-state" role="alert">
+                            <h1>Couldn’t open {selectedClubName || 'your club'}</h1>
+                            <p>{clubError}</p>
+                            <button type="button" className="btn-secondary" onClick={() => refreshClubs(selectedClubId)}>Retry</button>
+                        </div> : <Outlet key={`${location.pathname}${location.search}`} />)}
+                    </div>
                 </div>
             </main>
 

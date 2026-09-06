@@ -338,3 +338,6 @@ textarea.input {
     white-space: normal;
 }
 .matches-list:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.matches-page .page-header { flex-wrap: wrap; }
+.matches-header-actions { max-width: 100%; }

@@ -1,5 +1,5 @@
 import React from 'react';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, ClubContext, ThemeContext } from '../../app/contextHooks.js';
@@ -20,7 +20,7 @@ vi.mock('../../features/clubs/api/clubApi.js', () => ({
     clubApi: { leave: vi.fn(), restore: vi.fn() },
 }));
 
-function renderLayout({ role = 'owner', refreshClubs = vi.fn() } = {}) {
+function renderLayout({ role = 'owner', refreshClubs = vi.fn(), context = {}, initialPath = '/dashboard' } = {}) {
     return render(
         <AuthContext.Provider value={{ user: { id: 'user_1', name: 'Club Owner' }, logout: vi.fn() }}>
             <ClubContext.Provider value={{
@@ -33,13 +33,15 @@ function renderLayout({ role = 'owner', refreshClubs = vi.fn() } = {}) {
                 refreshClubs,
                 capabilities: { canManageMemberships: true, canManageClubSettings: true },
                 loading: false,
+                ...context,
             }}>
                 <ThemeContext.Provider value={{ theme: 'light', toggleTheme: vi.fn() }}>
-                    <MemoryRouter initialEntries={['/dashboard']}>
+                    <MemoryRouter initialEntries={[initialPath]}>
                         <Routes>
                             <Route element={<AppLayout />}>
                                 <Route path="/dashboard" element={<h1>Dashboard content</h1>} />
                                 <Route path="/matches" element={<h1>Matches content</h1>} />
+                                <Route path="/account" element={<h1>Account content</h1>} />
                             </Route>
                         </Routes>
                     </MemoryRouter>
@@ -124,4 +126,40 @@ describe('AppLayout navigation', () => {
         fireEvent.click(within(dialog).getByRole('button', { name: 'Leave club' }));
         await waitFor(() => expect(clubApi.leave).toHaveBeenCalledWith('club_1'));
     });
+    it('announces the destination while switching and hides the outgoing workspace', async () => {
+        let finishSwitch;
+        const selectClub = vi.fn(() => new Promise(resolve => { finishSwitch = resolve; }));
+        renderLayout({ context: { selectClub, activeClubs: [
+            { club: { id: 'club_1', name: 'Downtown Chess' }, membership: { role: 'owner' } },
+            { club: { id: 'club_2', name: 'Riverside Chess' }, membership: { role: 'member' } },
+        ] } });
+        fireEvent.click(screen.getByRole('button', { name: 'Open navigation menu' }));
+        const selector = screen.getByRole('combobox', { name: 'Switch active club' });
+        fireEvent.change(selector, { target: { value: 'club_2' } });
+        expect(screen.getByRole('status').textContent).toContain('Opening Riverside Chess…');
+        expect(selector.disabled).toBe(true);
+        expect(screen.getByRole('button', { name: 'Open navigation menu' }).getAttribute('aria-expanded')).toBe('false');
+        expect(screen.queryByRole('heading', { name: 'Dashboard content' })).toBeNull();
+        await act(async () => finishSwitch(true));
+        expect(screen.getByRole('heading', { name: 'Dashboard content' })).toBeTruthy();
+        expect(selector.disabled).toBe(false);
+    });
+
+    it('shows provider loading on club pages even when switching outside the selector', () => {
+        renderLayout({ context: { loading: true, club: null } });
+        expect(screen.getByRole('status').textContent).toContain('Opening Downtown Chess…');
+        expect(screen.queryByRole('heading', { name: 'Dashboard content' })).toBeNull();
+    });
+
+    it('offers retry after club loading fails and keeps account access available', () => {
+        const refreshClubs = vi.fn();
+        const view = renderLayout({ refreshClubs, context: { club: null, error: 'Connection lost' } });
+        expect(screen.getByRole('alert').textContent).toContain('Connection lost');
+        fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
+        expect(refreshClubs).toHaveBeenCalledWith('club_1');
+        view.unmount();
+        renderLayout({ initialPath: '/account', context: { club: null, error: 'Connection lost' } });
+        expect(screen.getByRole('heading', { name: 'Account content' })).toBeTruthy();
+    });
+
 });

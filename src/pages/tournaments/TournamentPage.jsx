@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import '../../styles/tournaments.css';
 import { useClub } from '../../app/contextHooks.js';
@@ -6,12 +6,11 @@ import { tournamentApi } from '../../features/tournaments/api/tournamentApi.js';
 import { playerApi } from '../../features/players/api/playerApi.js';
 import Button from '../../shared/common/Button.jsx';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
-import Dialog from '../../shared/common/Dialog.jsx';
 
 function localDateTime(value = new Date()) {
     const date = new Date(value);
     return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
-        .toISOString().slice(0, 16);
+        .toISOString().slice(0, 19);
 }
 
 const title = value => value?.replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase());
@@ -36,11 +35,12 @@ export default function TournamentPage() {
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState('');
     const [notice, setNotice] = useState('');
-    const [resultPairing, setResultPairing] = useState(null);
-    const [duplicateConfirmation, setDuplicateConfirmation] = useState(false);
+    const [resultDrafts, setResultDrafts] = useState({});
+    const resultSaving = useRef(false);
+    const [duplicateConfirmation, setDuplicateConfirmation] = useState(null);
     const [archiveConfirmation, setArchiveConfirmation] = useState(false);
     const [resumeConfirmation, setResumeConfirmation] = useState(false);
-    const [resultForm, setResultForm] = useState({ result: 'white', playedAt: localDateTime(), notes: '' });
+
 
     const load = useCallback(async () => {
         if (!club?.id) return;
@@ -75,7 +75,7 @@ export default function TournamentPage() {
     async function runAction(action, successMessage) {
         setSaving(true);
         setError('');
-        setDuplicateConfirmation(false);
+        setDuplicateConfirmation(null);
         try {
             await action();
             setNotice(successMessage);
@@ -106,44 +106,46 @@ export default function TournamentPage() {
         setSelectedPlayerId('');
     }
 
-    function openResult(pairing) {
-        setResultPairing(pairing);
-        setResultForm({
-            result: pairing.result && pairing.result !== 'bye' ? pairing.result : 'white',
-            playedAt: localDateTime(),
-            notes: '',
-        });
-        setError('');
+    function resultValues(pairing) {
+        return resultDrafts[pairing.id] || {
+            playedAt: pairing.playedAt || new Date().toISOString(),
+            notes: pairing.notes || '',
+        };
     }
 
-    async function saveResult(confirmDuplicate = false) {
+    function updateResultDraft(pairing, field, value) {
+        setResultDrafts(current => ({ ...current, [pairing.id]: { ...resultValues(pairing), [field]: value } }));
+    }
+
+    async function saveResult(pairingId, values, confirmDuplicate = false) {
+        if (resultSaving.current) return;
+        if (!values.playedAt || Number.isNaN(new Date(values.playedAt).valueOf())) {
+            setError('Enter a valid played date and time.');
+            return;
+        }
+        resultSaving.current = true;
         setSaving(true);
         setError('');
+        const payload = { ...values, playedAt: new Date(values.playedAt).toISOString(), notes: values.notes || null, confirmDuplicate };
         try {
-            const response = await tournamentApi.recordResult(
-                club.id,
-                tournamentId,
-                resultPairing.id,
-                {
-                    result: resultForm.result,
-                    playedAt: new Date(resultForm.playedAt).toISOString(),
-                    notes: resultForm.notes || null,
-                    confirmDuplicate,
-                }
-            );
-            setDuplicateConfirmation(false);
-            setResultPairing(null);
+            const response = await tournamentApi.recordResult(club.id, tournamentId, pairingId, payload);
+            setDuplicateConfirmation(null);
+            setResultDrafts(current => {
+                const next = { ...current };
+                delete next[pairingId];
+                return next;
+            });
             setNotice(response.ratingStatus === 'recalculation_pending'
-                ? 'Result saved. Ratings are being recalculated.'
-                : 'Result saved.');
+                ? 'Result saved. Ratings are being recalculated.' : 'Result saved.');
             await load();
         } catch (requestError) {
             if (requestError.code === 'POSSIBLE_DUPLICATE_MATCH' && !confirmDuplicate) {
-                setDuplicateConfirmation(true);
+                setDuplicateConfirmation({ pairingId, values: payload });
                 return;
             }
             setError(requestError.message || 'Unable to save result.');
         } finally {
+            resultSaving.current = false;
             setSaving(false);
         }
     }
@@ -208,12 +210,33 @@ export default function TournamentPage() {
                 <div className="round-list">
                     {[...rounds].reverse().map(round => <article className="round-card" key={round.id}>
                         <div className="round-card__header"><h3>Round {round.roundNumber}</h3><span className={`tournament-status ${round.status}`}>{title(round.status)}</span></div>
-                        <div className="pairing-list">{round.pairings.map(pairing => <div className="pairing-row" key={pairing.id}>
+                        <div className="pairing-list">{round.pairings.map(pairing => <div className="pairing-item" key={pairing.id}><div className="pairing-row">
                             <span className="board-number">{pairing.board}</span>
                             <span className="pairing-player">{pairing.whitePlayerName || participants.find(player => player.id === pairing.whitePlayerId)?.name}</span>
                             <strong className="pairing-result">{resultLabel(pairing.result)}</strong>
                             <span className="pairing-player black">{pairing.isBye ? 'Bye' : pairing.blackPlayerName || participants.find(player => player.id === pairing.blackPlayerId)?.name}</span>
-                            {isAdmin && !pairing.isBye && <Button variant="secondary" onClick={() => openResult(pairing)}>{pairing.status === 'completed' ? 'Edit' : 'Result'}</Button>}
+                            {isAdmin && !pairing.isBye && <div className="pairing-score-buttons" role="group" aria-label={`Result for round ${round.roundNumber}, board ${pairing.board}`}>
+                                {['white', 'draw', 'black'].map(result => <Button key={result}
+                                    variant={pairing.result === result ? 'primary' : 'secondary'}
+                                    aria-pressed={pairing.result === result} disabled={saving || Boolean(duplicateConfirmation)}
+                                    onClick={() => saveResult(pairing.id, { ...resultValues(pairing), result })}>{resultLabel(result)}</Button>)}
+                            </div>}
+                        </div>
+                        {isAdmin && !pairing.isBye && <details className="pairing-result-details">
+                            <summary>Played at &amp; notes</summary>
+                            <label>Played at (round {round.roundNumber}, board {pairing.board})
+                                <input type="datetime-local" step="1" className="input" required disabled={saving || Boolean(duplicateConfirmation)}
+                                    value={resultValues(pairing).playedAt ? localDateTime(resultValues(pairing).playedAt) : ''} onChange={event => updateResultDraft(pairing, 'playedAt', event.target.value)} /></label>
+                            <label>Notes (round {round.roundNumber}, board {pairing.board})
+                                <textarea className="input" disabled={saving || Boolean(duplicateConfirmation)} value={resultValues(pairing).notes}
+                                    onChange={event => updateResultDraft(pairing, 'notes', event.target.value)} /></label>
+                            <p className="muted">Choose a score above to save the result with these details.</p>
+                        </details>}
+                        {duplicateConfirmation?.pairingId === pairing.id && <div className="pairing-duplicate" role="alert">
+                            <p>A matching result already exists within five minutes. Save this result anyway?</p>
+                            <Button disabled={saving} onClick={() => saveResult(pairing.id, duplicateConfirmation.values, true)}>Save anyway</Button>
+                            <Button variant="secondary" disabled={saving} onClick={() => setDuplicateConfirmation(null)}>Cancel</Button>
+                        </div>}
                         </div>)}</div>
                     </article>)}
                     {!rounds.length && <p className="muted">No rounds have been generated.</p>}
@@ -229,24 +252,6 @@ export default function TournamentPage() {
                 </table></div>
             </section>
 
-            {resultPairing && <Dialog title={resultPairing.status === 'completed' ? 'Edit result' : 'Record result'}
-                busy={saving} onClose={() => setResultPairing(null)}>
-                <div className="modal-body">
-                    {error && <div className="error" role="alert">{error}</div>}
-                    <p><strong>{resultPairing.whitePlayerName || participants.find(player => player.id === resultPairing.whitePlayerId)?.name}</strong> vs <strong>{resultPairing.blackPlayerName || participants.find(player => player.id === resultPairing.blackPlayerId)?.name}</strong></p>
-                    <label className="form-row"><span className="label">Result</span><select className="input" value={resultForm.result} onChange={event => setResultForm({ ...resultForm, result: event.target.value })}><option value="white">White wins</option><option value="black">Black wins</option><option value="draw">Draw</option></select></label>
-                    <label className="form-row"><span className="label">Played at</span><input className="input" type="datetime-local" value={resultForm.playedAt} onChange={event => setResultForm({ ...resultForm, playedAt: event.target.value })} /></label>
-                    <label className="form-row"><span className="label">Notes (optional)</span><textarea className="input" value={resultForm.notes} onChange={event => setResultForm({ ...resultForm, notes: event.target.value })} /></label>
-                </div>
-                <div className="modal-footer"><Button variant="secondary" disabled={saving}
-                    onClick={() => { setResultPairing(null); setDuplicateConfirmation(false); }}>Cancel</Button>
-                    <Button loading={saving} disabled={saving} onClick={() => saveResult(false)}>Save result</Button></div>
-            </Dialog>}
-
-            <ConfirmDialog isOpen={duplicateConfirmation} title="Possible duplicate result"
-                message="A matching result already exists within five minutes. Save this result anyway?"
-                confirmLabel="Save anyway" variant="warning" loading={saving}
-                onClose={() => setDuplicateConfirmation(false)} onConfirm={() => saveResult(true)} />
             <ConfirmDialog isOpen={archiveConfirmation} title="Archive tournament?"
                 message="Its rounds and results will be preserved."
                 confirmLabel="Archive tournament" variant="danger" loading={saving}
