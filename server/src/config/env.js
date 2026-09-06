@@ -23,7 +23,11 @@ const parseCsvList = (value) =>
 const buildCorsOriginInput = () => {
     const configured = parseCsvList(process.env.CORS_ORIGIN || '');
     const frontendUrl = sanitizeUrl(process.env.FRONTEND_URL || '');
-    const deduped = [...new Set([...configured, frontendUrl].filter(Boolean))];
+    // Render exposes the public service URL automatically. Using it as a
+    // fallback keeps a single-service test deployment same-origin without
+    // hard-coding its generated hostname.
+    const renderUrl = sanitizeUrl(process.env.RENDER_EXTERNAL_URL || '');
+    const deduped = [...new Set([...configured, frontendUrl, renderUrl].filter(Boolean))];
     return deduped.join(',');
 };
 
@@ -115,6 +119,7 @@ const envInput = {
     ...process.env,
     CORS_ORIGIN: buildCorsOriginInput(),
     FRONTEND_URL: process.env.FRONTEND_URL
+        || process.env.RENDER_EXTERNAL_URL
         || parseCsvList(process.env.CORS_ORIGIN || '').find(origin => !origin.includes('*')),
 };
 
