@@ -200,7 +200,7 @@ export default function CreateClub() {
               <div className="rating-parameter-grid__system">
                 <label htmlFor="create-system">Rating system</label>
                 <input id="create-system" value="Elo" readOnly aria-describedby="rating-system-help" />
-                <div id="rating-system-help" className="form-helper">Chess Managers uses Elo for Blitz, Rapid, and Classical ratings.</div>
+                <div id="rating-system-help" className="form-helper">1chessclub uses Elo for Blitz, Rapid, and Classical ratings.</div>
               </div>
 
               <div>

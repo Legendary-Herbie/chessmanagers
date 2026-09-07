@@ -4,22 +4,22 @@ import BrandLogo from '../shared/common/BrandLogo.jsx';
 import '../styles/landing.css';
 
 const organizerOutcomes = [
-    ['Start every session ready', 'Approve new members, keep the roster current, and publish the details everyone needs before the first clock starts.'],
-    ['Trust every result', 'Record the game once. Corrections, backdated results, and category ratings stay connected to a clear history.'],
-    ['Know what needs attention', 'See pending requests, recent games, active players, and rating leaders without rebuilding a spreadsheet.'],
+    ['Welcome every new member', 'Bring members into your club, connect them with their player profiles, and help them find their place.'],
+    ['Keep everyone in the loop', 'Share club announcements and tournament details so members know what is happening and how to take part.'],
+    ['Build a shared club history', 'Keep the games, results, and player progress that tell the story of your club together.'],
 ];
 
 const playerOutcomes = [
-    ['A rating that matches the game', 'Blitz, Rapid, and Classical progress stay separate, so one format never distorts another.'],
-    ['A history you can follow', 'Review opponents, results, rating changes, peaks, streaks, and head-to-head records.'],
-    ['One place to stay involved', 'Find the club, follow announcements and tournaments, and keep your player profile connected.'],
+    ['Find your chess community', 'Discover a club, request to join, and connect your player profile once you become a member.'],
+    ['Follow your progress', 'Look back on your games and follow your Blitz, Rapid, and Classical ratings as you play.'],
+    ['Stay part of club life', 'Catch up on announcements, follow club tournaments, and see the latest results.'],
 ];
 
 export default function Landing() {
     return (
         <main className="landing-page">
             <header className="landing-nav">
-                <Link className="landing-brand" to="/" aria-label="Chess Managers home">
+                <Link className="landing-brand" to="/" aria-label="1chessclub home">
                     <BrandLogo className="landing-brand__logo" collapse="phone" />
                 </Link>
                 <nav aria-label="Public navigation">
@@ -30,54 +30,54 @@ export default function Landing() {
 
             <section className="landing-hero">
                 <div className="landing-hero__copy">
-                    <p className="landing-eyebrow">One dependable record for your chess club</p>
-                    <h1>Run your club without rebuilding the same spreadsheet.</h1>
+                    <p className="landing-eyebrow">A home for your chess community</p>
+                    <h1>One club. Every player connected.</h1>
                     <p className="landing-lead">
-                        Chess Managers turns membership, match results, ratings, and events into one dependable club record—so organizers make faster decisions and players can trust their progress.
+                        Bring your chess community together. 1chessclub gives members one place to follow club news, tournaments, and their progress, while organizers keep everyone involved.
                     </p>
                     <div className="landing-actions">
-                        <Link className="landing-button landing-button--primary" to="/auth/register">Get started</Link>
+                        <Link className="landing-button landing-button--primary" to="/auth/register">Bring your club together</Link>
                         <Link className="landing-button landing-button--secondary" to="/clubs">Find your club</Link>
                     </div>
-                    <p className="landing-hero__note">Set up the roster, record the first result, and give everyone a clearer view of club life.</p>
+                    <p className="landing-hero__note">For school clubs, local communities, and the people who bring them to life.</p>
                 </div>
 
-                <div className="landing-outcome-card" aria-label="What Chess Managers keeps connected">
-                    <div className="landing-outcome-card__header"><span>One result, reflected everywhere</span><strong>Connected</strong></div>
+                <div className="landing-outcome-card" aria-label="Your club community on 1chessclub">
+                    <div className="landing-outcome-card__header"><span>Your club, together</span><strong>Connected</strong></div>
                     <div className="landing-outcome-card__metrics">
-                        <div><strong>Record</strong><span>result and played time</span></div>
-                        <div><strong>Update</strong><span>the right rating category</span></div>
-                        <div><strong>Review</strong><span>history and statistics</span></div>
+                        <div><strong>Join</strong><span>find your community</span></div>
+                        <div><strong>Play</strong><span>take part in club life</span></div>
+                        <div><strong>Grow</strong><span>follow your progress</span></div>
                     </div>
                     <div className="landing-outcome-card__result">
                         <span aria-hidden="true">♞</span>
-                        <div><strong>Record a Rapid result</strong><small>Ratings, history, statistics, and the leaderboard stay in step</small></div>
+                        <div><strong>Stay connected between games</strong><small>Club news, tournaments, and results in one place</small></div>
                         <b>✓</b>
                     </div>
                     <div className="landing-outcome-card__categories">
-                        <span>Blitz <strong>Separate</strong></span>
-                        <span>Rapid <strong>Updated</strong></span>
-                        <span>Classical <strong>Separate</strong></span>
+                        <span>Members <strong>Belong</strong></span>
+                        <span>Games <strong>Connect</strong></span>
+                        <span>Progress <strong>Inspires</strong></span>
                     </div>
                 </div>
             </section>
 
             <section className="landing-audiences" aria-labelledby="landing-value-title">
                 <div className="landing-section-heading">
-                    <p className="landing-eyebrow">Less uncertainty for everyone</p>
-                    <h2 id="landing-value-title">A calmer operation. A better player experience.</h2>
+                    <p className="landing-eyebrow">A place for everyone in your club</p>
+                    <h2 id="landing-value-title">Bring people together. Keep them involved.</h2>
                 </div>
                 <div className="landing-audience-grid">
                     <article>
                         <span className="landing-audience-grid__label">For organizers</span>
-                        <h3>Know the club is under control.</h3>
+                        <h3>Make your club a place to belong.</h3>
                         <div className="landing-outcome-list">{organizerOutcomes.map(([title, copy]) => <div key={title}>
                             <span aria-hidden="true">✓</span><p><strong>{title}</strong>{copy}</p>
                         </div>)}</div>
                     </article>
                     <article>
                         <span className="landing-audience-grid__label">For players</span>
-                        <h3>See progress you can believe.</h3>
+                        <h3>Your next game starts with your club.</h3>
                         <div className="landing-outcome-list">{playerOutcomes.map(([title, copy]) => <div key={title}>
                             <span aria-hidden="true">✓</span><p><strong>{title}</strong>{copy}</p>
                         </div>)}</div>
@@ -87,18 +87,18 @@ export default function Landing() {
 
             <section className="landing-workflow" aria-labelledby="landing-workflow-title">
                 <div className="landing-section-heading">
-                    <p className="landing-eyebrow">From handshake to history</p>
-                    <h2 id="landing-workflow-title">Every result becomes a useful record.</h2>
+                    <p className="landing-eyebrow">From first hello to the next round</p>
+                    <h2 id="landing-workflow-title">Build your community, one game at a time.</h2>
                 </div>
                 <ol>
-                    <li><span>1</span><div><strong>Bring in the roster</strong><p>Start each player at the right Blitz, Rapid, and Classical rating.</p></div></li>
-                    <li><span>2</span><div><strong>Record what happened</strong><p>Capture opponents, result, category, rated status, and the actual time played.</p></div></li>
-                    <li><span>3</span><div><strong>Let the club learn from it</strong><p>Ratings, history, leaderboards, dashboards, and player statistics stay in step.</p></div></li>
+                    <li><span>1</span><div><strong>Bring your club together</strong><p>Create your club, add your players, and invite members to join.</p></div></li>
+                    <li><span>2</span><div><strong>Give everyone a way to take part</strong><p>Share announcements, organize tournaments, and record the games your members play.</p></div></li>
+                    <li><span>3</span><div><strong>Follow the story of your club</strong><p>Keep up with results and player progress, from the first game to the latest tournament.</p></div></li>
                 </ol>
             </section>
 
             <section className="landing-final-cta">
-                <div><p className="landing-eyebrow">Ready for the next round?</p><h2>Give your club a record everyone can rely on.</h2></div>
+                <div><p className="landing-eyebrow">There is a place for your club here</p><h2>Bring your people. Build your chess community.</h2></div>
                 <div className="landing-actions">
                     <Link className="landing-button landing-button--primary" to="/auth/register">Create your club</Link>
                     <Link className="landing-button landing-button--secondary" to="/auth/login">Sign in</Link>

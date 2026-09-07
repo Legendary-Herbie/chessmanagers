@@ -94,7 +94,7 @@ describe('AppRoutes route guards', () => {
         const mockUser = { id: 'user_1', email: 'user@example.com', name: 'User One' };
         render(<TestProviders user={mockUser}><MemoryRouter initialEntries={['/']}><AppRoutes /></MemoryRouter></TestProviders>);
         expect(await screen.findByRole('heading', { name: 'Build your club dashboard' }, { timeout: 5000 })).toBeTruthy();
-        expect(screen.queryByText('One result, reflected everywhere')).toBeNull();
+        expect(screen.queryByText('Your club, together')).toBeNull();
     });
 
     it('redirects guest accessing /dashboard to /auth/login', async () => {

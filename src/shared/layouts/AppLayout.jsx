@@ -200,7 +200,7 @@ export default function AppLayout() {
                             <BrandLogo className="app-nav__brand-logo" collapse="phone" />
                             <span className="app-nav__brand-toggle-icon" aria-hidden="true">{sidebarCollapsed ? '›' : '‹'}</span>
                         </button>
-                        <NavLink className="app-nav__mobile-brand" to="/dashboard" aria-label="Chess Managers dashboard">
+                        <NavLink className="app-nav__mobile-brand" to="/dashboard" aria-label="1chessclub dashboard">
                             <BrandLogo className="app-nav__brand-logo" collapse="phone" />
                         </NavLink>
                         <button

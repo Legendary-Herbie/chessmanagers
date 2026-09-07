@@ -1,4 +1,4 @@
-# Chess Managers
+# 1chessclub
 
 A full-stack web application for managing chess clubs, players, tournaments, and ratings. Built with React, Express.js, and PostgreSQL.
 

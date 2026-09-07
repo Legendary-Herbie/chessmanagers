@@ -7,14 +7,14 @@ import Landing from './Landing.jsx';
 afterEach(cleanup);
 
 describe('Landing value proposition', () => {
-    it('leads with organizer and player outcomes instead of tenancy mechanics', () => {
+    it('connects club community messaging with organizer and player actions', () => {
         render(<MemoryRouter><Landing /></MemoryRouter>);
 
-        expect(screen.getByRole('heading', { name: 'Run your club without rebuilding the same spreadsheet.' })).toBeTruthy();
-        expect(screen.getByRole('heading', { name: 'Know the club is under control.' })).toBeTruthy();
-        expect(screen.getByRole('heading', { name: 'See progress you can believe.' })).toBeTruthy();
-        expect(screen.getByRole('link', { name: 'Get started' })).toBeTruthy();
-        expect(screen.getByText('One result, reflected everywhere')).toBeTruthy();
+        expect(screen.getByRole('heading', { name: 'One club. Every player connected.' })).toBeTruthy();
+        expect(screen.getByRole('heading', { name: 'Make your club a place to belong.' })).toBeTruthy();
+        expect(screen.getByRole('heading', { name: 'Your next game starts with your club.' })).toBeTruthy();
+        expect(screen.getByRole('link', { name: 'Bring your club together' })).toBeTruthy();
+        expect(screen.getByText('Your club, together')).toBeTruthy();
         expect(screen.queryByText(/club-specific/i)).toBeNull();
     });
 });
