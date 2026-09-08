@@ -3,11 +3,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import '../../styles/tournaments.css';
 import { useClub } from '../../app/contextHooks.js';
 import { tournamentApi } from '../../features/tournaments/api/tournamentApi.js';
-import { playerApi } from '../../features/players/api/playerApi.js';
+import PlayerSearchSelect from '../../features/players/components/PlayerSearchSelect.jsx';
+import TournamentCrosstable from '../../features/tournaments/components/TournamentCrosstable.jsx';
+import Dialog from '../../shared/common/Dialog.jsx';
+import CopyPublicLink from '../../shared/common/CopyPublicLink.jsx';
 import Button from '../../shared/common/Button.jsx';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 
-function localDateTime(value = new Date()) {
+function localDateTime(value) {
     const date = new Date(value);
     return new Date(date.getTime() - date.getTimezoneOffset() * 60_000)
         .toISOString().slice(0, 19);
@@ -29,7 +32,10 @@ export default function TournamentPage() {
     const { club, capabilities } = useClub();
     const isAdmin = Boolean(capabilities.canManageMatches);
     const [detail, setDetail] = useState(null);
-    const [clubPlayers, setClubPlayers] = useState([]);
+    const [participantsOpen, setParticipantsOpen] = useState(false);
+    const [participantQuery, setParticipantQuery] = useState('');
+    const [playerSearchVersion, setPlayerSearchVersion] = useState(0);
+    const [tableView, setTableView] = useState('standings');
     const [selectedPlayerId, setSelectedPlayerId] = useState('');
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
@@ -46,18 +52,15 @@ export default function TournamentPage() {
         if (!club?.id) return;
         setLoading(true);
         try {
-            const requests = [tournamentApi.get(club.id, tournamentId)];
-            if (isAdmin) requests.push(playerApi.fetchPlayers(club.id, { limit: 100 }));
-            const [tournamentDetail, players = []] = await Promise.all(requests);
+            const tournamentDetail = await tournamentApi.get(club.id, tournamentId);
             setDetail(tournamentDetail);
-            setClubPlayers(players);
             setError('');
         } catch (requestError) {
             setError(requestError.message || 'Unable to load tournament.');
         } finally {
             setLoading(false);
         }
-    }, [club?.id, isAdmin, tournamentId]);
+    }, [club?.id, tournamentId]);
 
     useEffect(() => { void load(); }, [load]);
 
@@ -65,7 +68,6 @@ export default function TournamentPage() {
         () => new Set((detail?.participants || []).map(player => player.id)),
         [detail?.participants]
     );
-    const availablePlayers = clubPlayers.filter(player => !registeredIds.has(player.id));
     const currentRound = detail?.rounds?.find(round => (
         round.roundNumber === detail.tournament.current_round
     ));
@@ -98,17 +100,17 @@ export default function TournamentPage() {
     }
 
     async function addPlayer() {
-        if (!selectedPlayerId) return;
-        await runAction(
+        if (!selectedPlayerId || registeredIds.has(selectedPlayerId) || saving) return;
+        const added = await runAction(
             () => tournamentApi.addPlayer(club.id, tournamentId, selectedPlayerId),
             'Player registered.'
         );
-        setSelectedPlayerId('');
+        if (added) { setSelectedPlayerId(''); setPlayerSearchVersion(version => version + 1); }
     }
 
     function resultValues(pairing) {
         return resultDrafts[pairing.id] || {
-            playedAt: pairing.playedAt || new Date().toISOString(),
+            playedAt: pairing.playedAt || '',
             notes: pairing.notes || '',
         };
     }
@@ -169,13 +171,16 @@ export default function TournamentPage() {
         <Button variant="secondary" onClick={() => navigate('/tournaments')}>Back to tournaments</Button>
     </div>;
     const { tournament, participants, rounds, standings } = detail;
+    const missingResults = rounds.flatMap(round => round.pairings).filter(pairing => !pairing.isBye && !['white', 'black', 'draw'].includes(pairing.result)).length;
 
     return (
         <div className="tournament-detail-page">
             <div className="page-header tournament-detail-header">
                 <div>
                     <div className="tournament-heading"><h1>{tournament.name}</h1><span className={`tournament-status ${tournament.status}`}>{title(tournament.status)}</span></div>
-                    <p className="muted">{title(tournament.type)} · {title(tournament.rating_category)} · {tournament.is_rated ? 'Rated' : 'Unrated'}</p>
+                    <p className="muted">{title(tournament.type)} · {title(tournament.rating_category)} · {tournament.is_rated ? 'Rated — affects club ratings' : 'Casual — no rating changes'}</p>
+                    <p>{rounds.filter(round => round.status === 'completed').length} of {rounds.length} paired rounds complete · {missingResults ? `${missingResults} missing result${missingResults === 1 ? '' : 's'}` : 'No missing results'}</p>
+                    {club.visibility === 'public' && <CopyPublicLink path={`/clubs/${club.id}/tournaments/${tournamentId}`} />}
                 </div>
                 {isAdmin && <div className="tournament-actions">
                     {tournament.status === 'upcoming' && <Button loading={saving} onClick={() => runAction(() => tournamentApi.setStatus(club.id, tournamentId, 'active'), 'Tournament started.')}>Start</Button>}
@@ -194,13 +199,15 @@ export default function TournamentPage() {
             </div>
 
             <section className="tournament-section">
-                <div className="section-heading"><div><h2>Standings</h2><p className="muted">Match points, Buchholz, Sonneborn-Berger, then head-to-head.</p></div></div>
-                <div className="tournament-table-wrap"><table className="tournament-table">
+                <div className="section-heading"><div><h2>{tableView === 'standings' ? 'Standings' : 'Crosstable'}</h2><p className="muted">Match points, Buchholz, Sonneborn-Berger, then head-to-head.</p></div>
+                    <div className="tournament-actions" role="group" aria-label="Tournament table view">{['standings', 'crosstable'].map(view => <Button key={view} variant={tableView === view ? 'primary' : 'secondary'} aria-pressed={tableView === view} onClick={() => setTableView(view)}>{title(view)}</Button>)}</div>
+                </div>
+                {tableView === 'crosstable' ? <TournamentCrosstable participants={participants} rounds={rounds} standings={standings} /> : <><div className="tournament-table-wrap" tabIndex={0} role="region" aria-label="Tournament standings"><table className="tournament-table">
                     <thead><tr><th>#</th><th>Player</th><th>Pts</th><th>W</th><th>D</th><th>L</th><th>Buchholz</th><th>SB</th><th>H2H</th></tr></thead>
                     <tbody>{standings.map(row => <tr key={row.playerId}><td>{row.rank}</td><td>{row.playerName}</td><td><strong>{row.matchPoints}</strong></td><td>{row.wins}</td><td>{row.draws}</td><td>{row.losses}</td><td>{row.buchholz}</td><td>{row.sonnebornBerger}</td><td>{row.directHeadToHead}</td></tr>)}
                         {!standings.length && <tr><td colSpan={9} className="muted">No participants yet.</td></tr>}
                     </tbody>
-                </table></div>
+                </table></div><p className="muted">Pts: match points · W/D/L: wins/draws/losses · SB: Sonneborn-Berger · H2H: head-to-head. Standings are calculated by the server.</p></>}
             </section>
 
             <section className="tournament-section">
@@ -208,8 +215,8 @@ export default function TournamentPage() {
                     {isAdmin && tournament.status === 'active' && <Button disabled={!canGenerate || saving} loading={saving} onClick={() => runAction(() => tournamentApi.generateRound(club.id, tournamentId), 'Next round paired.')}>Generate next round</Button>}
                 </div>
                 <div className="round-list">
-                    {[...rounds].reverse().map(round => <article className="round-card" key={round.id}>
-                        <div className="round-card__header"><h3>Round {round.roundNumber}</h3><span className={`tournament-status ${round.status}`}>{title(round.status)}</span></div>
+                    {[...rounds].reverse().map(round => <details className="round-card" key={round.id} open={round.roundNumber === tournament.current_round}>
+                        <summary className="round-card__header"><strong>Round {round.roundNumber}</strong><span className={`tournament-status ${round.status}`}>{title(round.status)}</span><span>{round.pairings.filter(pairing => !pairing.isBye && !['white', 'black', 'draw'].includes(pairing.result)).length} missing results · {round.pairings.filter(pairing => pairing.isBye).length} byes</span></summary>
                         <div className="pairing-list">{round.pairings.map(pairing => <div className="pairing-item" key={pairing.id}><div className="pairing-row">
                             <span className="board-number">{pairing.board}</span>
                             <span className="pairing-player">{pairing.whitePlayerName || participants.find(player => player.id === pairing.whitePlayerId)?.name}</span>
@@ -222,7 +229,7 @@ export default function TournamentPage() {
                                     onClick={() => saveResult(pairing.id, { ...resultValues(pairing), result })}>{resultLabel(result)}</Button>)}
                             </div>}
                         </div>
-                        {isAdmin && !pairing.isBye && <details className="pairing-result-details">
+                        {isAdmin && !pairing.isBye && <details className="pairing-result-details" open={!pairing.playedAt}>
                             <summary>Played at &amp; notes</summary>
                             <label>Played at (round {round.roundNumber}, board {pairing.board})
                                 <input type="datetime-local" step="1" className="input" required disabled={saving || Boolean(duplicateConfirmation)}
@@ -238,19 +245,38 @@ export default function TournamentPage() {
                             <Button variant="secondary" disabled={saving} onClick={() => setDuplicateConfirmation(null)}>Cancel</Button>
                         </div>}
                         </div>)}</div>
-                    </article>)}
+                    </details>)}
                     {!rounds.length && <p className="muted">No rounds have been generated.</p>}
                 </div>
             </section>
 
             <section className="tournament-section">
                 <div className="section-heading"><div><h2>Participants</h2><p className="muted">Late registrations become eligible for the next round.</p></div>
-                    {isAdmin && tournament.status !== 'completed' && <div className="participant-add"><select className="input" value={selectedPlayerId} onChange={event => setSelectedPlayerId(event.target.value)}><option value="">Select active club player</option>{availablePlayers.map(player => <option key={player.id} value={player.id}>{player.name}</option>)}</select><Button disabled={!selectedPlayerId || saving} onClick={addPlayer}>Add</Button></div>}
+                    {isAdmin && <Button onClick={() => setParticipantsOpen(true)}>Manage participants</Button>}
                 </div>
                 <div className="tournament-table-wrap"><table className="tournament-table"><thead><tr><th>Player</th><th>Rating</th><th>Entered</th><th>Status</th><th>Byes</th>{isAdmin && <th>Action</th>}</tr></thead>
-                    <tbody>{participants.map(player => <tr key={player.id}><td>{player.name}</td><td>{player.rating}</td><td>Round {player.registrationRound}</td><td>{title(player.status)}</td><td>{player.byeCount}</td>{isAdmin && <td>{player.status === 'active' && (tournament.current_round > 0 ? <Button variant="warning" onClick={() => runAction(() => tournamentApi.withdrawPlayer(club.id, tournamentId, player.id), `${player.name} withdrawn.`)}>Withdraw</Button> : <Button variant="danger" onClick={() => runAction(() => tournamentApi.removePlayer(club.id, tournamentId, player.id), `${player.name} removed.`)}>Remove</Button>)}</td>}</tr>)}</tbody>
+                    <tbody>{participants.map(player => <tr key={player.id}><td>{player.name}</td><td>{player.rating}</td><td>Round {player.registrationRound}</td><td>{title(player.status)}</td><td>{player.byeCount}</td>{isAdmin && <td>Use Manage participants</td>}</tr>)}</tbody>
                 </table></div>
             </section>
+
+            {participantsOpen && isAdmin && <Dialog title="Manage participants" busy={saving} onClose={() => setParticipantsOpen(false)}>
+                <div className="modal-body">
+                {error && <p role="alert">{error}</p>}
+                {notice && <p role="status">{notice}</p>}
+                {tournament.status !== 'completed' && <div className="participant-add">
+                    <PlayerSearchSelect key={playerSearchVersion} clubId={club.id} label="Add club player" value={selectedPlayerId} onChange={setSelectedPlayerId} />
+                    <Button disabled={saving || !selectedPlayerId || registeredIds.has(selectedPlayerId)} onClick={addPlayer}>Add</Button>
+                </div>}
+                {registeredIds.has(selectedPlayerId) && <p>This player is already registered.</p>}
+                <label>Search registered participants<input className="input" type="search" value={participantQuery} onChange={event => setParticipantQuery(event.target.value)} /></label>
+                <ul className="participant-manager-list">{participants.filter(player => player.name.toLowerCase().includes(participantQuery.trim().toLowerCase())).map(player => <li key={player.id}>
+                    <span>{player.name} · {title(player.status)}</span>
+                    {tournament.status !== 'completed' && player.status === 'active' && <Button disabled={saving} variant="secondary" onClick={() => runAction(() => tournament.current_round > 0 ? tournamentApi.withdrawPlayer(club.id, tournamentId, player.id) : tournamentApi.removePlayer(club.id, tournamentId, player.id), `${player.name} ${tournament.current_round > 0 ? 'withdrawn' : 'removed'}.`)}>{tournament.current_round > 0 ? 'Withdraw' : 'Remove'}</Button>}
+                </li>)}</ul>
+                {!participants.some(player => player.name.toLowerCase().includes(participantQuery.trim().toLowerCase())) && <p>No matching participants.</p>}
+                <p className="muted">Changes save immediately. Withdrawals preserve earlier results. Late entries join future rounds only.</p>
+                </div>
+            </Dialog>}
 
             <ConfirmDialog isOpen={archiveConfirmation} title="Archive tournament?"
                 message="Its rounds and results will be preserved."

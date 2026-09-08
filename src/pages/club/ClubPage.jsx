@@ -12,6 +12,8 @@ import {
 import DataExportPanel from '../../features/exports/components/DataExportPanel.jsx';
 import { canRemoveClubMember } from '../../features/clubs/membership/memberActionPermissions.js';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
+import UnsavedChangesWarning from '../../shared/common/UnsavedChangesWarning.jsx';
+import CopyPublicLink from '../../shared/common/CopyPublicLink.jsx';
 
 const profileFieldId = field => `club-profile-${field.replaceAll('.', '-')}`;
 const PROFILE_FIELD_LABELS = {
@@ -61,6 +63,7 @@ export default function ClubPage() {
     const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
 
     const [profile, setProfile] = useState(null);
+    const [savedProfile, setSavedProfile] = useState(null);
     const [badgeFile, setBadgeFile] = useState(null);
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(false);
@@ -99,6 +102,7 @@ export default function ClubPage() {
     useEffect(() => {
         if (!club) return;
         setProfile(club);
+        setSavedProfile(club);
         if (capabilities.canManageMemberships) loadMembers();
     }, [club, capabilities.canManageMemberships, loadMembers]);
 
@@ -206,6 +210,7 @@ export default function ClubPage() {
                 await clubApi.uploadBadge(club.id, badgeFile);
                 setBadgeFile(null);
             }
+            setSavedProfile(profile);
             await refreshClub();
             notify('Club profile saved.', 'success');
         } catch (err) {
@@ -418,6 +423,7 @@ export default function ClubPage() {
             {activeTab === 'profile' && (
                 <div className="tab-panel profile-panel">
                     <form noValidate onSubmit={saveProfile}>
+                    <fieldset disabled={savingSettings} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
                     <label className="form-row">
                         <div className="label">Name</div>
                         <input {...validationProps('name')} className="input" maxLength={150} disabled={!isOwner} value={profile?.name || ''} onChange={e => { clearProfileError('name'); setProfile({ ...profile, name: e.target.value }); }} />
@@ -563,13 +569,17 @@ export default function ClubPage() {
                         {isClubAdmin ? (
                             <>
                                 <Button type="submit" disabled={savingSettings} className="mr-2">{savingSettings ? 'Saving...' : 'Save'}</Button>
-                                <Button variant="secondary" onClick={() => { setProfile(club); setBadgeFile(null); setProfileErrors({}); setManagementError(null); }}>Reset</Button>
+                                <Button variant="secondary" disabled={savingSettings} onClick={() => { setProfile(savedProfile); setBadgeFile(null); setProfileErrors({}); setManagementError(null); }}>Reset</Button>
                             </>
                         ) : (
                             <div className="muted">Only club owners and admins can edit the public club presentation.</div>
                         )}
                     </div>
+                    </fieldset>
                     </form>
+                    {club.visibility === 'public' && <CopyPublicLink path={`/clubs/${club.id}`} />}
+                    <UnsavedChangesWarning dirty={Boolean(profile && savedProfile && (badgeFile || JSON.stringify(profile) !== JSON.stringify(savedProfile)))} saving={savingSettings}
+                        onDiscard={() => { setProfile(savedProfile); setBadgeFile(null); setProfileErrors({}); }} />
 
                     {isOwner && (
                         <div className="dashboard-settings-card">

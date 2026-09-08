@@ -1,6 +1,6 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, ClubContext, NotificationsContext } from '../../app/contextHooks.js';
 import { clubApi } from '../../features/clubs/api/clubApi.js';
@@ -55,9 +55,7 @@ function renderPage({ refreshClub = vi.fn() } = {}) {
                 refreshClub,
             }}>
                 <NotificationsContext.Provider value={{ notify }}>
-                    <MemoryRouter initialEntries={['/club?tab=profile']}>
-                        <ClubPage />
-                    </MemoryRouter>
+                    <RouterProvider router={createMemoryRouter([{ path: '*', element: <ClubPage /> }], { initialEntries: ['/club?tab=profile'] })} />
                 </NotificationsContext.Provider>
             </ClubContext.Provider>
         </AuthContext.Provider>,

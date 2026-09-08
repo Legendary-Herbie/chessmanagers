@@ -1,4 +1,4 @@
-import { BrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import Providers from './providers.jsx';
 import AppRoutes from './routes.jsx';
 import { useEffect } from 'react';
@@ -23,13 +23,13 @@ function AuthLogoutListener() {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
-export default function App() {
-    return (
-        <BrowserRouter>
+const router = createBrowserRouter([{ path: '*', element:
             <Providers>
                 <AuthLogoutListener />
                 <AppRoutes />
             </Providers>
-        </BrowserRouter>
-    );
+}]);
+
+export default function App() {
+    return <RouterProvider router={router} />;
 }

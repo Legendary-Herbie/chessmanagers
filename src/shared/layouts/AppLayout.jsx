@@ -127,6 +127,7 @@ export default function AppLayout() {
     }, [menuOpen]);
 
     const handleLogout = async () => {
+        if (!window.dispatchEvent(new Event('app:before-context-change', { cancelable: true }))) return;
         setMenuOpen(false);
         await logout();
         navigate('/auth/login', { replace: true });
@@ -138,6 +139,7 @@ export default function AppLayout() {
     };
 
     const handleClubChange = async (event) => {
+        if (!window.dispatchEvent(new Event('app:before-context-change', { cancelable: true }))) return;
         const nextClubId = event.target.value;
         setSwitchingClubId(nextClubId);
         setMobileNavOpen(false);

@@ -8,10 +8,10 @@ import { playerApi } from '../../features/players/api/playerApi.js';
 import TournamentPage from './TournamentPage.jsx';
 
 vi.mock('../../features/tournaments/api/tournamentApi.js', () => ({
-    tournamentApi: { get: vi.fn(), recordResult: vi.fn(), setStatus: vi.fn(), archive: vi.fn() },
+    tournamentApi: { get: vi.fn(), recordResult: vi.fn(), setStatus: vi.fn(), archive: vi.fn(), addPlayer: vi.fn(), withdrawPlayer: vi.fn() },
 }));
 vi.mock('../../features/players/api/playerApi.js', () => ({
-    playerApi: { fetchPlayers: vi.fn() },
+    playerApi: { fetchPlayers: vi.fn(), searchPlayers: vi.fn() },
 }));
 
 const detail = {
@@ -49,6 +49,29 @@ describe('TournamentPage duplicate result protection', () => {
     });
     afterEach(cleanup);
 
+    it('requires an explicit played time for a new result', async () => {
+        renderPage();
+        fireEvent.click(await screen.findByRole('button', { name: '1–0' }));
+        expect(screen.getByRole('alert').textContent).toContain('valid played date');
+        expect(tournamentApi.recordResult).not.toHaveBeenCalled();
+        expect(screen.getByLabelText('Played at (round 1, board 1)').value).toBe('');
+    });
+
+    it('searches the server for new participants and filters registered participants in the window', async () => {
+        playerApi.searchPlayers.mockResolvedValue({ players: [{ id: 'player_101', name: 'Zoe' }] });
+        tournamentApi.addPlayer.mockResolvedValue({});
+        renderPage();
+        fireEvent.click(await screen.findByRole('button', { name: 'Manage participants' }));
+        const dialog = screen.getByRole('dialog', { name: 'Manage participants' });
+        fireEvent.change(within(dialog).getByLabelText('Search registered participants'), { target: { value: 'Alpha' } });
+        expect(within(dialog).queryByText('Beta · Active')).toBeNull();
+        fireEvent.change(within(dialog).getByRole('combobox'), { target: { value: 'Zoe' } });
+        fireEvent.click(await within(dialog).findByRole('option', { name: 'Zoe' }));
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Add' }));
+        await waitFor(() => expect(tournamentApi.addPlayer).toHaveBeenCalledWith('club_1', 'tour_1', 'player_101'));
+        expect(playerApi.fetchPlayers).not.toHaveBeenCalled();
+    });
+
     it('announces a load failure and allows retry', async () => {
         tournamentApi.get.mockRejectedValueOnce(new Error('Offline'));
         renderPage();
@@ -61,7 +84,9 @@ describe('TournamentPage duplicate result protection', () => {
     it.each([['1–0', 'white'], ['½–½', 'draw'], ['0–1', 'black']])('records %s inline without a result modal', async (label, result) => {
         tournamentApi.recordResult.mockResolvedValue({ ratingStatus: 'complete' });
         renderPage();
-        fireEvent.click(await screen.findByRole('button', { name: label }));
+        await screen.findByRole('button', { name: label });
+        fireEvent.change(screen.getByLabelText('Played at (round 1, board 1)'), { target: { value: '2026-09-01T10:00' } });
+        fireEvent.click(screen.getByRole('button', { name: label }));
         await waitFor(() => expect(tournamentApi.recordResult).toHaveBeenCalledWith('club_1', 'tour_1', 'pairing_1', expect.objectContaining({ result, confirmDuplicate: false })));
         expect(screen.queryByRole('dialog')).toBeNull();
     });
@@ -95,7 +120,9 @@ describe('TournamentPage duplicate result protection', () => {
             .mockRejectedValueOnce({ code: 'POSSIBLE_DUPLICATE_MATCH' })
             .mockResolvedValueOnce({ ratingStatus: 'complete' });
         renderPage();
-        fireEvent.click(await screen.findByRole('button', { name: '1–0' }));
+        await screen.findByRole('button', { name: '1–0' });
+        fireEvent.change(screen.getByLabelText('Played at (round 1, board 1)'), { target: { value: '2026-09-01T10:00' } });
+        fireEvent.click(screen.getByRole('button', { name: '1–0' }));
         expect((await screen.findByRole('alert')).textContent).toContain('matching result');
         expect(tournamentApi.recordResult).toHaveBeenCalledTimes(1);
         fireEvent.click(screen.getByRole('button', { name: 'Save anyway' }));
@@ -106,7 +133,9 @@ describe('TournamentPage duplicate result protection', () => {
     it('keeps inline controls and makes no retry when the warning is cancelled', async () => {
         tournamentApi.recordResult.mockRejectedValueOnce({ code: 'POSSIBLE_DUPLICATE_MATCH' });
         renderPage();
-        fireEvent.click(await screen.findByRole('button', { name: '1–0' }));
+        await screen.findByRole('button', { name: '1–0' });
+        fireEvent.change(screen.getByLabelText('Played at (round 1, board 1)'), { target: { value: '2026-09-01T10:00' } });
+        fireEvent.click(screen.getByRole('button', { name: '1–0' }));
         const duplicateDialog = await screen.findByRole('alert');
         fireEvent.click(within(duplicateDialog).getByRole('button', { name: 'Cancel' }));
         expect(tournamentApi.recordResult).toHaveBeenCalledTimes(1);

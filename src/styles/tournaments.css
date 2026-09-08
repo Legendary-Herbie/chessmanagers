@@ -135,7 +135,19 @@
 .section-heading { margin-bottom: 1rem; }
 .section-heading p { margin: 0.35rem 0 0; }
 
-.tournament-table-wrap { overflow-x: auto; }
+.tournament-table-wrap { overflow: auto; max-height: 65vh; }
+.tournament-table thead th { position: sticky; top: 0; z-index: 2; background: var(--bg-secondary); }
+.tournament-table tr > :first-child { position: sticky; left: 0; background: var(--bg-secondary); z-index: 1; }
+.tournament-table thead tr > :first-child { z-index: 3; }
+.tournament-crosstable td { text-align: center; }
+.cross-score { display: inline-block; padding: 0.3rem; }
+.round-card > summary { cursor: pointer; flex-wrap: wrap; }
+.round-card > summary::before { content: '▸'; }
+.round-card[open] > summary::before { content: '▾'; }
+.participant-manager-list { padding: 0; list-style: none; }
+.participant-manager-list li { display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding: 0.75rem 0; border-bottom: 1px solid var(--border); }
+.participant-add .player-search-select { flex: 1; min-width: 0; }
+.copy-public-link p { font-size: 0.85rem; }
 .tournament-table { width: 100%; border-collapse: collapse; }
 .tournament-table th,
 .tournament-table td { padding: 0.75rem; border-bottom: 1px solid var(--border); text-align: left; white-space: nowrap; }
