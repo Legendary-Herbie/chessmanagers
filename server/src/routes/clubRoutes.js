@@ -59,6 +59,7 @@ import {
     setMemberRoleSchema,
     transferClubOwnershipSchema,
     clubLifecycleSchema,
+    permanentDeletionSchema,
     membershipReasonSchema,
     emptyBodySchema,
 } from '../middleware/validate.js';
@@ -125,7 +126,7 @@ router.post('/:clubId/badge', validateRequest({ params: clubParamsSchema }), loa
 router.post('/:clubId/ownership', validateRequest({ params: clubParamsSchema, body: transferClubOwnershipSchema }), loadClubContext, requireActiveClubMember, requireClubOwner, transferClubOwnership);
 router.post('/:clubId/archive', validateRequest({ params: clubParamsSchema, body: clubLifecycleSchema }), loadClubContext, requireActiveClubMember, requireClubOwner, archiveClub);
 router.post('/:clubId/restore', validateRequest({ params: clubParamsSchema, body: clubLifecycleSchema }), allowInactiveClubMutation, loadClubContext, requireActiveClubMember, requireClubOwner, restoreClub);
-router.delete('/:clubId', validateRequest({ params: clubParamsSchema, body: clubLifecycleSchema }), allowInactiveClubMutation, loadClubContext, requireActiveClubMember, requireClubOwner, deleteClub);
+router.delete('/:clubId', validateRequest({ params: clubParamsSchema, body: permanentDeletionSchema }), allowInactiveClubMutation, loadClubContext, requireActiveClubMember, requireClubOwner, deleteClub);
 
 router.post('/:clubId/leave', validateRequest({ params: clubParamsSchema, body: membershipReasonSchema }), loadClubContext, requireActiveClubMember, leaveClub);
 router.get('/:clubId/join-code', validateRequest({ params: clubParamsSchema }), loadClubContext, requireActiveClubMember, requireClubAdmin, getJoinCode);

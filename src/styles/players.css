@@ -808,3 +808,22 @@
 }
 
 .empty-state__action { margin-top: 6px; }
+.roster-summary { padding:10px 0; margin-bottom:16px; color:var(--text-muted); font-size:.85rem; }
+.players-filter-disclosure summary { cursor:pointer; padding:12px; }
+.players-filter-disclosure .players-toolbar__filters { padding-top:12px; flex-wrap:wrap; }
+.player-more-actions summary { cursor:pointer; padding:8px; }
+.player-more-actions[open] { display:flex; }
+.player-card__bio { display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.mobile-rating-label { display:none; }
+@media(max-width:600px) {
+  .players-table-wrapper:has(> .player-roster-table) { overflow:visible; border:0; background:transparent; box-shadow:none; }
+  .player-roster-table, .player-roster-table tbody { display:block; width:100%; }
+  .player-roster-table thead { display:none; }
+  .player-roster-table tbody { display:grid; gap:12px; }
+  .player-roster-table tbody tr { display:grid; grid-template-columns:minmax(0,1fr) auto; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--bg-surface); }
+  .player-roster-table tbody td { padding:6px 0; border:0; min-width:0; }
+  .player-roster-table tbody td:first-child { align-self:center; overflow-wrap:anywhere; }
+  .player-roster-table tbody td:nth-child(3) { display:none; }
+  .player-roster-table tbody td:last-child { grid-column:1 / -1; }
+  .player-roster-table .mobile-rating-label { display:inline; }
+}

@@ -16,7 +16,7 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
 
     // Toolbar filtering & sorting state
     const [searchTerm, setSearchTerm] = useState('');
-    const [ratingCategory, setRatingCategory] = useState('blitz');
+    const [ratingCategory, setRatingCategory] = useState('rapid');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'claimed' | 'pending' | 'unlinked'
     const [sortBy, setSortBy] = useState('rating_desc');     // 'rating_desc' | 'rating_asc' | 'name_asc' | 'games_desc' | 'winrate_desc'
     const [viewMode, setViewMode] = useState('grid');       // 'grid' | 'table'

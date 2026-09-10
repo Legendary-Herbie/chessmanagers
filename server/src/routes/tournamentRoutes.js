@@ -3,9 +3,11 @@ import {
     getTournaments,
     getTournament,
     createTournament,
+    setupTournament,
     updateTournament,
     setTournamentStatus,
     deleteTournament,
+    archiveTournament,
     getTournamentPlayers,
     addTournamentPlayer,
     removeTournamentPlayer,
@@ -26,11 +28,13 @@ import {
     clubTournamentPairingParamsSchema,
     tournamentListQuerySchema,
     createTournamentSchema,
+    tournamentSetupSchema,
     updateTournamentSchema,
     setTournamentStatusSchema,
     addTournamentPlayerSchema,
     recordTournamentResultSchema,
     tournamentReasonSchema,
+    permanentDeletionSchema,
     emptyBodySchema,
 } from '../middleware/validate.js';
 
@@ -45,6 +49,7 @@ router.get('/', validateRequest({ query: tournamentListQuerySchema }), getTourna
 
 // POST /api/v1/clubs/:clubId/tournaments
 router.post('/', requireClubAdmin, validate(createTournamentSchema), createTournament);
+router.post('/:tournamentId/setup', validateRequest({ params: clubTournamentParamsSchema }), requireClubAdmin, validate(tournamentSetupSchema), setupTournament);
 
 // GET /api/v1/clubs/:clubId/tournaments/:tournamentId
 // Returns tournament + players + standings in one response
@@ -57,7 +62,8 @@ router.patch('/:tournamentId', validateRequest({ params: clubTournamentParamsSch
 router.patch('/:tournamentId/status', validateRequest({ params: clubTournamentParamsSchema }), requireClubAdmin, validate(setTournamentStatusSchema), setTournamentStatus);
 
 // DELETE /api/v1/clubs/:clubId/tournaments/:tournamentId
-router.delete('/:tournamentId', validateRequest({ params: clubTournamentParamsSchema }), requireClubAdmin, validate(tournamentReasonSchema), deleteTournament);
+router.delete('/:tournamentId', validateRequest({ params: clubTournamentParamsSchema }), requireClubAdmin, validate(permanentDeletionSchema), deleteTournament);
+router.post('/:tournamentId/archive', validateRequest({ params: clubTournamentParamsSchema }), requireClubAdmin, validate(tournamentReasonSchema), archiveTournament);
 
 // ── Roster management ─────────────────────────────────────────────────────────
 

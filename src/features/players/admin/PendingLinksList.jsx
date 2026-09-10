@@ -33,11 +33,11 @@ export default function PendingLinksList({ clubId, onActionComplete }) {
     };
 
     if (loading) {
-        return <div style={{ padding: '16px', fontSize: '0.875rem', color: 'var(--text-muted)' }}>Loading pending claim requests...</div>;
+        return <div>Loading pending claim requests...</div>;
     }
 
     if (error) {
-        return <div className="error-box">{error}</div>;
+        return <div className="error-box" role="alert">{error}</div>;
     }
 
     if (!pendingLinks || pendingLinks.length === 0) {
@@ -45,46 +45,38 @@ export default function PendingLinksList({ clubId, onActionComplete }) {
     }
 
     return (
-        <div className="pending-banner">
-            {actionError && <div className="error-box" style={{ width: '100%' }}>{actionError}</div>}
+        <div className="pending-banner queue-card">
+            {actionError && <div className="error-box" role="alert" >{actionError}</div>}
             <div className="pending-banner__info">
                 <span className="pending-badge">{pendingLinks.length}</span>
                 <div>
-                    <strong style={{ color: 'var(--text-strong)', display: 'block', fontSize: '0.95rem' }}>
+                    <strong>
                         Pending Account Claim Requests
                     </strong>
-                    <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>
+                    <span>
                         Members requesting to link their login to player profiles.
                     </span>
                 </div>
             </div>
 
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', width: '100%', maxWidth: '420px' }}>
+            <div>
                 {pendingLinks.map((link) => (
                     <div
-                        key={link.id}
-                        style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            backgroundColor: 'var(--bg-surface)',
-                            padding: '8px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid var(--border)',
-                        }}
+                        key={link.id} className="queue-item"
+
                     >
-                        <div style={{ fontSize: '0.85rem' }}>
-                            <strong style={{ color: 'var(--text-strong)' }}>{link.player_name}</strong>
-                            <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
+                        <div>
+                            <strong>{link.player_name}</strong>
+                            <div>
                                 Requested by: {link.user_email}
                             </div>
                         </div>
-                        <div style={{ display: 'flex', gap: '6px' }}>
+                        <div className="queue-actions">
                             <button
                                 type="button"
                                 className="btn-primary btn-sm"
-                                style={{ backgroundColor: 'var(--accent)' }}
-                                disabled={actionId === link.id}
+
+                                disabled={Boolean(actionId)}
                                 onClick={() => handleApprove(link.id)}
                             >
                                 {actionId === link.id ? '...' : 'Approve'}
@@ -92,7 +84,7 @@ export default function PendingLinksList({ clubId, onActionComplete }) {
                             <button
                                 type="button"
                                 className="btn-danger btn-sm"
-                                disabled={actionId === link.id}
+                                disabled={Boolean(actionId)}
                                 onClick={() => handleReject(link.id)}
                             >
                                 {actionId === link.id ? '...' : 'Reject'}

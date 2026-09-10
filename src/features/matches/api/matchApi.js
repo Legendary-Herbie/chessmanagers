@@ -1,6 +1,7 @@
 import { api, endpoints } from '../../../config/api.js';
 
 export const matchApi = {
+    get: (clubId, matchId, options = {}) => api.get(endpoints.matches.byId(clubId, matchId), options),
     list: async (clubId, { signal, ...query } = {}) => {
         const params = new URLSearchParams();
         Object.entries(query).forEach(([key, value]) => {

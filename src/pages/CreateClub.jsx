@@ -1,3 +1,5 @@
+import Disclosure from '../shared/common/Disclosure.jsx';
+import Icon from '../shared/common/Icon.jsx';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getFieldErrors, isValidationError } from '../config/api.js';
@@ -10,7 +12,8 @@ export default function CreateClub() {
   const navigate = useNavigate();
   const { updateSession } = useAuth();
   const { refreshClubs } = useClub();
-  const [step, setStep] = useState(1);
+  const [created, setCreated] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // Core identity
   const [name, setName] = useState('');
@@ -45,6 +48,7 @@ export default function CreateClub() {
   function validateStep1() {
     const errs = {};
     if (!name.trim()) errs.name = 'Name is required.';
+    else if (name.trim().length > 150) errs.name = 'Use no more than 150 characters.';
     if (!federation.trim()) errs.federation = 'Federation is required.';
     else if (federation.trim().length > 5) errs.federation = 'Use a federation code of no more than 5 characters.';
     return errs;
@@ -52,35 +56,27 @@ export default function CreateClub() {
 
   function validateStep2() {
     const errs = {};
-    if (!Number.isFinite(Number(initialRating))) errs.initialRating = 'Initial rating must be a number.';
-    if (!Number.isFinite(Number(ratingFloor)) || Number(ratingFloor) > Number(initialRating)) errs.ratingFloor = 'Rating floor must not exceed the initial rating.';
-    if (!Number.isFinite(Number(kFactor))) errs.kFactor = 'K-factor must be a number.';
-    if (!Number.isFinite(Number(provisionalKFactor))) errs.provisionalKFactor = 'Provisional K-factor must be a number.';
-    if (!Number.isFinite(Number(provisionalGames))) errs.provisionalGames = 'Provisional games must be a number.';
-    return errs;
-  }
-
-  async function handleNext() {
-    setErrors({});
-    if (step === 1) {
-      const e = validateStep1();
-      if (Object.keys(e).length) return setErrors(e);
-      setStep(2);
-    } else {
-      const e = validateStep2();
-      if (Object.keys(e).length) return setErrors(e);
+    for (const [field, value, min, max] of [
+      ['initialRating', initialRating, 100, 4000], ['ratingFloor', ratingFloor, 0, 4000],
+      ['kFactor', kFactor, 1, 100], ['provisionalKFactor', provisionalKFactor, 1, 100],
+      ['provisionalGames', provisionalGames, 1, 100],
+    ]) {
+      if (String(value).trim() === '' || !Number.isInteger(Number(value)) || Number(value) < min || Number(value) > max)
+        errs[field] = `Enter a whole number from ${min} to ${max}.`;
     }
-  }
-
-  function handleBack() {
-    setErrors({});
-    setMessage(null);
-    setMessageIsError(false);
-    setStep((s) => Math.max(1, s - 1));
+    if (Number(ratingFloor) > Number(initialRating)) errs.ratingFloor = 'Rating floor must not exceed the initial rating.';
+    return errs;
   }
 
   async function handleSubmit(e) {
     e && e.preventDefault && e.preventDefault();
+    if (loading || created) return;
+    const validation = { ...validateStep1(), ...validateStep2() };
+    if (Object.keys(validation).length) {
+      setErrors(validation);
+      if (Object.keys(validateStep2()).length) setAdvancedOpen(true);
+      return;
+    }
     setLoading(true);
     setErrors({});
     setMessage(null);
@@ -103,6 +99,7 @@ export default function CreateClub() {
     try {
       const data = await clubApi.create(payload);
       createdClub = data.club;
+      setCreated(true);
 
       // Refresh the account session returned alongside the new club. Club
       // permissions remain scoped to the membership loaded by ClubProvider.
@@ -143,16 +140,10 @@ export default function CreateClub() {
     <div className="create-club">
       <h1>Create Club</h1>
 
-      <div className="stepper">
-        <div className="stepper-label">Step {step} of 2</div>
-        <div className="progress"><div className="progress-bar" style={{ width: step === 1 ? '50%' : '100%' }} /></div>
-      </div>
-
-      <form onSubmit={handleSubmit}>
-        {step === 1 && (
+      <p className="muted">Set up your club with independent Blitz, Rapid, and Classical ratings. You can adjust the details later.</p>
+      <form onSubmit={handleSubmit} noValidate>
+        <fieldset className="form-fieldset" disabled={loading || created}>
           <section>
-            <h2 style={{ marginTop: 0 }}>Core Identity</h2>
-
             <label htmlFor="create-name">Name</label>
             <input id="create-name" className="" placeholder="e.g. Royal Gambit Chess Academy" value={name} onChange={(e) => setName(e.target.value)} />
             {errors.name && <div className="error" role="alert">{errors.name}</div>}
@@ -178,24 +169,17 @@ export default function CreateClub() {
               </div>
             </div>
 
-            <label htmlFor="create-badge" style={{ marginTop: 16 }}>Club badge</label>
+            <label htmlFor="create-badge" className="create-club__badge-label">Club badge</label>
             <div className="create-club__badge-field">
               {badgePreview ? <img src={badgePreview} alt="Club badge preview" />
-                : <span className="create-club__badge-placeholder" aria-hidden="true">♜</span>}
+                : <span className="create-club__badge-placeholder" aria-hidden="true"><Icon name="club" size="xl" /></span>}
               <div><input id="create-badge" type="file" accept="image/jpeg,image/png,image/webp"
                 onChange={e => setBadgeFile(e.target.files?.[0] || null)} />
                 <div className="form-helper">{badgeFile ? `${badgeFile.name} selected` : 'JPEG, PNG, or WebP; maximum 5 MB.'}</div></div>
             </div>
-            <div className="controls">
-              <button type="button" className="btn btn-secondary" onClick={handleNext}>Proceed to Rating</button>
-            </div>
           </section>
-        )}
-
-        {step === 2 && (
-          <section>
-            <h2 style={{ marginTop: 0 }}>Rating Parameters</h2>
-
+          <Disclosure title="Advanced rating rules (optional)" forceOpen={advancedOpen}>
+            <p className="muted">Starting rating 1500 · floor 500 · established K 32 · provisional K 40 for 10 games. Applied separately to each category.</p>
             <div className="rating-parameter-grid">
               <div className="rating-parameter-grid__system">
                 <label htmlFor="create-system">Rating system</label>
@@ -222,12 +206,11 @@ export default function CreateClub() {
                 {errors.provisionalGames && <div className="error" role="alert">{errors.provisionalGames}</div>}</div>
             </div>
 
+          </Disclosure>
             <div className="controls">
-              <button type="button" className="btn btn-secondary" onClick={handleBack}>Back</button>
               <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Creating…' : 'Create Club'}</button>
             </div>
-          </section>
-        )}
+        </fieldset>
       </form>
 
       {message && <div className="message" role={messageIsError ? 'alert' : 'status'}>{message}</div>}

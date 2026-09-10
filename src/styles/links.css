@@ -1,0 +1,43 @@
+/* Text links remain quiet until interaction; names retain the text hierarchy. */
+a { text-underline-offset:.22em; text-decoration-thickness:1.5px; text-decoration-skip-ink:auto; }
+a.text-link, a.name-link, a.title-link, button.name-link {
+    text-decoration:none;
+    transition:color 160ms ease, background-color 160ms ease;
+    border-radius:3px;
+}
+a.text-link { color:var(--primary); font-weight:600; overflow-wrap:anywhere; }
+a.name-link, a.title-link, button.name-link { color:var(--text-strong); font-weight:650; }
+a.title-link { font-weight:inherit; }
+button.name-link { background:transparent; border:0; box-shadow:none; padding:6px 0; min-height:44px; font:inherit; font-weight:650; text-align:left; cursor:pointer; }
+a:focus-visible, button.name-link:focus-visible {
+    outline:2px solid var(--primary); outline-offset:4px; border-radius:4px;
+}
+a.text-link:focus-visible, a.name-link:focus-visible, a.title-link:focus-visible, button.name-link:focus-visible {
+    color:var(--primary); text-decoration:underline;
+}
+@media(hover:hover) {
+    a.text-link:hover, a.name-link:hover, a.title-link:hover, button.name-link:hover {
+        color:var(--primary); text-decoration:underline;
+    }
+    a.text-link:hover { color:var(--text-strong); }
+}
+/* Links presented as actions or whole cards should not acquire text underlines. */
+a:is(.btn-primary,.btn-secondary,.public-link-button,.landing-button,.public-nav__button) {
+    text-decoration:none; transition:background-color 160ms ease,border-color 160ms ease,box-shadow 160ms ease;
+}
+@media(hover:hover) {
+    a:is(.btn-primary,.btn-secondary,.public-link-button,.landing-button,.public-nav__button):hover {
+        text-decoration:none; box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 22%,transparent);
+    }
+    a:is(.tournament-card,.dash-stat-card):hover { text-decoration:none; }
+    a.tournament-card:hover h2 { color:var(--primary); }
+}
+a:is(.tournament-card,.dash-stat-card):focus-visible {
+    border-color:var(--primary); outline:2px solid var(--primary); outline-offset:4px;
+}
+a:is(.app-nav__link,.app-nav__dropdown-item):focus-visible { outline:2px solid var(--primary); outline-offset:-2px; }
+.entity-name { color:var(--text-strong); font-weight:650; overflow-wrap:anywhere; }
+@media(prefers-reduced-motion:reduce) {
+    a,button.name-link { transition:none !important; }
+    a:is(.tournament-card,.dash-stat-card):hover { transform:none; }
+}

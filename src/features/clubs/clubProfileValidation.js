@@ -116,6 +116,12 @@ export function validateClubProfile(profile, { isOwner = false, badgeFile = null
     };
 }
 
+export function validateClubRatingSettings(settings) {
+    const parsed = profileSchema.shape.ratingSettings.unwrap().safeParse(settings);
+    return parsed.success ? { success: true, data: parsed.data, errors: {} }
+        : { success: false, data: null, errors: issuesToErrors(parsed.error.issues.map(issue => ({ ...issue, path: ['ratingSettings', ...issue.path] }))) };
+}
+
 const API_FIELD_ALIASES = {
     contactInfo: 'contactInfo',
     'settings.contacts.website': 'website',

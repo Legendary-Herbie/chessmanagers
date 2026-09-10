@@ -1,3 +1,4 @@
+import Icon from '../../shared/common/Icon.jsx';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import '../../styles/leaderboard.css';
@@ -45,7 +46,7 @@ export default function LeaderboardPage() {
     const { club, capabilities = {} } = useClub();
     const [searchParams, setSearchParams] = useSearchParams();
     const requestedCategory = searchParams.get('category');
-    const selectedCategory = CATEGORIES.includes(requestedCategory) ? requestedCategory : 'blitz';
+    const selectedCategory = CATEGORIES.includes(requestedCategory) ? requestedCategory : 'rapid';
     const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1);
     const search = searchParams.get('q') || '';
     const [leaderboard, setLeaderboard] = useState({ entries: [], total: 0 });
@@ -117,7 +118,7 @@ export default function LeaderboardPage() {
         <div className="leaderboard-page">
             <div className="page-header">
                 <h1>Leaderboard</h1>
-                <div className="controls">
+                <div className="controls filter-toolbar">
                     <div className="category-switcher" role="group" aria-label="Rating category">
                         {CATEGORIES.map(category => (
                             <button type="button" key={category}
@@ -136,13 +137,13 @@ export default function LeaderboardPage() {
             <div className="leaderboard-list" aria-busy={loading}>
                 {loading ? <div className="muted">Loading...</div> : (
                     <>
-                        {leaderboard.entries.length > 0 ? <table className="leaderboard-table">
+                        {leaderboard.entries.length > 0 ? <div className="table-scroll leaderboard-desktop" tabIndex={0} role="region" aria-label="Leaderboard ratings"><table className="leaderboard-table">
                             <thead><tr><th>Rank</th><th>Player</th><th>Blitz</th><th>Rapid</th><th>Classical</th><th>Total Games</th></tr></thead>
                             <tbody>
                                 {leaderboard.entries.map(entry => (
                                     <tr key={entry.playerId} className="leaderboard-row" onClick={() => openPlayer(entry)}>
                                         <td className={`rank ${entry.rank <= 3 ? `top${entry.rank}` : ''}`}>{entry.rank}</td>
-                                        <td><button type="button" className="btn-secondary"
+                                        <td><button type="button" className="name-link"
                                             onClick={event => { event.stopPropagation(); openPlayer(entry); }}
                                             aria-label={`View ${entry.playerName} rating history`}>{entry.playerName}</button></td>
                                         <RatingCells entry={entry} selectedCategory={selectedCategory} />
@@ -150,8 +151,8 @@ export default function LeaderboardPage() {
                                     </tr>
                                 ))}
                             </tbody>
-                        </table> : <section className="leaderboard-empty">
-                            <span aria-hidden="true">♜</span>
+                        </table></div> : <section className="leaderboard-empty">
+                            <span aria-hidden="true"><Icon name="trophy" size="xl" /></span>
                             <h2>The first ranking is one rated result away</h2>
                             <p>Players appear here after they complete a rated match in the selected {label(selectedCategory)} category.</p>
                             <Link className="btn-primary" to="/matches">{capabilities.canManageMatches ? 'Record a rated match' : 'View club matches'}</Link>

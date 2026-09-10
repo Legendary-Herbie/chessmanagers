@@ -9,6 +9,7 @@ const PLAYER_FIELDS = `
     p.blitz_rating, p.rapid_rating, p.classical_rating,
     p.games, p.wins, p.draws, p.losses, p.last_played,
     p.bio, p.photo_url, p.date_of_birth, p.federation_id,
+    p.name_locked, p.chesscom_username, p.lichess_username,
     p.status, p.archived_at, p.deleted_at, p.created_at, p.updated_at`;
 
 const PLAYER_RATINGS_JOIN = `
@@ -266,8 +267,12 @@ export const PlayerModel = {
         ).then(result => result.first);
         if (!player) return failure('PLAYER_NOT_FOUND');
         if (player.status === 'deleted') return failure('PLAYER_DELETED');
+        const owner = await trx.query('SELECT owner_id FROM clubs WHERE id = $1 FOR SHARE', [clubId]).then(r => r.first);
+        if (Object.hasOwn(changes, 'nameLocked') && owner.owner_id !== actorUserId) return failure('OWNER_ONLY_NAME_LOCK');
+        if (player.name_locked && Object.hasOwn(changes, 'name') && changes.name !== player.name && owner.owner_id !== actorUserId) return failure('PLAYER_NAME_LOCKED');
         const { assignments, values } = updateAssignments(changes, {
             name: 'name', bio: 'bio', photoUrl: 'photo_url', dateOfBirth: 'date_of_birth', federationId: 'federation_id',
+            nameLocked: 'name_locked', chesscomUsername: 'chesscom_username', lichessUsername: 'lichess_username',
         });
         if (!assignments.length) return failure('NO_CHANGES');
         values.push(clubId, playerId);
@@ -296,7 +301,11 @@ export const PlayerModel = {
         ).then(result => result.first);
         if (!player) return failure('NOT_LINKED_PLAYER');
         if (player.status !== 'active' || player.deleted_at) return failure('PLAYER_NOT_ACTIVE');
-        const { assignments, values } = updateAssignments(changes, { bio: 'bio', photoUrl: 'photo_url' });
+        if (player.name_locked && Object.hasOwn(changes, 'name') && changes.name !== player.name) return failure('PLAYER_NAME_LOCKED');
+        const { assignments, values } = updateAssignments(changes, {
+            bio: 'bio', photoUrl: 'photo_url', name: 'name', federationId: 'federation_id',
+            chesscomUsername: 'chesscom_username', lichessUsername: 'lichess_username',
+        });
         if (!assignments.length) return failure('NO_CHANGES');
         values.push(clubId, playerId);
         const updated = await trx.query(

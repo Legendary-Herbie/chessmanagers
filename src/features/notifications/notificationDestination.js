@@ -5,7 +5,7 @@ export function notificationDestination(notification) {
     if (notification.eventType === 'join_request.approved') return '/dashboard';
     if (notification.eventType === 'player_claim.pending') return '/players';
     if (notification.eventType.startsWith('player_') && payload.playerId) return `/players/${payload.playerId}`;
-    if (notification.eventType.startsWith('match.')) return '/matches';
+    if (notification.eventType.startsWith('match.')) return payload.matchId ? `/matches?matchId=${encodeURIComponent(payload.matchId)}` : '/matches';
     if (notification.eventType.startsWith('tournament.') && payload.tournamentId) return `/tournaments/${payload.tournamentId}`;
     if (notification.eventType === 'announcement.published' && payload.announcementId) return `/announcements/${payload.announcementId}`;
     return '/dashboard';

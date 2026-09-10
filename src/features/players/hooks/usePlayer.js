@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { playerApi } from '../api/playerApi.js';
 import { isCancelledError } from '../../../config/api.js';
 
-export function usePlayer(clubId, playerId, ratingCategory = 'blitz') {
+export function usePlayer(clubId, playerId, ratingCategory = 'rapid') {
     const [player, setPlayer] = useState(null);
     const [allPlayers, setAllPlayers] = useState([]);
     const [matches, setMatches] = useState([]);

@@ -58,8 +58,8 @@ describe('player lifecycle and account linking', () => {
         await request(app)
             .patch(`${base}/players/${player.id}/profile`)
             .set('Authorization', authorization(member))
-            .send({ name: 'Unauthorized identity change' })
-            .expect(400);
+            .send({ name: 'Member-updated name' })
+            .expect(200);
 
         await request(app)
             .delete(`${base}/players/${player.id}/unlink`)

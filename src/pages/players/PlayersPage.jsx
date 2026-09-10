@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import Disclosure from '../../shared/common/Disclosure.jsx';
+import Icon from '../../shared/common/Icon.jsx';
+import React, { useEffect, useState } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import { useAuth, useClub, useNotifications } from '../../app/contextHooks.js';
 import { usePlayers } from '../../features/players/hooks/usePlayers.js';
 
@@ -15,6 +17,7 @@ import NoClubState from '../../shared/common/NoClubState.jsx';
 import '../../styles/players.css';
 
 export default function PlayersPage() {
+    const [searchParams, setSearchParams] = useSearchParams();
     const { user } = useAuth();
     const { club, linkedPlayer, capabilities, loading: clubLoading } = useClub();
     const { notify } = useNotifications();
@@ -46,6 +49,13 @@ export default function PlayersPage() {
     // Player creation lives in a focused modal so the roster stays uncluttered.
     const [showInlineAddForm, setShowInlineAddForm] = useState(false);
     const [editingPlayer, setEditingPlayer] = useState(null);
+    useEffect(() => {
+        if (club?.id && isAdmin && searchParams.get('action') === 'add') {
+            setShowInlineAddForm(true);
+            const next = new URLSearchParams(searchParams); next.delete('action');
+            setSearchParams(next, { replace: true });
+        }
+    }, [club?.id, isAdmin, searchParams, setSearchParams]);
 
     // Confirm Modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -117,7 +127,7 @@ export default function PlayersPage() {
     if (clubLoading) {
         return (
             <div className="players-container">
-                <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
+                <div className="page-empty">
                     Loading club context...
                 </div>
             </div>
@@ -156,35 +166,12 @@ export default function PlayersPage() {
             </div>
 
             {/* Admin Pending Requests Banner */}
-            {isAdmin && <PendingLinksList clubId={club.id} onActionComplete={refetch} />}
 
-            {/* Stats Summary Bar */}
-            <div className="players-stats-bar">
-                <div className="stat-card">
-                    <span className="stat-card__label">Total Roster</span>
-                    <span className="stat-card__value">{loading ? '—' : stats.totalPlayers}</span>
-                    <span className="stat-card__subtext">{loading ? 'Loading roster summary' : 'Registered club players'}</span>
-                </div>
-                <div className="stat-card">
-                    <span className="stat-card__label">Average ratings</span>
-                    <span className="stat-card__ratings" aria-label="Average club ratings by category">
-                        <span><small>Blitz</small>{loading ? '—' : stats.averageRatings.blitz ?? '—'}</span>
-                        <span><small>Rapid</small>{loading ? '—' : stats.averageRatings.rapid ?? '—'}</span>
-                        <span><small>Classical</small>{loading ? '—' : stats.averageRatings.classical ?? '—'}</span>
-                    </span>
-                    <span className="stat-card__subtext">All active roster players</span>
-                </div>
-                <div className="stat-card">
-                    <span className="stat-card__label">Active Players</span>
-                    <span className="stat-card__value">{loading ? '—' : stats.activePlayers}</span>
-                    <span className="stat-card__subtext">{loading ? 'Loading activity summary' : 'Played at least 1 match'}</span>
-                </div>
-            </div>
 
             {/* Toolbar: Search, Filters, Sorting & View Toggle */}
             <div className="players-toolbar">
                 <div className="players-toolbar__search">
-                    <span className="players-toolbar__search-icon">🔍</span>
+                    <span className="players-toolbar__search-icon"><Icon name="search" /></span>
                     <input
                         type="text"
                         className="players-toolbar__search-input"
@@ -195,7 +182,7 @@ export default function PlayersPage() {
                     />
                 </div>
 
-                <div className="players-toolbar__filters">
+                <Disclosure className="players-filter-disclosure" title="Filters and view"><div className="players-toolbar__filters">
                     <label>Rating category <select className="players-filter-select" value={ratingCategory}
                         onChange={event => setRatingCategory(event.target.value)}>
                         <option value="blitz">Blitz</option><option value="rapid">Rapid</option><option value="classical">Classical</option>
@@ -231,33 +218,37 @@ export default function PlayersPage() {
                             className={`view-toggle__button ${viewMode === 'grid' ? 'view-toggle__button--active' : ''}`}
                             onClick={() => setViewMode('grid')}
                         >
-                            ▦ Grid
+                            <Icon name="grid" /> Grid
                         </button>
                         <button
                             type="button"
                             className={`view-toggle__button ${viewMode === 'table' ? 'view-toggle__button--active' : ''}`}
                             onClick={() => setViewMode('table')}
                         >
-                            ≡ List
+                            <Icon name="list" /> List
                         </button>
                     </div>
-                </div>
+                </div></Disclosure>
             </div>
 
-            <p className="muted">Elo ratings use the selected rating category. Game totals and win rates include all categories.</p>
+            <Disclosure className="roster-summary" title={loading ? 'Loading roster…' : `${stats.totalPlayers} players · ${stats.activePlayers} with games played`}>
+                <p>Average Elo ratings: Blitz {stats.averageRatings.blitz ?? '—'} · Rapid {stats.averageRatings.rapid ?? '—'} · Classical {stats.averageRatings.classical ?? '—'}</p>
+            </Disclosure>
+
+
 
             {/* Error banner */}
             {error && <div className="error-box" role="alert"><p>Couldn’t load players. Try again. {error}</p><button type="button" className="btn-secondary" disabled={loading} onClick={() => refetch()}>Retry</button></div>}
 
             {/* Loading & Empty states */}
             {loading ? (
-                <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
+                <div className="page-empty">
                     Fetching player records...
                 </div>
             ) : error ? null : processedPlayers.length === 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+                <div className="page-stack">
                     <div className="empty-state">
-                        <span className="empty-state__icon">👥</span>
+                        <span className="empty-state__icon"><Icon name="players" size="xl" /></span>
                         <h3 className="empty-state__title">No Players Found</h3>
                         <p className="empty-state__description">
                             {searchTerm || statusFilter !== 'all'
@@ -299,6 +290,8 @@ export default function PlayersPage() {
                 />
             )}
 
+            {isAdmin && <PendingLinksList clubId={club.id} onActionComplete={refetch} />}
+
             {/* Edit Player Modal */}
             <EditPlayerForm
                 isOpen={!!editingPlayer}
@@ -306,6 +299,7 @@ export default function PlayersPage() {
                 clubId={club.id}
                 player={editingPlayer}
                 isAdmin={isAdmin}
+                isOwner={Boolean(capabilities.canManageClubSettings)}
                 onPlayerUpdated={refetch}
             />
 
@@ -319,7 +313,7 @@ export default function PlayersPage() {
                     <p style={{ color: 'var(--text-muted)' }}>Archived records retain their full match and rating history.</p>
                     {inactivePlayers.map((archived) => (
                         <div key={archived.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
-                            <Link to={`/players/${archived.id}`}>{archived.name}</Link>
+                            <Link className="name-link" to={`/players/${archived.id}`}>{archived.name}</Link>
                             <button type="button" className="btn-secondary btn-sm" onClick={() => restorePlayer(archived.id)}>
                                 Restore
                             </button>

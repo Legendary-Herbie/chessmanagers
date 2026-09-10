@@ -14,6 +14,26 @@ function selectContents(element) {
 describe('RichTextEditor', () => {
     afterEach(cleanup);
 
+    it('formats with keyboard shortcuts and exposes active toolbar state', () => {
+        const onChange = vi.fn();
+        render(<RichTextEditor value="Hello" onChange={onChange} />);
+        const editor = screen.getByRole('textbox');
+        selectContents(editor);
+        fireEvent.keyDown(editor, { key: 'b', ctrlKey: true });
+        expect(onChange).toHaveBeenLastCalledWith('<strong>Hello</strong>');
+        expect(screen.getByRole('button', { name: 'Bold' }).getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('passes pasted and dropped files to the existing attachment workflow', () => {
+        const onFiles = vi.fn();
+        render(<RichTextEditor value="" onChange={vi.fn()} onFiles={onFiles} />);
+        const file = new File(['image'], 'photo.png', { type: 'image/png' });
+        fireEvent.paste(screen.getByRole('textbox'), { clipboardData: { files: [file] } });
+        fireEvent.drop(screen.getByRole('textbox'), { dataTransfer: { files: [file] } });
+        expect(onFiles).toHaveBeenCalledTimes(2);
+        expect(onFiles).toHaveBeenLastCalledWith([file]);
+    });
+
     it('formats selections without the deprecated execCommand API', () => {
         const onChange = vi.fn();
         render(<RichTextEditor value="Hello" onChange={onChange} />);

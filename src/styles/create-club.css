@@ -88,3 +88,7 @@
   .create-club__badge-field img,
   .create-club__badge-placeholder { width: 64px; height: 64px; }
 }
+.create-club__badge-label { margin-top:16px; }
+.create-club .disclosure { border:1px solid var(--border); border-radius:12px; padding:6px; }
+.create-club .disclosure__content { padding:12px; }
+.create-club .message[role='alert'] { color:var(--text-red); background:var(--status-danger-bg); }

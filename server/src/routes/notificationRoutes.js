@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import {
+    dismissAllUserNotifications,
     dismissUserNotification,
     getUserUnreadCount,
     listUserNotifications,
@@ -24,6 +25,7 @@ const readAllBody = z.object({ clubId: optionalClubId }).strict();
 
 router.use(requireAuth);
 router.get('/', validateRequest({ query: listQuery }), listUserNotifications);
+router.delete('/', validateRequest({ query: z.object({}).strict() }), dismissAllUserNotifications);
 router.get('/unread-count', validateRequest({ query: unreadQuery }), getUserUnreadCount);
 router.patch('/read', validateRequest({ body: readAllBody }), readAllUserNotifications);
 router.patch('/:notificationId/read', validateRequest({ params: readParams }), readUserNotification);

@@ -32,7 +32,7 @@ export default function ClubInviteHandler() {
 
     if (!token && !code) return <section className="public-panel public-state public-state--error" role="alert">
         <h1>Invitation unavailable</h1><p>An invite token or six-digit join code is required.</p>
-        <Link className="public-back-link" to="/clubs">Find clubs</Link>
+        <Link className="public-back-link text-link" to="/clubs">Find clubs</Link>
     </section>;
     if (!user) {
         const continuation = token

@@ -164,5 +164,10 @@ describe('canonical leaderboard and statistics', () => {
         expect(ownerResponse.body.dashboard.admin).toEqual({
             pendingJoinRequests: 0, pendingPlayerLinks: 0,
         });
+        const defaultResponse = await request(app)
+            .get(`/api/v1/clubs/${club.id}/leaderboard/dashboard`)
+            .set('Authorization', authorization(owner)).expect(200);
+        expect(defaultResponse.body.dashboard.selectedCategory).toBe('rapid');
+        expect(defaultResponse.body.dashboard.topPlayers).toEqual([]);
     });
 });

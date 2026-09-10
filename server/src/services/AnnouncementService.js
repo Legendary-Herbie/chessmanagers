@@ -46,6 +46,8 @@ function dto(row, attachments = undefined) {
         publishedAt: row.published_at,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        authorName: row.author_name ?? null,
+        viewCount: Number(row.view_count ?? 0),
     };
     if (attachments) value.attachments = attachments.map(attachmentDto);
     return value;
@@ -97,8 +99,11 @@ export async function listAnnouncements(clubId, {
 }) {
     const params = [clubId, canManage, status, q, limit, offset];
     const result = await db.query(
-        `SELECT announcement.*, COUNT(*) OVER ()::INTEGER AS total_count
+        `SELECT announcement.*, users.name AS author_name,
+                (SELECT COUNT(*)::int FROM announcement_views v WHERE v.announcement_id = announcement.id) AS view_count,
+                COUNT(*) OVER ()::INTEGER AS total_count
          FROM announcements announcement
+         LEFT JOIN users ON users.id = announcement.created_by
          WHERE announcement.club_id = $1 AND announcement.deleted_at IS NULL
            AND ($2::BOOLEAN OR announcement.status = 'published')
            AND ($3::TEXT IS NULL OR announcement.status = $3)
@@ -109,8 +114,11 @@ export async function listAnnouncements(clubId, {
          LIMIT $5 OFFSET $6`,
         params
     );
+    const attachments = await db.query(`SELECT * FROM announcement_attachments WHERE club_id = $1
+        AND announcement_id = ANY($2::text[]) AND deleted_at IS NULL ORDER BY created_at, id`,
+    [clubId, result.rows.map(row => row.id)]);
     return {
-        announcements: result.rows.map(row => dto(row)),
+        announcements: result.rows.map(row => dto(row, attachments.rows.filter(file => file.announcement_id === row.id))),
         total: result.first?.total_count ?? 0,
         limit,
         offset,
@@ -119,7 +127,9 @@ export async function listAnnouncements(clubId, {
 
 export async function getAnnouncement({ clubId, announcementId, canManage = false }) {
     const announcement = await db.query(
-        `SELECT * FROM announcements
+        `SELECT announcements.*, (SELECT name FROM users WHERE id = announcements.created_by) AS author_name,
+            (SELECT COUNT(*)::int FROM announcement_views WHERE announcement_id = announcements.id) AS view_count
+         FROM announcements
          WHERE id = $1 AND club_id = $2 AND deleted_at IS NULL
            AND ($3::BOOLEAN OR status = 'published')`,
         [announcementId, clubId, canManage]
@@ -132,6 +142,18 @@ export async function getAnnouncement({ clubId, announcementId, canManage = fals
         [announcementId, clubId]
     ).then(result => result.rows);
     return dto(announcement, attachments);
+}
+
+export async function recordAnnouncementView({ clubId, announcementId, userId }) {
+    return db.transaction(async trx => {
+        const announcement = await trx.query(`SELECT id FROM announcements WHERE id = $1 AND club_id = $2
+            AND status = 'published' AND deleted_at IS NULL FOR SHARE`, [announcementId, clubId]).then(r => r.first);
+        if (!announcement) return null;
+        await trx.query(`INSERT INTO announcement_views (club_id, announcement_id, user_id)
+            VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [clubId, announcementId, userId]);
+        return trx.query('SELECT COUNT(*)::int AS "viewCount" FROM announcement_views WHERE announcement_id = $1',
+            [announcementId]).then(r => r.first);
+    });
 }
 
 export async function updateAnnouncement({ clubId, announcementId, actorUserId, title, contentHtml }) {

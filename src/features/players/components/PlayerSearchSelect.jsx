@@ -12,6 +12,9 @@ export default function PlayerSearchSelect({
     selectedPlayer = null,
     placeholder = 'Search players',
     allowClear = false,
+    excludePlayerId = null,
+    onSelect,
+    allowCreate = false,
 }) {
     const inputId = useId();
     const listboxId = `${inputId}-results`;
@@ -25,6 +28,36 @@ export default function PlayerSearchSelect({
     const [loadError, setLoadError] = useState(false);
     const [activeIndex, setActiveIndex] = useState(-1);
     const requestSequence = useRef(0);
+    const [creating, setCreating] = useState(false);
+    const [createError, setCreateError] = useState('');
+    const creatingLock = useRef(false);
+    const context = useRef(null);
+    useEffect(() => {
+        const token = {};
+        context.current = token;
+        return () => { if (context.current === token) context.current = null; };
+    }, [clubId]);
+    const canCreate = allowCreate && query.trim().length > 0 && query.trim().length <= 100
+        && !loading && !loadError && !selected
+        && !results.some(player => player.name.toLocaleLowerCase() === query.trim().toLocaleLowerCase());
+    const optionCount = results.length + (canCreate ? 1 : 0);
+
+    async function createPlayer() {
+        if (!canCreate || creatingLock.current) return;
+        const token = context.current;
+        creatingLock.current = true;
+        setCreating(true);
+        setCreateError('');
+        try {
+            const player = await playerApi.createPlayer(clubId, { name: query.trim() });
+            if (context.current === token) choose(player);
+        } catch (error) {
+            if (context.current === token) setCreateError(error.message || 'Couldn’t add player. Try again.');
+        } finally {
+            creatingLock.current = false;
+            if (context.current === token) setCreating(false);
+        }
+    }
 
     useEffect(() => {
         setSelected(selectedPlayerId ? { id: selectedPlayerId, name: selectedPlayerName } : null);
@@ -47,7 +80,7 @@ export default function PlayerSearchSelect({
                     signal: controller.signal,
                 });
                 if (controller.signal.aborted || sequence !== requestSequence.current) return;
-                setResults(response.players);
+                setResults(response.players.filter(player => player.id !== excludePlayerId));
                 setActiveIndex(response.players.length ? 0 : -1);
             } catch (error) {
                 if (controller.signal.aborted || isCancelledError(error)) return;
@@ -63,7 +96,7 @@ export default function PlayerSearchSelect({
             clearTimeout(timer);
             controller.abort();
         };
-    }, [clubId, open, query]);
+    }, [clubId, open, query, excludePlayerId]);
 
     function choose(player) {
         setSelected(player);
@@ -71,6 +104,7 @@ export default function PlayerSearchSelect({
         setOpen(false);
         setActiveIndex(-1);
         onChange(player.id);
+        onSelect?.(player);
     }
 
     function clearSelection() {
@@ -83,6 +117,7 @@ export default function PlayerSearchSelect({
     }
 
     function handleInputChange(event) {
+        setCreateError('');
         setQuery(event.target.value);
         setOpen(true);
         if (selected || value) {
@@ -95,13 +130,14 @@ export default function PlayerSearchSelect({
         if (event.key === 'ArrowDown') {
             event.preventDefault();
             setOpen(true);
-            setActiveIndex(index => Math.min(index + 1, results.length - 1));
+            setActiveIndex(index => Math.min(index + 1, optionCount - 1));
         } else if (event.key === 'ArrowUp') {
             event.preventDefault();
             setActiveIndex(index => Math.max(index - 1, 0));
-        } else if (event.key === 'Enter' && open && activeIndex >= 0 && results[activeIndex]) {
+        } else if (event.key === 'Enter' && open) {
             event.preventDefault();
-            choose(results[activeIndex]);
+            if (results[activeIndex]) choose(results[activeIndex]);
+            else if (canCreate && (activeIndex === results.length || results.length === 0)) void createPlayer();
         } else if (event.key === 'Escape' && open) {
             event.stopPropagation();
             setOpen(false);
@@ -119,6 +155,8 @@ export default function PlayerSearchSelect({
                     type="text"
                     role="combobox"
                     autoComplete="off"
+                    readOnly={creating}
+                    aria-busy={creating}
                     aria-autocomplete="list"
                     aria-expanded={open}
                     aria-controls={listboxId}
@@ -127,7 +165,7 @@ export default function PlayerSearchSelect({
                     value={query}
                     onChange={handleInputChange}
                     onFocus={() => setOpen(true)}
-                    onBlur={() => setOpen(false)}
+                    onBlur={() => { if (!creatingLock.current) setOpen(false); }}
                     onKeyDown={handleKeyDown}
                 />
                 {allowClear && value && (
@@ -158,11 +196,19 @@ export default function PlayerSearchSelect({
                             </small>}
                         </button>
                     ))}
-                    {!loading && !loadError && !results.length && (
+                    {canCreate && <button type="button" role="option" aria-selected="false"
+                        id={`${listboxId}-${results.length}`} disabled={creating}
+                        className={`player-search-select__option ${activeIndex === results.length ? 'active' : ''}`}
+                        onMouseDown={event => event.preventDefault()} onMouseEnter={() => setActiveIndex(results.length)}
+                        onClick={createPlayer}>{creating ? 'Adding player…' : `+ Add “${query.trim()}” as new player`}
+                        <small>Uses this club’s starting ratings</small>
+                    </button>}
+                    {!loading && !loadError && !results.length && !canCreate && (
                         <div className="player-search-select__status">No players found.</div>
                     )}
                 </div>
             )}
+            {createError && <p role="alert">{createError}</p>}
         </div>
     );
 }

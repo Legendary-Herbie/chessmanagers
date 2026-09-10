@@ -14,7 +14,7 @@ function withoutTotalCount(row) {
 export const LeaderboardModel = {
     // Eligibility and rank are calculated before pagination. Account linking is
     // deliberately absent: linked and unlinked roster players rank identically.
-    getByClub: async (clubId, { category = 'blitz', limit = 50, offset = 0, q = '' } = {}) => {
+    getByClub: async (clubId, { category = 'rapid', limit = 50, offset = 0, q = '' } = {}) => {
         const result = await db.query(
             `WITH eligible AS (
                 SELECT player.id AS "playerId", player.public_id AS "publicPlayerId", player.name AS "playerName",
@@ -88,7 +88,7 @@ export const LeaderboardModel = {
         };
     },
 
-    getRatingHistory: async (clubId, playerId, { category = 'blitz', limit = 30 } = {}) => db.query(
+    getRatingHistory: async (clubId, playerId, { category = 'rapid', limit = 30 } = {}) => db.query(
         `SELECT played_at AS "playedAt", rating_before AS "ratingBefore",
                 rating_after AS "ratingAfter", match_id AS "matchId", category,
                 played_at, rating_before, rating_after AS rating, match_id
@@ -178,7 +178,7 @@ export const LeaderboardModel = {
 
     // All dashboard metrics use the all-time period. Active players are active
     // roster players with at least one active (non-voided/non-deleted) game.
-    getDashboardStats: async (clubId, { category = 'blitz', includeAdmin = false } = {}) => {
+    getDashboardStats: async (clubId, { category = 'rapid', includeAdmin = false } = {}) => {
         const [metrics, recentMatches, leaderboard, breakdown] = await Promise.all([
             db.query(
                 `SELECT

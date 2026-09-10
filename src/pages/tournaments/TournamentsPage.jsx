@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import '../../styles/tournaments.css';
 import { useClub } from '../../app/contextHooks.js';
 import Button from '../../shared/common/Button.jsx';
@@ -19,7 +19,7 @@ function emptyForm() {
         type: 'swiss',
         startDate: localDateTime(),
         endDate: '',
-        ratingCategory: 'blitz',
+        ratingCategory: 'rapid',
         isRated: true,
     };
 }
@@ -27,6 +27,7 @@ function emptyForm() {
 const title = value => value.replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase());
 
 export default function TournamentsPage() {
+    const navigate = useNavigate();
     const { club, capabilities } = useClub();
     const isAdmin = Boolean(capabilities.canManageMatches);
     const [tournaments, setTournaments] = useState([]);
@@ -59,14 +60,14 @@ export default function TournamentsPage() {
         setSaving(true);
         setError('');
         try {
-            await tournamentApi.create(club.id, {
+            const response = await tournamentApi.create(club.id, {
                 ...form,
                 startDate: new Date(form.startDate).toISOString(),
                 endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
             });
             setModalOpen(false);
             setForm(emptyForm());
-            await load();
+            navigate(`/tournaments/${response.tournament.id}`);
         } catch (requestError) {
             setError(requestError.message || 'Unable to create tournament.');
         } finally {

@@ -1,3 +1,4 @@
+import Icon from '../common/Icon.jsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useClub, useTheme } from '../../app/contextHooks.js';
@@ -143,7 +144,12 @@ export default function AppLayout() {
         const nextClubId = event.target.value;
         setSwitchingClubId(nextClubId);
         setMobileNavOpen(false);
-        navigate('/dashboard');
+        const section = location.pathname.split('/')[1];
+        const path = ['players', 'tournaments', 'announcements'].includes(section) ? `/${section}` : location.pathname;
+        const query = new URLSearchParams(location.search);
+        ['page', 'q', 'action', 'playerId'].forEach(key => query.delete(key));
+        if (path === '/club') query.delete('tab');
+        navigate({ pathname: path, search: query.toString() }, { replace: true });
         try {
             await selectClub(nextClubId);
         } finally {
@@ -200,7 +206,7 @@ export default function AppLayout() {
                             onClick={() => setSidebarCollapsed(current => !current)}
                         >
                             <BrandLogo className="app-nav__brand-logo" collapse="phone" />
-                            <span className="app-nav__brand-toggle-icon" aria-hidden="true">{sidebarCollapsed ? '›' : '‹'}</span>
+                            <span className="app-nav__brand-toggle-icon" aria-hidden="true"><Icon name={sidebarCollapsed ? 'chevronRight' : 'chevronLeft'} size="lg" /></span>
                         </button>
                         <NavLink className="app-nav__mobile-brand" to="/dashboard" aria-label="1chessclub dashboard">
                             <BrandLogo className="app-nav__brand-logo" collapse="phone" />
@@ -212,7 +218,7 @@ export default function AppLayout() {
                             aria-expanded={mobileNavOpen}
                             onClick={() => setMobileNavOpen(current => !current)}
                         >
-                            <span aria-hidden="true">{mobileNavOpen ? '✕' : '☰'}</span>
+                            <span aria-hidden="true"><Icon name={mobileNavOpen ? 'x' : 'menu'} size="xl" /></span>
                         </button>
                     </div>
 
@@ -243,7 +249,7 @@ export default function AppLayout() {
                         aria-label={`Expand sidebar. Active club: ${clubName}`}
                         onClick={() => setSidebarCollapsed(false)}
                     >
-                        ♜
+                        <Icon name="club" size="xl" />
                     </button>
 
                     <nav className={`app-nav__links${mobileNavOpen ? ' app-nav__links--mobile-open' : ''}`} aria-label="Primary navigation">
@@ -368,7 +374,7 @@ export default function AppLayout() {
                             <h1>Couldn’t open {selectedClubName || 'your club'}</h1>
                             <p>{clubError}</p>
                             <button type="button" className="btn-secondary" onClick={() => refreshClubs(selectedClubId)}>Retry</button>
-                        </div> : <Outlet key={`${location.pathname}${location.search}`} />)}
+                        </div> : <Outlet key={`${club?.id ?? ''}:${location.pathname}`} />)}
                     </div>
                 </div>
             </main>

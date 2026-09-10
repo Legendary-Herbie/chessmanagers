@@ -9,14 +9,18 @@ export const tournamentApi = {
     },
     get: (clubId, tournamentId) => api.get(endpoints.tournaments.byId(clubId, tournamentId)),
     create: (clubId, payload) => api.post(endpoints.tournaments.list(clubId), payload),
+    setup: (clubId, tournamentId, payload) => api.post(`${endpoints.tournaments.byId(clubId, tournamentId)}/setup`, payload),
     update: (clubId, tournamentId, payload) => api.patch(
         endpoints.tournaments.byId(clubId, tournamentId), payload
     ),
     setStatus: (clubId, tournamentId, status) => api.patch(
         endpoints.tournaments.status(clubId, tournamentId), { status }
     ),
-    archive: (clubId, tournamentId, reason = null) => api.delete(
-        endpoints.tournaments.byId(clubId, tournamentId), { reason }
+    archive: (clubId, tournamentId, reason = null) => api.post(
+        `${endpoints.tournaments.byId(clubId, tournamentId)}/archive`, { reason }
+    ),
+    delete: (clubId, tournamentId, reason = null) => api.delete(
+        endpoints.tournaments.byId(clubId, tournamentId), { reason, permanent: true }
     ),
     addPlayer: (clubId, tournamentId, playerId) => api.post(
         endpoints.tournaments.players(clubId, tournamentId), { playerId }

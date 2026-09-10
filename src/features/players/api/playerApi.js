@@ -99,7 +99,7 @@ export const playerApi = {
         return data.matches;
     },
 
-    fetchRatingHistory: async (clubId, playerId, category = 'blitz', options = {}) => {
+    fetchRatingHistory: async (clubId, playerId, category = 'rapid', options = {}) => {
         const data = await api.get(
             `${endpoints.players.ratingHistory(clubId, playerId)}?category=${category}`,
             options

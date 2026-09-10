@@ -98,7 +98,7 @@ describe('AddPlayerForm rating defaults', () => {
         const { unmount } = render(<AddPlayerForm isOpen clubId="club_1" onClose={onClose} />);
         expect(screen.getByRole('dialog', { name: 'Add players' })).toBeTruthy();
         expect(document.body.style.overflow).toBe('hidden');
-        fireEvent.keyDown(window, { key: 'Escape' });
+        fireEvent.keyDown(screen.getByRole('dialog', { name: 'Add players' }), { key: 'Escape' });
         expect(onClose).toHaveBeenCalledOnce();
         unmount();
         expect(document.body.style.overflow).toBe('auto');

@@ -84,8 +84,8 @@ async function currentRoundPayload(trx, tournament) {
     return { round, pairings: pairings.map(toPairing), alreadyGenerated: true };
 }
 
-export async function generateNextRound({ clubId, tournamentId }) {
-    return db.transaction(async trx => {
+export async function generateNextRound({ clubId, tournamentId, trx: existingTransaction }) {
+    return (existingTransaction ? async fn => fn(existingTransaction) : db.transaction)(async trx => {
         const tournament = await TournamentModel.findById(tournamentId, clubId, {
             forUpdate: true, trx,
         });
@@ -179,6 +179,34 @@ export async function generateNextRound({ clubId, tournamentId }) {
         );
         return { ok: true, round, pairings, alreadyGenerated: false };
     });
+}
+
+export async function saveTournamentSetup({ clubId, tournamentId, playerIds, start, allActivePlayers = false }) {
+    try {
+        return await db.transaction(async trx => {
+            const tournament = await TournamentModel.findById(tournamentId, clubId, { forUpdate: true, trx });
+            if (!tournament) return failure('TOURNAMENT_NOT_FOUND');
+            if (tournament.status !== 'upcoming' || tournament.current_round > 0) return failure('TOURNAMENT_ALREADY_STARTED');
+            const ids = allActivePlayers ? (await trx.query(
+                `SELECT id FROM players WHERE club_id = $1 AND status = 'active' AND deleted_at IS NULL ORDER BY id`,
+                [clubId]
+            )).rows.map(player => player.id) : playerIds;
+            for (const playerId of [...new Set(ids)].sort()) {
+                const added = await TournamentModel.addPlayer(tournamentId, playerId, clubId, { trx });
+                if (!added.ok && added.code !== 'PLAYER_ALREADY_REGISTERED') throw Object.assign(new Error(added.code), { setupFailure: added });
+            }
+            if (start) {
+                await TournamentModel.setStatus(tournamentId, clubId, 'active', { trx });
+                const paired = await generateNextRound({ clubId, tournamentId, trx });
+                if (!paired.ok) throw Object.assign(new Error(paired.code), { setupFailure: paired });
+                return paired;
+            }
+            return { ok: true };
+        });
+    } catch (error) {
+        if (error.setupFailure) return error.setupFailure;
+        throw error;
+    }
 }
 
 export async function getTournamentDetail(clubId, tournamentId) {

@@ -22,6 +22,15 @@ export default function AnnouncementPage() {
     const [error, setError] = useState(null);
     const [confirmAction, setConfirmAction] = useState(null);
 
+    useEffect(() => {
+        if (!club?.id || announcement?.id !== announcementId || announcement?.status !== 'published') return;
+        let active = true;
+        announcementApi.view(club.id, announcementId).then(result => {
+            if (active) setAnnouncement(current => current?.id === announcementId ? { ...current, viewCount: result.viewCount } : current);
+        }).catch(() => {});
+        return () => { active = false; };
+    }, [club?.id, announcementId, announcement?.id, announcement?.status]);
+
     const load = useCallback(async () => {
         if (!club?.id) return;
         setLoading(true);
@@ -105,13 +114,14 @@ export default function AnnouncementPage() {
     const editable = canManage && announcement.status !== 'archived';
     return (
         <article className="announcement-detail">
-            <Link to="/announcements">← All announcements</Link>
+            <Link className="text-link" to="/announcements">← All announcements</Link>
             <header>
                 <span className={`announcement-status announcement-status--${announcement.status}`}>{announcement.status}</span>
                 {editing ? (
                     <input className="input announcement-title-input" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} />
                 ) : <h1>{announcement.title}</h1>}
                 <time>{new Date(announcement.publishedAt || announcement.updatedAt).toLocaleString()}</time>
+                {announcement.status === 'published' && <p>{announcement.viewCount ?? 0} views</p>}
             </header>
 
             {error && <p className="announcement-error" role="alert">{error}</p>}

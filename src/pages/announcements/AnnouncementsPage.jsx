@@ -1,128 +1,99 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useClub } from '../../app/contextHooks.js';
 import { announcementApi } from '../../features/announcements/api/announcementApi.js';
-import RichTextEditor from '../../features/announcements/components/RichTextEditor.jsx';
+import AnnouncementComposer from '../../features/announcements/components/AnnouncementComposer.jsx';
+import AnnouncementPost from '../../features/announcements/components/AnnouncementPost.jsx';
 import Button from '../../shared/common/Button.jsx';
-import Dialog from '../../shared/common/Dialog.jsx';
-import '../../styles/announcements.css';
 import NoClubState from '../../shared/common/NoClubState.jsx';
+import '../../styles/announcements.css';
+import { useSearchParams } from 'react-router-dom';
 
 export default function AnnouncementsPage() {
+    const [searchParams, setSearchParams] = useSearchParams();
     const { club, capabilities } = useClub();
-    const navigate = useNavigate();
     const canManage = Boolean(capabilities.canManageAnnouncements);
     const [announcements, setAnnouncements] = useState([]);
     const [status, setStatus] = useState('');
     const [query, setQuery] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
-    const [creating, setCreating] = useState(false);
     const [showComposer, setShowComposer] = useState(false);
-    const [title, setTitle] = useState('');
-    const [contentHtml, setContentHtml] = useState('<p></p>');
+    const [hasMore, setHasMore] = useState(false);
+    const [feedClub, setFeedClub] = useState(null);
+    const sentinel = useRef(null);
+    const generation = useRef({ value: 0 });
+    const busy = useRef(false);
+    const offset = useRef(0);
 
-    const load = useCallback(async () => {
-        if (!club?.id) return;
-        setLoading(true);
-        setError(null);
+    const load = useCallback(async (reset = false) => {
+        if (!club?.id || (!reset && busy.current)) return;
+        const current = ++generation.current.value;
+        busy.current = true; setLoading(true); setError(null);
+        if (reset) { offset.current = 0; setAnnouncements([]); setHasMore(false); }
         try {
             const result = await announcementApi.list(club.id, {
-                ...(canManage && status ? { status } : {}),
-                ...(query ? { q: query } : {}),
+                ...(canManage && status ? { status } : {}), ...(query ? { q: query } : {}),
+                ...(offset.current ? { offset: offset.current } : {}),
             });
-            setAnnouncements(result.announcements);
+            if (current !== generation.current.value) return;
+            offset.current += result.announcements.length;
+            setAnnouncements(previous => reset ? result.announcements : [...previous, ...result.announcements.filter(row => !previous.some(value => value.id === row.id))]);
+            setHasMore(result.announcements.length > 0 && offset.current < (result.total ?? offset.current));
+            setFeedClub(club.id);
         } catch (loadError) {
-            setError(loadError.message || 'Could not load announcements.');
+            if (current === generation.current.value) setError(loadError.message || 'Could not load announcements.');
         } finally {
-            setLoading(false);
+            if (current === generation.current.value) { busy.current = false; setLoading(false); }
         }
     }, [canManage, club?.id, query, status]);
-
-    useEffect(() => { load(); }, [load]);
-
-    const create = async event => {
-        event.preventDefault();
-        setCreating(true);
-        setError(null);
-        try {
-            const result = await announcementApi.create(club.id, { title, contentHtml });
-            navigate(`/announcements/${result.announcement.id}`);
-        } catch (createError) {
-            setError(createError.message || 'Could not create announcement.');
-        } finally {
-            setCreating(false);
+    useEffect(() => {
+        const requestState = generation.current;
+        load(true);
+        return () => { requestState.value++; busy.current = false; };
+    }, [load]);
+    useEffect(() => { setShowComposer(false); }, [club?.id]);
+    useEffect(() => {
+        if (club?.id && canManage && searchParams.get('action') === 'create') {
+            setShowComposer(true);
+            const next = new URLSearchParams(searchParams); next.delete('action');
+            setSearchParams(next, { replace: true });
         }
-    };
+    }, [club?.id, canManage, searchParams, setSearchParams]);
+    useEffect(() => {
+        if (!hasMore || loading || error || !window.IntersectionObserver || !sentinel.current) return;
+        const observer = new IntersectionObserver(entries => {
+            if (entries.some(entry => entry.isIntersecting)) load();
+        }, { rootMargin: '200px' });
+        observer.observe(sentinel.current);
+        return () => observer.disconnect();
+    }, [hasMore, loading, error, load]);
 
     if (!club) return <NoClubState title="Keep everyone informed"
         feature="Announcements give a club one place for news, event details, rich text, and shared files."
         description="Create a club or join one to publish and read its updates." />;
-
-    return (
-        <div className="announcements-page">
-            <header className="announcement-page-header">
-                <div>
-                    <span className="eyebrow">{club.name}</span>
-                    <h1>Announcements</h1>
-                    <p>Club news, updates, and shared files.</p>
-                </div>
-                {canManage && <Button onClick={() => setShowComposer(value => !value)}>New announcement</Button>}
-            </header>
-
-            {showComposer && canManage && (
-                <Dialog title="New announcement" busy={creating} onClose={() => setShowComposer(false)}>
-                <form className="announcement-composer" onSubmit={create}>
-                    <p className="muted">Share an update with {club.name}. Save a draft to add files and review it before publishing.</p>
-                    {error && <p className="announcement-error" role="alert">{error}</p>}
-                    <label>Title<input className="input" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} required /></label>
-                    <label>Content</label>
-                    <RichTextEditor value={contentHtml} onChange={setContentHtml} />
-                    <div className="announcement-actions">
-                        <Button type="submit" loading={creating}>Save draft</Button>
-                        <Button variant="secondary" onClick={() => setShowComposer(false)}>Cancel</Button>
-                    </div>
-                </form>
-                </Dialog>
-            )}
-
-            <div className="announcement-filters">
-                <label>Search<input className="input" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search announcements" /></label>
-                {canManage && (
-                    <label>Status<select className="input" value={status} onChange={event => setStatus(event.target.value)}>
-                        <option value="">All states</option>
-                        <option value="draft">Draft</option>
-                        <option value="published">Published</option>
-                        <option value="archived">Archived</option>
-                    </select></label>
-                )}
-            </div>
-
-            {error && <p className="announcement-error" role="alert">{error}</p>}
-            {loading && <p>Loading announcements…</p>}
-            {!loading && !error && announcements.length === 0 && <section className="announcement-empty">
-                <span className="announcement-empty__icon" aria-hidden="true">◈</span>
-                <h2>{query || status ? 'No announcements match these filters' : 'A quieter feed—for now'}</h2>
-                <p>{query || status ? 'Try a different search or status.'
-                    : 'Published updates, event details, and shared club files will appear here in one easy-to-find place.'}</p>
-                {canManage && !query && !status && <Button onClick={() => setShowComposer(true)}>Create the first announcement</Button>}
-            </section>}
-            <div className="announcement-grid">
-                {announcements.map(announcement => (
-                    <article className="announcement-card" key={announcement.id}>
-                        <header className="announcement-post-header">
-                            <span className="announcement-avatar" aria-hidden="true">{club.name?.slice(0, 1).toUpperCase()}</span>
-                            <div className="announcement-post-author"><strong>{club.name}</strong>
-                                <time dateTime={announcement.publishedAt || announcement.updatedAt}>{new Date(announcement.publishedAt || announcement.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time>
-                            </div>
-                            {announcement.status !== 'published' && <span className={`announcement-status announcement-status--${announcement.status}`}>{announcement.status}</span>}
-                        </header>
-                        <h2><Link to={`/announcements/${announcement.id}`}>{announcement.title}</Link></h2>
-                        <p className="announcement-post-text">{announcement.contentText}</p>
-                        <footer className="announcement-post-footer"><Link to={`/announcements/${announcement.id}`}>View announcement <span aria-hidden="true">→</span></Link></footer>
-                    </article>
-                ))}
-            </div>
+    const visible = feedClub === club.id ? announcements : [];
+    return <div className="announcements-page">
+        <header className="announcement-page-header">
+            <div><span className="eyebrow">{club.name}</span><h1>Announcements</h1><p>News from your club, all in one place.</p></div>
+            {canManage && <Button onClick={() => setShowComposer(true)}>New announcement</Button>}
+        </header>
+        {showComposer && canManage && <AnnouncementComposer key={club.id} clubId={club.id}
+            onClose={() => { setShowComposer(false); load(true); }}
+            onComplete={() => { setShowComposer(false); load(true); }} />}
+        <div className="announcement-filters">
+            <label>Search<input className="input" value={query} onChange={event => setQuery(event.target.value)} placeholder="Search announcements" /></label>
+            {canManage && <label>Status<select className="input" value={status} onChange={event => setStatus(event.target.value)}>
+                <option value="">All states</option><option value="draft">Draft</option><option value="published">Published</option><option value="archived">Archived</option>
+            </select></label>}
         </div>
-    );
+        {error && <div className="announcement-error" role="alert">{error} <Button variant="secondary" onClick={() => load(!visible.length)}>Retry</Button></div>}
+        {!loading && !error && !visible.length && <section className="announcement-empty">
+            <h2>{query || status ? 'No announcements match these filters' : 'Your club’s next update starts here'}</h2>
+            <p>{query || status ? 'Try a different search or status.' : 'News, event details, and shared photos will appear in this feed.'}</p>
+            {canManage && !query && !status && <Button onClick={() => setShowComposer(true)}>Create the first announcement</Button>}
+        </section>}
+        <div className="announcement-grid">{visible.map(announcement => <AnnouncementPost key={`${club.id}-${announcement.id}`} announcement={announcement} club={club} />)}</div>
+        {loading && <p role="status">Loading announcements…</p>}
+        <div ref={sentinel}>{hasMore && !loading && <Button variant="secondary" onClick={() => load()}>Load more announcements</Button>}</div>
+    </div>;
 }

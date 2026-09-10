@@ -23,8 +23,8 @@ export default function Landing() {
                     <BrandLogo className="landing-brand__logo" collapse="phone" />
                 </Link>
                 <nav aria-label="Public navigation">
-                    <Link to="/clubs">Find clubs</Link>
-                    <Link to="/auth/login">Sign in</Link>
+                    <Link className="text-link" to="/clubs">Find clubs</Link>
+                    <Link className="text-link" to="/auth/login">Sign in</Link>
                 </nav>
             </header>
 

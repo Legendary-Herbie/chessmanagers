@@ -18,7 +18,7 @@ export default function PublicPlayerPage() {
     }, [clubId, publicPlayerId]);
     if (error) return <section className="public-panel public-state public-state--error" role="alert">
         <h1>Player could not be loaded</h1><p>{error}</p>
-        <Link className="public-back-link" to={`/clubs/${clubId}`}>Back to club</Link>
+        <Link className="public-back-link text-link" to={`/clubs/${clubId}`}>Back to club</Link>
     </section>;
     if (!player) return <section className="public-panel public-state" role="status">
         <h1>Loading player…</h1><p>Retrieving this player’s public profile.</p>
@@ -31,6 +31,6 @@ export default function PublicPlayerPage() {
                 <div className="public-rating" key={category}><dt>{category[0].toUpperCase() + category.slice(1)}</dt><dd>{rating}</dd></div>
             )}</dl>
         </article>
-        <div><Link className="public-back-link" to={`/clubs/${clubId}`}>← Back to club</Link></div>
+        <div><Link className="public-back-link text-link" to={`/clubs/${clubId}`}>← Back to club</Link></div>
     </div>;
 }

@@ -128,3 +128,6 @@ textarea.input {
 .members-table tr:hover {
     background: var(--bg);
 }
+.club-page > .tabs { display:flex; flex-wrap:wrap; }
+.club-page > .tabs button { flex:1 1 130px; min-height:44px; }
+.club-page .profile-panel h2 { margin-top:0; }

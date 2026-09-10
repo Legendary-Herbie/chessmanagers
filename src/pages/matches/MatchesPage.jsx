@@ -1,3 +1,7 @@
+import MatchRating from '../../features/matches/components/MatchRating.jsx';
+import NotificationMatchPreview from '../../features/matches/components/NotificationMatchPreview.jsx';
+import Disclosure from '../../shared/common/Disclosure.jsx';
+import ActionMenu from '../../shared/common/ActionMenu.jsx';
 import React, { useCallback, useEffect, useState } from 'react';
 import '../../styles/matches.css';
 import Button from '../../shared/common/Button.jsx';
@@ -7,6 +11,7 @@ import { useClub } from '../../app/contextHooks.js';
 import { matchApi } from '../../features/matches/api/matchApi.js';
 import PlayerSearchSelect from '../../features/players/components/PlayerSearchSelect.jsx';
 import NoClubState from '../../shared/common/NoClubState.jsx';
+import { useSearchParams } from 'react-router-dom';
 
 const CATEGORIES = ['blitz', 'rapid', 'classical'];
 const PAGE_SIZE = 25;
@@ -23,7 +28,7 @@ function emptyForm() {
         whitePlayerId: '',
         blackPlayerId: '',
         result: 'white',
-        ratingCategory: 'blitz',
+        ratingCategory: 'rapid',
         isRated: true,
         playedAt: localDateTime(),
         notes: '',
@@ -37,6 +42,7 @@ function resultLabel(result) {
 }
 
 export default function MatchesPage() {
+    const [searchParams, setSearchParams] = useSearchParams();
     const { club, capabilities } = useClub();
     const isAdmin = Boolean(capabilities.canManageMatches);
     const [matches, setMatches] = useState([]);
@@ -61,6 +67,21 @@ export default function MatchesPage() {
     const [notice, setNotice] = useState(null);
     const [duplicateConfirmation, setDuplicateConfirmation] = useState(null);
     const [lifecycleAction, setLifecycleAction] = useState(null);
+    const [entrySettings, setEntrySettings] = useState({ ratingCategory: 'rapid', isRated: true });
+    const [entryVersion, setEntryVersion] = useState(0);
+
+    useEffect(() => {
+        setModalOpen(false);
+        setEntrySettings({ ratingCategory: 'rapid', isRated: true });
+        setDuplicateConfirmation(null);
+    }, [club?.id]);
+    useEffect(() => {
+        if (club?.id && isAdmin && searchParams.get('action') === 'add') {
+            setEditingMatch(null); setForm(emptyForm()); setModalOpen(true);
+            const next = new URLSearchParams(searchParams); next.delete('action');
+            setSearchParams(next, { replace: true });
+        }
+    }, [club?.id, isAdmin, searchParams, setSearchParams]);
 
     useEffect(() => {
         const timer = setTimeout(() => setDebouncedSearch(search.trim()), 300);
@@ -108,7 +129,8 @@ export default function MatchesPage() {
 
     function openAddModal() {
         setEditingMatch(null);
-        setForm(emptyForm());
+        setForm({ ...emptyForm(), ...entrySettings });
+        setEntryVersion(value => value + 1);
         setError(null);
         setModalOpen(true);
     }
@@ -130,6 +152,7 @@ export default function MatchesPage() {
 
     function setRatingField(field, value) {
         setForm(current => ({ ...current, [field]: value }));
+        if (!editingMatch) setEntrySettings(current => ({ ...current, [field]: value }));
     }
 
     function payload(confirmDuplicate = false) {
@@ -145,7 +168,8 @@ export default function MatchesPage() {
         };
     }
 
-    async function saveMatch(confirmDuplicate = false) {
+    async function saveMatch(confirmDuplicate = false, addAnother = false) {
+        if (saving) return;
         setError(null);
         if (!form.whitePlayerId || !form.blackPlayerId) {
             setError('Select both players.');
@@ -166,14 +190,17 @@ export default function MatchesPage() {
                 ? await matchApi.update(club.id, editingMatch.id, requestPayload)
                 : await matchApi.create(club.id, requestPayload);
             setDuplicateConfirmation(null);
-            setModalOpen(false);
+            if (addAnother && !editingMatch) {
+                setForm({ ...emptyForm(), ratingCategory: form.ratingCategory, isRated: form.isRated });
+                setEntryVersion(value => value + 1);
+            } else setModalOpen(false);
             setNotice(response.ratingStatus === 'recalculation_pending'
                 ? 'Match saved. Ratings are being recalculated.'
                 : 'Match saved.');
             await refreshAll();
         } catch (requestError) {
             if (requestError.code === 'POSSIBLE_DUPLICATE_MATCH') {
-                setDuplicateConfirmation({ editing: Boolean(editingMatch) });
+                setDuplicateConfirmation({ editing: Boolean(editingMatch), addAnother });
             } else {
                 setError(requestError.message || 'Failed to save match.');
             }
@@ -232,6 +259,7 @@ export default function MatchesPage() {
             </div>
             {error && !modalOpen && <div className="error" role="alert"><p>{error}</p><Button variant="secondary" disabled={loading} onClick={() => refreshAll()}>Retry</Button></div>}
             {notice && <div className="match-notice" role="status">{notice}</div>}
+            {searchParams.get('matchId') && <NotificationMatchPreview clubId={club.id} matchId={searchParams.get('matchId')} />}
             <div className="matches-controls">
                 <input className="input" placeholder="Search by player or notes" value={search}
                     onChange={event => { setSearch(event.target.value); setPage(0); }} aria-label="Search matches" />
@@ -272,35 +300,35 @@ export default function MatchesPage() {
 
             <div className="matches-list" role="region" aria-label="Match history" tabIndex={0}>
                 {loading ? <div className="muted">Loading...</div> : (
-                    <table className="matches-table">
-                        <thead><tr>
-                            <th>Date</th><th>White</th><th>Black</th><th>Result</th>
-                            <th>Rating category</th><th>Rated / Unrated</th><th>Status</th><th>Notes</th>
-                            {isAdmin && <th>Actions</th>}
-                        </tr></thead>
-                        <tbody>
-                            {matches.map(match => (
-                                <tr key={match.id} className={match.status === 'voided' ? 'voided-match' : ''}>
-                                    <td>{new Date(match.playedAt).toLocaleString()}</td>
-                                    <td>{match.whitePlayerName || match.whitePlayerId}</td>
-                                    <td>{match.blackPlayerName || match.blackPlayerId}</td>
-                                    <td>{resultLabel(match.result)}</td>
-                                    <td><span className="badge time-control">{categoryLabel(match.ratingCategory)}</span></td>
-                                    <td>{match.isRated ? 'Rated' : 'Unrated'}</td>
-                                    <td><span className={`match-status ${match.status}`}>{categoryLabel(match.status)}</span></td>
-                                    <td>{match.notes || '—'}</td>
-                                    {isAdmin && <td className="match-actions">
-                                        {match.status === 'active' && <>
-                                            <Button variant="secondary" onClick={() => openEditModal(match)}>Edit</Button>
-                                            <Button variant="warning" onClick={() => setLifecycleAction({ kind: 'void', match, reason: '', error: null })}>Void</Button>
-                                        </>}
+                    <div className="match-history-cards">
+                        {matches.map(match => <article key={match.id} className={`match-history-card ${match.status === 'voided' ? 'voided-match' : ''}`}>
+                            <div className="match-history-result">
+                                <div className="match-history-player"><strong className="entity-name">{match.whitePlayerName || match.whitePlayerId}</strong><MatchRating match={match} color="white" /></div>
+                                <span className="match-score">{resultLabel(match.result)}</span>
+                                <div className="match-history-player"><strong className="entity-name">{match.blackPlayerName || match.blackPlayerId}</strong><MatchRating match={match} color="black" /></div>
+                            </div>
+                            <div className="match-history-meta">
+                                <time dateTime={match.playedAt}>{new Date(match.playedAt).toLocaleString()}</time>
+                                <span>{categoryLabel(match.ratingCategory)} · {match.isRated ? 'Rated' : 'Unrated'}</span>
+                                {match.status !== 'active' && <span className="match-status">{categoryLabel(match.status)}</span>}
+                            </div>
+                            <div className="match-history-footer">
+                                <Disclosure title="Details">
+                                    <p>Status: {categoryLabel(match.status)}</p>
+                                    {match.notes && <p className="match-history-notes">{match.notes}</p>}
+                                    {!match.notes && <p className="muted">No notes.</p>}
+                                </Disclosure>
+                                {isAdmin && <div className="match-actions">
+                                    {match.status === 'active' && <Button variant="secondary" onClick={() => openEditModal(match)}>Edit</Button>}
+                                    <ActionMenu>
+                                        {match.status === 'active' && <Button variant="warning" onClick={() => setLifecycleAction({ kind: 'void', match, reason: '', error: null })}>Void</Button>}
                                         <Button variant="danger" onClick={() => setLifecycleAction({ kind: 'delete', match, reason: '', error: null })}>Delete</Button>
-                                    </td>}
-                                </tr>
-                            ))}
-                            {!matches.length && <tr><td colSpan={isAdmin ? 9 : 8} className="muted">No matches found.</td></tr>}
-                        </tbody>
-                    </table>
+                                    </ActionMenu>
+                                </div>}
+                            </div>
+                        </article>)}
+                        {!matches.length && <p className="muted">No matches found.</p>}
+                    </div>
                 )}
             </div>
 
@@ -314,50 +342,62 @@ export default function MatchesPage() {
             </div>
 
             {modalOpen && <Dialog title={editingMatch ? 'Edit Match' : 'Add Match'} busy={saving}
-                onClose={() => setModalOpen(false)}>
+                className="match-entry-dialog" onClose={() => setModalOpen(false)}>
                     <div className="modal-body">
                         {error && <div className="error" role="alert">{error}</div>}
-                        <PlayerSearchSelect clubId={club.id} label="White" value={form.whitePlayerId}
+                        {notice && <p role="status">{notice}</p>}
+                        <label className="rated-toggle">
+                            <input type="checkbox" checked={form.isRated}
+                                onChange={event => setRatingField('isRated', event.target.checked)} />
+                            Rated match
+                        </label>
+                        <div className="match-entry-players">
+                        <PlayerSearchSelect key={`white-${entryVersion}`} clubId={club.id} label="White" allowCreate={Boolean(capabilities.canManagePlayers)} value={form.whitePlayerId}
                             selectedPlayer={editingMatch ? {
                                 id: editingMatch.whitePlayerId,
                                 name: editingMatch.whitePlayerName || editingMatch.whitePlayerId,
                             } : null}
                             onChange={playerId => setForm(current => ({ ...current, whitePlayerId: playerId }))}
                             placeholder="Search for White" />
-                        <PlayerSearchSelect clubId={club.id} label="Black" value={form.blackPlayerId}
+                        <span className="match-entry-versus" aria-hidden="true">vs.</span>
+                        <PlayerSearchSelect key={`black-${entryVersion}`} clubId={club.id} label="Black" allowCreate={Boolean(capabilities.canManagePlayers)} value={form.blackPlayerId}
                             selectedPlayer={editingMatch ? {
                                 id: editingMatch.blackPlayerId,
                                 name: editingMatch.blackPlayerName || editingMatch.blackPlayerId,
                             } : null}
                             onChange={playerId => setForm(current => ({ ...current, blackPlayerId: playerId }))}
                             placeholder="Search for Black" />
-                        <label className="form-row"><span className="label">Result</span>
-                            <select value={form.result} onChange={event => setForm({ ...form, result: event.target.value })} className="input">
-                                <option value="white">White wins</option><option value="black">Black wins</option><option value="draw">Draw</option>
-                            </select>
-                        </label>
+                        </div>
+                        <fieldset className="match-entry-result"><legend>Result</legend>
+                            <div className="match-category-switcher">
+                                {[['white', '1–0', 'White wins'], ['draw', '½–½', 'Draw'], ['black', '0–1', 'Black wins']].map(([value, score, label]) => (
+                                    <button key={value} type="button" aria-label={`${score} ${label}`} aria-pressed={form.result === value}
+                                        className={form.result === value ? 'active' : ''}
+                                        onClick={() => setForm(current => ({ ...current, result: value }))}>{score}</button>
+                                ))}
+                            </div>
+                        </fieldset>
                         <div className="form-row"><span className="label">Rating category</span>
                             <div className="match-category-switcher" role="group" aria-label="Rating category">
                                 {CATEGORIES.map(category => <button type="button" key={category}
                                     className={form.ratingCategory === category ? 'active' : ''}
+                                    aria-pressed={form.ratingCategory === category}
                                     onClick={() => setRatingField('ratingCategory', category)}>{categoryLabel(category)}</button>)}
                             </div>
                         </div>
-                        <label className="rated-toggle">
-                            <input type="checkbox" checked={form.isRated}
-                                onChange={event => setRatingField('isRated', event.target.checked)} />
-                            Rated match
-                        </label>
                         <label className="form-row"><span className="label">Played at</span>
                             <input type="datetime-local" className="input" required value={form.playedAt}
                                 onChange={event => setForm({ ...form, playedAt: event.target.value })} />
                         </label>
-                        <label className="form-row"><span className="label">Notes (optional)</span>
+                        <Disclosure key={`notes-${entryVersion}`} defaultOpen={Boolean(editingMatch?.notes)} title="Notes (optional)">
+                        <label className="form-row"><span className="sr-only">Notes (optional)</span>
                             <textarea className="input" value={form.notes} onChange={event => setForm({ ...form, notes: event.target.value })} />
                         </label>
+                        </Disclosure>
                     </div>
                     <div className="modal-footer">
                         <Button variant="secondary" disabled={saving} onClick={() => setModalOpen(false)}>Cancel</Button>
+                        {!editingMatch && <Button variant="secondary" disabled={saving} onClick={() => saveMatch(false, true)}>Save and add another</Button>}
                         <Button variant="primary" disabled={saving} onClick={() => saveMatch(false)}>
                             {saving ? 'Saving...' : editingMatch ? 'Save changes' : 'Create match'}
                         </Button>
@@ -367,7 +407,7 @@ export default function MatchesPage() {
             <ConfirmDialog isOpen={Boolean(duplicateConfirmation)} title="Possible duplicate match"
                 message="A matching record exists within five minutes. Save this match anyway?"
                 confirmLabel="Save anyway" variant="warning" loading={saving}
-                onClose={() => setDuplicateConfirmation(null)} onConfirm={() => saveMatch(true)} />
+                onClose={() => setDuplicateConfirmation(null)} onConfirm={() => saveMatch(true, duplicateConfirmation?.addAnother)} />
 
             <ConfirmDialog isOpen={Boolean(lifecycleAction)}
                 title={lifecycleAction?.kind === 'void' ? 'Void match' : 'Delete match'}

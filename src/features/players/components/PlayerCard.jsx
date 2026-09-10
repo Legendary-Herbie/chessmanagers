@@ -1,3 +1,5 @@
+import ActionMenu from '../../../shared/common/ActionMenu.jsx';
+import Icon from '../../../shared/common/Icon.jsx';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { playerRating } from '../roster/playerRating.js';
@@ -6,7 +8,7 @@ import { resolveAssetUrl } from '../../../config/api.js';
 export default function PlayerCard({
     player,
     currentUser,
-    ratingCategory = 'blitz',
+    ratingCategory = 'rapid',
     currentLinkedPlayerId,
     isAdmin,
     onClaim,
@@ -20,10 +22,6 @@ export default function PlayerCard({
         id,
         name,
         bio,
-        games = 0,
-        wins = 0,
-        draws = 0,
-        losses = 0,
         link_status,
         photo_url,
     } = player;
@@ -32,7 +30,6 @@ export default function PlayerCard({
         ? name.split(' ').map((n) => n[0]).join('').substring(0, 2).toUpperCase()
         : 'P';
 
-    const winRate = games > 0 ? Math.round(((wins + (draws * 0.5)) / games) * 100) : 0;
     const isSelf = currentLinkedPlayerId === id;
     const canEdit = isAdmin || isSelf;
     const isLinked = link_status === 'approved';
@@ -48,50 +45,21 @@ export default function PlayerCard({
                     {photo_url ? <img src={resolveAssetUrl(photo_url)} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} /> : initials}
                 </div>
                 <div className="player-card__main">
-                    <Link to={`/players/${id}`} className="player-card__name" title={name}>
+                    <Link to={`/players/${id}`} className="player-card__name name-link" title={name}>
                         {name}
                     </Link>
                     <div className="player-card__meta">
                         <span className="rating-badge" title={`${ratingCategory[0].toUpperCase() + ratingCategory.slice(1)} Elo rating`}>
                             {ratingCategory[0].toUpperCase() + ratingCategory.slice(1)} Elo: {playerRating(player, ratingCategory) ?? '—'}
                         </span>
-                        {isLinked && <span className="link-badge link-badge--approved">✓ Claimed</span>}
-                        {isPending && <span className="link-badge link-badge--pending">⏳ Pending Claim</span>}
-                        {!isLinked && !isPending && <span className="link-badge link-badge--unlinked">Unlinked</span>}
+                        {isLinked && <span className="link-badge link-badge--approved"><Icon name="check" /> Claimed</span>}
+                        {isPending && <span className="link-badge link-badge--pending"><Icon name="clock" /> Pending Claim</span>}
+
                     </div>
                 </div>
             </div>
 
-            {bio ? (
-                <p className="player-card__bio">{bio}</p>
-            ) : (
-                <p className="player-card__bio" style={{ fontStyle: 'italic', opacity: 0.6 }}>
-                    No bio provided.
-                </p>
-            )}
-
-            <div className="player-card__stats">
-                <div className="player-card__stat-item">
-                    <span className="player-card__stat-val">{games}</span>
-                    <span className="player-card__stat-lbl">Played</span>
-                </div>
-                <div className="player-card__stat-item">
-                    <span className="player-card__stat-val" style={{ color: 'var(--accent)' }}>{wins}</span>
-                    <span className="player-card__stat-lbl">Wins</span>
-                </div>
-                <div className="player-card__stat-item">
-                    <span className="player-card__stat-val" style={{ color: 'var(--warning)' }}>{draws}</span>
-                    <span className="player-card__stat-lbl">Draws</span>
-                </div>
-                <div className="player-card__stat-item">
-                    <span className="player-card__stat-val" style={{ color: 'var(--danger)' }}>{losses}</span>
-                    <span className="player-card__stat-lbl">Losses</span>
-                </div>
-                <div className="player-card__stat-item">
-                    <span className="player-card__stat-val">{winRate}%</span>
-                    <span className="player-card__stat-lbl">Win %</span>
-                </div>
-            </div>
+            {bio && <p className="player-card__bio">{bio}</p>}
 
             <div className="player-card__footer">
                 <Link to={`/players/${id}`} className="btn-secondary btn-sm">
@@ -118,10 +86,11 @@ export default function PlayerCard({
                             title="Edit Player Profile"
                             aria-label="Edit Player"
                         >
-                            ✏️
+                            <Icon name="edit" />
                         </button>
                     )}
 
+                    {((isAdmin || isSelf) && isLinked || isAdmin) && <ActionMenu>
                     {(isAdmin || isSelf) && isLinked && (
                         <button
                             type="button"
@@ -145,6 +114,7 @@ export default function PlayerCard({
                             🗑️
                         </button>
                     )}
+                    </ActionMenu>}
                 </div>
             </div>
         </div>

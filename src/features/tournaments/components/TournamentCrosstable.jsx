@@ -24,13 +24,13 @@ export default function TournamentCrosstable({ participants, rounds, standings }
         }
     }
     return <>
-        <div className="tournament-table-wrap" tabIndex={0} role="region" aria-label="Tournament crosstable">
+        <div className="tournament-table-wrap table-scroll" tabIndex={0} role="region" aria-label="Tournament crosstable">
             <table className="tournament-table tournament-crosstable">
                 <thead><tr><th scope="col">Player</th>{players.map((player, index) => <th scope="col" key={player.id} title={player.name}>{index + 1}</th>)}<th scope="col">Byes</th><th scope="col">Points</th></tr></thead>
                 <tbody>{players.map((player, index) => <tr key={player.id}>
                     <th scope="row">{index + 1}. {player.name}</th>
-                    {players.map(opponent => <td key={opponent.id} aria-label={`${player.name} against ${opponent.name}`}>
-                        {player.id === opponent.id ? '—' : results.get(`${player.id}:${opponent.id}`)?.map(cell => <span className="cross-score" key={cell.id} title={cell.description} aria-label={cell.description}>{cell.score}</span>) || '·'}
+                    {players.map(opponent => <td className={player.id === opponent.id ? 'cross-self' : undefined} key={opponent.id} aria-label={`${player.name} against ${opponent.name}`}>
+                        {player.id === opponent.id ? '—' : results.get(`${player.id}:${opponent.id}`)?.map(cell => <span className={`cross-score cross-score--${cell.score === '1' ? 'win' : cell.score === '½' ? 'draw' : cell.score === '0' ? 'loss' : 'empty'}`} key={cell.id} title={cell.description} aria-label={cell.description}>{cell.score}</span>) || '·'}
                     </td>)}
                     <td>{player.byeCount ?? 0}</td><td><strong>{standings.find(row => row.playerId === player.id)?.matchPoints ?? '—'}</strong></td>
                 </tr>)}</tbody>

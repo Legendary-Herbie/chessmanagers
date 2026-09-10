@@ -290,6 +290,15 @@ export async function markAllNotificationsRead(userId, clubId = null) {
     ).then(result => result.rowCount);
 }
 
+export async function dismissAllNotifications(userId) {
+    const result = await db.query(
+        `UPDATE notifications SET dismissed_at = NOW(), updated_at = NOW()
+         WHERE user_id = $1 AND dismissed_at IS NULL`,
+        [userId]
+    );
+    return result.rowCount;
+}
+
 export async function dismissNotification(userId, notificationId) {
     return db.query(
         `UPDATE notifications

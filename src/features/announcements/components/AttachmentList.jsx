@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { announcementApi } from '../api/announcementApi.js';
 
-function ImageAttachment({ clubId, announcementId, attachment }) {
+export function ImageAttachment({ clubId, announcementId, attachment }) {
     const [url, setUrl] = useState(null);
     const [error, setError] = useState('');
     useEffect(() => {

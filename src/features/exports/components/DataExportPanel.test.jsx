@@ -9,6 +9,7 @@ vi.mock('../api/exportApi.js', () => ({
         downloadPlayers: vi.fn(),
         downloadMatches: vi.fn(),
         downloadRatings: vi.fn(),
+        downloadPackage: vi.fn(),
     },
 }));
 
@@ -20,6 +21,14 @@ describe('DataExportPanel', () => {
         exportApi.downloadRatings.mockResolvedValue();
     });
     afterEach(cleanup);
+
+    it('downloads a complete records package in one action', async () => {
+        exportApi.downloadPackage.mockResolvedValue();
+        render(<DataExportPanel clubId="club_1" />);
+        fireEvent.click(screen.getByRole('button', { name: 'Export full club package' }));
+        await waitFor(() => expect(exportApi.downloadPackage).toHaveBeenCalledWith('club_1'));
+        expect(await screen.findByText('Your download has started.')).toBeTruthy();
+    });
 
     it('downloads each approved export with lifecycle and category filters', async () => {
         render(<DataExportPanel clubId="club_1" />);

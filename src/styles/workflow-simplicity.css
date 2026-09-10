@@ -1,0 +1,35 @@
+.queue-heading,.queue-item,.queue-actions,.rivalry-legend { display:flex; flex-wrap:wrap; gap:12px; align-items:center; justify-content:space-between; }
+.queue-heading { align-items:baseline; }
+.queue-heading h2 { margin-bottom:4px; }
+.queue-heading p { margin-top:0; }
+.queue-item { padding:12px; margin-top:8px; border:1px solid var(--border); border-radius:10px; background:var(--bg-surface); }
+.queue-actions { justify-content:flex-start; gap:8px; }
+.queue-card { gap:16px; }
+.queue-card strong { color:var(--text-strong); }
+.queue-card .pending-banner__info span { color:var(--text-muted); }
+.rivalry-bar { display:flex; min-height:18px; overflow:hidden; border-radius:999px; background:var(--bg-muted); margin:12px 0; }
+.rivalry-bar span { flex-basis:0; }
+.rivalry-bar__first { background:var(--primary); }
+.rivalry-bar__draw { background:var(--warning); }
+.rivalry-bar__second { background:var(--accent); }
+.rivalry-legend { font-size:.85rem; }
+.cross-score { min-width:1.8rem; border-radius:6px; margin:2px; font-weight:700; }
+.cross-score--win { background:var(--status-success-bg); color:var(--status-success-text); }
+.cross-score--draw { background:var(--status-warning-bg); color:var(--status-warning-text); }
+.cross-score--loss { background:var(--status-neutral-bg); color:var(--status-neutral-text); }
+.cross-self { background:var(--bg-muted); color:var(--text-muted); }
+.rich-editor__toolbar button[aria-pressed='true'] { background:var(--primary); color:var(--primary-contrast); }
+.announcement-file-picker { border:1px dashed var(--border); border-radius:12px; padding:16px; }
+.discovery-hub { display:grid; gap:16px; }
+.discovery-switch { display:flex; flex-wrap:wrap; gap:8px; }
+.discovery-switch button[aria-pressed='true'] { border-color:var(--primary); background:var(--primary); color:var(--primary-contrast); }
+.discovery-hub [hidden] { display:none !important; }
+.discovery-hub .public-input { min-height:48px; }
+.invite-share-hub { margin-top:24px; }
+.share-code { display:grid; gap:10px; margin-top:12px; }
+.share-code > code { font-size:1.4rem; letter-spacing:4px; }
+.share-controls { display:grid; gap:6px; }
+.share-controls .input { max-width:100%; }
+.notification-target { outline:2px solid var(--primary); outline-offset:3px; padding:20px; border-radius:12px; margin:16px 0; scroll-margin-top:90px; }
+@media (prefers-reduced-motion:no-preference) { .notification-target { animation:target-reveal .3s ease-out; } }
+@keyframes target-reveal { from { opacity:.5; } to { opacity:1; } }

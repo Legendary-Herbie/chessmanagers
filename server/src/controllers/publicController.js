@@ -31,7 +31,7 @@ export async function getPublicLeaderboard(req, res, next) {
         const club = await publicClub(req.params.clubId, res);
         if (!club) return;
         if (!club.public_leaderboard) return res.status(404).json({ error: 'Resource not found.' });
-        const { category = 'blitz', limit = 50, offset = 0, q = '' } = req.validatedQuery;
+        const { category = 'rapid', limit = 50, offset = 0, q = '' } = req.validatedQuery;
         const leaderboard = await LeaderboardModel.getByClub(req.params.clubId, { category, limit, offset, q });
         res.json({ leaderboard: {
             ...leaderboard,

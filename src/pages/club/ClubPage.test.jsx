@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, ClubContext, NotificationsContext } from '../../app/contextHooks.js';
 import { clubApi } from '../../features/clubs/api/clubApi.js';
 import ClubPage from './ClubPage.jsx';
+import { transferableAbortController } from 'node:util';
 
 vi.mock('../../features/clubs/api/clubApi.js', () => ({
     clubApi: {
@@ -65,13 +66,14 @@ function renderPage({ refreshClub = vi.fn() } = {}) {
 
 describe('ClubPage profile validation', () => {
     beforeEach(() => {
+        vi.stubGlobal('AbortController', class { constructor() { return transferableAbortController(); } });
         vi.clearAllMocks();
         clubApi.fetchMembers.mockResolvedValue([]);
         clubApi.fetchInvites.mockResolvedValue([]);
         clubApi.getJoinCode.mockResolvedValue({ joinCode: { active: false } });
         clubApi.update.mockResolvedValue({ club });
     });
-    afterEach(cleanup);
+    afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
 
     it('blocks submission and identifies the malformed field', async () => {
         renderPage();
@@ -97,5 +99,15 @@ describe('ClubPage profile validation', () => {
         })));
         expect(refreshClub).toHaveBeenCalled();
         expect(notify).toHaveBeenCalledWith('Club profile saved.', 'success');
+        expect(clubApi.update.mock.calls[0][1]).not.toHaveProperty('ratingSettings');
+        expect(clubApi.update.mock.calls[0][1].settings).not.toHaveProperty('notifications');
+    });
+
+    it('saves notification preferences without changing profile or rating rules', async () => {
+        renderPage();
+        fireEvent.click(screen.getByRole('button', { name: 'Notifications', exact: true }));
+        fireEvent.click(await screen.findByLabelText('Allow notification email delivery'));
+        fireEvent.click(screen.getByRole('button', { name: 'Save notifications' }));
+        await waitFor(() => expect(clubApi.update).toHaveBeenCalledWith('club_1', { settings: { notifications: { emailEnabled: true } } }));
     });
 });

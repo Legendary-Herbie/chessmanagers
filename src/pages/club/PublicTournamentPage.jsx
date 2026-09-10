@@ -16,7 +16,7 @@ export default function PublicTournamentPage() {
     }, [clubId, tournamentId]);
     if (error) return <section className="public-panel public-state public-state--error" role="alert">
         <h1>Tournament could not be loaded</h1><p>{error}</p>
-        <Link className="public-back-link" to={`/clubs/${clubId}`}>Back to club</Link>
+        <Link className="public-back-link text-link" to={`/clubs/${clubId}`}>Back to club</Link>
     </section>;
     if (!data) return <section className="public-panel public-state" role="status">
         <h1>Loading tournament…</h1><p>Retrieving the public standings.</p>
@@ -32,6 +32,6 @@ export default function PublicTournamentPage() {
                 </tr>)}</tbody>
             </table></div> : <p>No standings are available yet.</p>}
         </section>
-        <div><Link className="public-back-link" to={`/clubs/${clubId}`}>← Back to club</Link></div>
+        <div><Link className="public-back-link text-link" to={`/clubs/${clubId}`}>← Back to club</Link></div>
     </div>;
 }

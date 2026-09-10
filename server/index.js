@@ -12,6 +12,7 @@ import env from './src/config/env.js';
 import db from './src/database/database.js';
 import { startRatingRecalculationWorker } from './src/services/RatingService.js';
 import { startNotificationOutboxWorker } from './src/services/NotificationService.js';
+import { startAssetCleanupWorker } from './src/services/AssetCleanupService.js';
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
@@ -214,6 +215,7 @@ if (NODE_ENV !== 'test') {
         .then(() => {
             startRatingRecalculationWorker();
             startNotificationOutboxWorker();
+            startAssetCleanupWorker();
             console.log(`[INFO] Allowed CORS origins: ${CORS_ORIGIN.join(', ')}`);
             const server = http.createServer({ maxHeaderSize: 64 * 1024 }, app);
             server.listen(PORT, () => {

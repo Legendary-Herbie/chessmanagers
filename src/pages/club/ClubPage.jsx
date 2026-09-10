@@ -1,3 +1,5 @@
+import ShareControls from '../../features/clubs/components/ShareControls.jsx';
+import Disclosure from '../../shared/common/Disclosure.jsx';
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import '../../styles/club.css';
@@ -8,6 +10,7 @@ import { clubApi } from '../../features/clubs/api/clubApi.js';
 import {
     mapClubProfileApiErrors,
     validateClubProfile,
+    validateClubRatingSettings,
 } from '../../features/clubs/clubProfileValidation.js';
 import DataExportPanel from '../../features/exports/components/DataExportPanel.jsx';
 import { canRemoveClubMember } from '../../features/clubs/membership/memberActionPermissions.js';
@@ -165,7 +168,9 @@ export default function ClubPage() {
     async function saveProfile(event) {
         event?.preventDefault();
         if (!club || !isClubAdmin) return;
-        const validation = validateClubProfile(profile, { isOwner, badgeFile });
+        const validation = activeTab === 'ratings' ? validateClubRatingSettings(profile.rating_settings)
+            : activeTab === 'notifications' ? { success: true, data: {} }
+                : validateClubProfile(profile, { isOwner: false, badgeFile });
         if (!validation.success) {
             setProfileErrors(validation.errors);
             setManagementError('Please correct the highlighted club profile fields.');
@@ -178,41 +183,42 @@ export default function ClubPage() {
         setProfileErrors({});
         try {
             const values = validation.data;
-            const presentation = {
-                federation: values.federation,
-                description: values.description,
-                contactInfo: values.contactInfo,
-                settings: {
-                    contacts: values.contacts,
-                    affiliation: values.affiliation,
-                    presentation: {
-                        ...(profile.settings_json?.presentation || {}),
-                        primaryColor: values.primaryColor,
-                    },
-                },
-            };
-            if (isOwner) {
-                await clubApi.update(club.id, {
-                    name: values.name,
-                    ...presentation,
-                    visibility: profile.visibility,
-                    publicLeaderboard: Boolean(profile.public_leaderboard),
-                    settings: {
-                        ...presentation.settings,
-                        notifications: profile.settings_json?.notifications || {},
-                    },
-                    ratingSettings: values.ratingSettings,
-                });
+            if (activeTab === 'notifications') {
+                await clubApi.update(club.id, { settings: { notifications: profile.settings_json?.notifications || {} } });
+            } else if (activeTab === 'ratings') {
+                await clubApi.update(club.id, { ratingSettings: validation.data });
             } else {
-                await clubApi.updatePresentation(club.id, presentation);
-            }
-            if (badgeFile) {
-                await clubApi.uploadBadge(club.id, badgeFile);
-                setBadgeFile(null);
+                const presentation = {
+                    federation: values.federation,
+                    description: values.description,
+                    contactInfo: values.contactInfo,
+                    settings: {
+                        contacts: values.contacts,
+                        affiliation: values.affiliation,
+                        presentation: {
+                            ...(profile.settings_json?.presentation || {}),
+                            primaryColor: values.primaryColor,
+                        },
+                    },
+                };
+                if (isOwner) {
+                    await clubApi.update(club.id, {
+                        name: values.name,
+                        ...presentation,
+                        visibility: profile.visibility,
+                        publicLeaderboard: Boolean(profile.public_leaderboard),
+                    });
+                } else {
+                    await clubApi.updatePresentation(club.id, presentation);
+                }
+                if (badgeFile) {
+                    await clubApi.uploadBadge(club.id, badgeFile);
+                    setBadgeFile(null);
+                }
             }
             setSavedProfile(profile);
             await refreshClub();
-            notify('Club profile saved.', 'success');
+            notify(`${activeTab === 'ratings' ? 'Rating rules' : activeTab === 'notifications' ? 'Notifications' : 'Club profile'} saved.`, 'success');
         } catch (err) {
             const fieldErrors = mapClubProfileApiErrors(err?.errors);
             if (Object.keys(fieldErrors).length > 0) {
@@ -296,7 +302,7 @@ export default function ClubPage() {
     function deleteClub() {
         openDialog({
             kind: 'deleteClub', title: 'Delete club', confirmLabel: 'Delete club', variant: 'danger',
-            message: 'Delete this club? Historical chess records will be retained, but the club cannot be restored.',
+            message: 'Permanently delete this club and all its players, matches, ratings, tournaments, announcements, and uploaded files? User accounts and other clubs will remain. This cannot be undone.',
         });
     }
 
@@ -410,7 +416,8 @@ export default function ClubPage() {
 
             {/* Club profile and administration tabs. Operational work lives on the main dashboard. */}
             <div className="tabs">
-                <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => setActiveTab('profile')}>Profile</button>
+                <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => setActiveTab('profile')}>Club profile</button>
+                {isOwner && ['notifications', 'ratings', 'ownership'].map(tab => <button key={tab} className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'ratings' ? 'Rating rules' : tab === 'ownership' ? 'Ownership' : 'Notifications'}</button>)}
                 {isClubAdmin && (
                     <button className={activeTab === 'members' ? 'active' : ''} onClick={() => setActiveTab('members')}>Members &amp; access</button>
                 )}
@@ -420,10 +427,11 @@ export default function ClubPage() {
             </div>
 
             {/* Profile tab — club info editing (name, federation, description, logo) */}
-            {activeTab === 'profile' && (
+            {(activeTab === 'profile' || isOwner && ['notifications', 'ratings', 'ownership'].includes(activeTab)) && (
                 <div className="tab-panel profile-panel">
-                    <form noValidate onSubmit={saveProfile}>
-                    <fieldset disabled={savingSettings} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
+                    {activeTab !== 'ownership' && <form noValidate onSubmit={saveProfile}>
+                    <fieldset disabled={savingSettings} className="form-fieldset">
+                    {activeTab === 'profile' && <>
                     <label className="form-row">
                         <div className="label">Name</div>
                         <input {...validationProps('name')} className="input" maxLength={150} disabled={!isOwner} value={profile?.name || ''} onChange={e => { clearProfileError('name'); setProfile({ ...profile, name: e.target.value }); }} />
@@ -504,6 +512,8 @@ export default function ClubPage() {
                         <ProfileFieldError field="primaryColor" errors={profileErrors} />
                     </label>
 
+                    </>}
+                    {activeTab === 'notifications' && <>
                     <label className="form-row">
                         <div className="label">Allow notification email delivery</div>
                         <input type="checkbox" disabled={!isOwner} checked={Boolean(profile?.settings_json?.notifications?.emailEnabled)} onChange={e => updateStructuredSetting('notifications', 'emailEnabled', e.target.checked)} />
@@ -534,6 +544,10 @@ export default function ClubPage() {
                         <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.announcementEvents !== false} onChange={e => updateStructuredSetting('notifications', 'announcementEvents', e.target.checked)} />
                     </label>
 
+                    </>}
+                    {activeTab === 'ratings' && <>
+                    <h2>Rating rules</h2><p className="muted">Blitz, Rapid, and Classical use independent Elo ratings.</p>
+                    <Disclosure forceOpen={Object.keys(profileErrors).some(field => field.startsWith('ratingSettings.'))} title="Advanced rating controls">
                     {['blitz', 'rapid', 'classical'].map(category => {
                         const field = key => `ratingSettings.${category}.${key}`;
                         return (
@@ -563,12 +577,13 @@ export default function ClubPage() {
                         );
                     })}
 
-                    {profile?.logo && <div className="logo-preview"><img src={resolveAssetUrl(profile.logo)} alt="Club badge" /></div>}
+                    </Disclosure></>}
+                    {activeTab === 'profile' && profile?.logo && <div className="logo-preview"><img src={resolveAssetUrl(profile.logo)} alt="Club badge" /></div>}
 
                     <div className="form-actions">
                         {isClubAdmin ? (
                             <>
-                                <Button type="submit" disabled={savingSettings} className="mr-2">{savingSettings ? 'Saving...' : 'Save'}</Button>
+                                <Button type="submit" disabled={savingSettings} className="mr-2">{savingSettings ? 'Saving...' : activeTab === 'ratings' ? 'Save rating rules' : activeTab === 'notifications' ? 'Save notifications' : 'Save'}</Button>
                                 <Button variant="secondary" disabled={savingSettings} onClick={() => { setProfile(savedProfile); setBadgeFile(null); setProfileErrors({}); setManagementError(null); }}>Reset</Button>
                             </>
                         ) : (
@@ -576,12 +591,12 @@ export default function ClubPage() {
                         )}
                     </div>
                     </fieldset>
-                    </form>
-                    {club.visibility === 'public' && <CopyPublicLink path={`/clubs/${club.id}`} />}
+                    </form>}
+                    {activeTab === 'profile' && club.visibility === 'public' && <CopyPublicLink path={`/clubs/${club.id}`} />}
                     <UnsavedChangesWarning dirty={Boolean(profile && savedProfile && (badgeFile || JSON.stringify(profile) !== JSON.stringify(savedProfile)))} saving={savingSettings}
                         onDiscard={() => { setProfile(savedProfile); setBadgeFile(null); setProfileErrors({}); }} />
 
-                    {isOwner && (
+                    {isOwner && activeTab === 'ownership' && (
                         <div className="dashboard-settings-card">
                             <h3>Ownership and lifecycle</h3>
                             <label className="form-row">
@@ -646,8 +661,9 @@ export default function ClubPage() {
                         </table>
                     )}
 
-                    <div className="invite-section" style={{ marginTop: 24 }}>
-                        <h2>Club access</h2>
+                    <section className="invite-section invite-share-hub">
+                        <h2>Invite & share</h2>
+                        <p className="muted">Share a code or invite link to bring people into your club.</p>
                         <div className="invite-label">Six-digit join code</div>
                         <div className="muted">
                             {joinCodeStatus.active
@@ -655,8 +671,9 @@ export default function ClubPage() {
                                 : 'No active join code'}
                         </div>
                         {revealedJoinCode && (
-                            <div style={{ marginTop: 8 }}>
-                                <code style={{ fontSize: 20, letterSpacing: 4 }}>{revealedJoinCode}</code>
+                            <div className="share-code">
+                                <code>{revealedJoinCode}</code>
+                                <ShareControls value={revealedJoinCode} label="Code" qrValue={`${window.location.origin}/clubs?joinCode=${encodeURIComponent(revealedJoinCode)}`} />
                                 <div className="muted">Copy this code now. It is stored securely and cannot be shown again.</div>
                             </div>
                         )}
@@ -680,16 +697,16 @@ export default function ClubPage() {
                             <ul className="invite-list">
                                 {invites.map(invite => (
                                     <li key={invite.id} className="invite-item">
-                                        <code style={{ fontSize: 12 }}>{invite.token}</code>
+                                        <span className="muted">Club invite</span>
                                         <div style={{ marginLeft: 'auto' }}>
-                                            <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/clubs/join?token=${invite.token}`)}>Copy</Button>
+                                            <ShareControls value={`${window.location.origin}/clubs/join?token=${encodeURIComponent(invite.token)}`} />
                                             <Button variant="danger" style={{ marginLeft: 8 }} onClick={() => revokeInvite(invite)}>Revoke</Button>
                                         </div>
                                     </li>
                                 ))}
                             </ul>
                         )}
-                    </div>
+                    </section>
                 </div>
             ) : activeTab === 'members' ? (
                 <div className="tab-panel">

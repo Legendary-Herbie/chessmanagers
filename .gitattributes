@@ -1,0 +1,2 @@
+# The baseline migration verifies the exact committed schema checksum.
+server/src/database/schema.sql text eol=lf

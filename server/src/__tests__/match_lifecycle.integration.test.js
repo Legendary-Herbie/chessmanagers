@@ -25,6 +25,28 @@ function matchPayload(white, black, overrides = {}) {
 }
 
 describe('canonical match lifecycle', () => {
+    it('returns historical snapshots and suppresses stale values until replay completes', async () => {
+        const owner = await createUser();
+        const club = await createClub(owner);
+        const white = await createPlayer(club);
+        const black = await createPlayer(club);
+        const base = `/api/v1/clubs/${club.id}/matches`;
+        const token = authorization(owner);
+        const created = await request(app).post(base).set('Authorization', token).send(matchPayload(white, black)).expect(201);
+        const id = created.body.match.id;
+        const first = await request(app).get(base).set('Authorization', token).expect(200);
+        expect(first.body.matches[0].ratings).toEqual({ status: 'applied',
+            white: { before: 1500, after: 1520, change: 20 }, black: { before: 1500, after: 1480, change: -20 } });
+        await request(app).patch(`${base}/${id}`).set('Authorization', token)
+            .send(matchPayload(white, black, { result: 'black' })).expect(200);
+        const pending = await request(app).get(`${base}/${id}`).set('Authorization', token).expect(200);
+        expect(pending.body.match.ratings).toEqual({ status: 'pending', white: null, black: null });
+        await drainRatingRecalculationJobs({ clubId: club.id });
+        const replayed = await request(app).get(base).set('Authorization', token).expect(200);
+        expect(replayed.body.matches[0].ratings.white).toEqual({ before: 1500, after: 1480, change: -20 });
+        const playerHistory = await request(app).get(`/api/v1/clubs/${club.id}/players/${white.id}/matches`).set('Authorization', token).expect(200);
+        expect(playerHistory.body.matches[0].ratings).toEqual(replayed.body.matches[0].ratings);
+    });
     it('requires explicit chronology, category, and rated state and rejects legacy type input', async () => {
         const owner = await createUser();
         const club = await createClub(owner);

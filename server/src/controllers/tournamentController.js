@@ -1,6 +1,8 @@
 import { TournamentModel } from '../models/Tournament.js';
+import { permanentlyDeleteTournament } from '../services/DeletionService.js';
 import {
     generateNextRound,
+    saveTournamentSetup,
     getTournamentDetail,
     recordPairingResult,
 } from '../services/TournamentService.js';
@@ -127,13 +129,31 @@ export async function setTournamentStatus(req, res, next) {
     }
 }
 
-export async function deleteTournament(req, res, next) {
+export async function archiveTournament(req, res, next) {
     try {
-        const deleted = await TournamentModel.delete(
+        const deleted = await TournamentModel.archive(
             req.params.tournamentId, req.params.clubId, req.validated.reason ?? null
         );
         if (!deleted) return res.status(404).json({ error: 'Tournament not found.' });
         res.json({ message: 'Tournament archived.' });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function setupTournament(req, res, next) {
+    try {
+        const result = await saveTournamentSetup({ clubId: req.params.clubId, tournamentId: req.params.tournamentId, ...req.validated });
+        if (!result.ok) return sendFailure(res, result);
+        res.json(result);
+    } catch (error) { next(error); }
+}
+
+export async function deleteTournament(req, res, next) {
+    try {
+        const deleted = await permanentlyDeleteTournament(req.params.clubId, req.params.tournamentId);
+        if (!deleted) return res.status(404).json({ error: 'Tournament not found.' });
+        res.json({ message: 'Tournament and related records deleted. Ratings recalculated.' });
     } catch (error) {
         next(error);
     }

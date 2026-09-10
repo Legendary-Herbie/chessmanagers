@@ -8,7 +8,7 @@ describe('notificationDestination', () => {
         ['join_request.rejected', {}, '/clubs/club_1'],
         ['player_claim.pending', { playerId: 'player_1' }, '/players'],
         ['player_claim.approved', { playerId: 'player_1' }, '/players/player_1'],
-        ['match.corrected', { matchId: 'match_1' }, '/matches'],
+        ['match.corrected', { matchId: 'match_1' }, '/matches?matchId=match_1'],
         ['tournament.pairing', { tournamentId: 'tournament_1' }, '/tournaments/tournament_1'],
         ['announcement.published', { announcementId: 'announcement_1' }, '/announcements/announcement_1'],
     ])('maps %s to its relevant workflow', (eventType, payload, expected) => {

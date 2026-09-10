@@ -1,10 +1,19 @@
 import {
+    dismissAllNotifications,
     dismissNotification,
     getUnreadCount,
     listNotifications,
     markAllNotificationsRead,
     markNotificationRead,
 } from '../services/NotificationService.js';
+
+export async function dismissAllUserNotifications(req, res, next) {
+    try {
+        res.json({ deleted: await dismissAllNotifications(req.user.id) });
+    } catch (error) {
+        next(error);
+    }
+}
 
 export async function dismissUserNotification(req, res, next) {
     try {

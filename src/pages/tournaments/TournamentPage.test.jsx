@@ -8,7 +8,7 @@ import { playerApi } from '../../features/players/api/playerApi.js';
 import TournamentPage from './TournamentPage.jsx';
 
 vi.mock('../../features/tournaments/api/tournamentApi.js', () => ({
-    tournamentApi: { get: vi.fn(), recordResult: vi.fn(), setStatus: vi.fn(), archive: vi.fn(), addPlayer: vi.fn(), withdrawPlayer: vi.fn() },
+    tournamentApi: { get: vi.fn(), recordResult: vi.fn(), setStatus: vi.fn(), archive: vi.fn(), delete: vi.fn(), addPlayer: vi.fn(), withdrawPlayer: vi.fn() },
 }));
 vi.mock('../../features/players/api/playerApi.js', () => ({
     playerApi: { fetchPlayers: vi.fn(), searchPlayers: vi.fn() },
@@ -49,12 +49,59 @@ describe('TournamentPage duplicate result protection', () => {
     });
     afterEach(cleanup);
 
-    it('requires an explicit played time for a new result', async () => {
+    it('puts standings first and gives members plain, printable pairings', async () => {
+        const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+        renderPage(false);
+        await screen.findByRole('heading', { name: 'Standings' });
+        expect(screen.getAllByRole('heading', { level: 2 })[0].textContent).toBe('Standings');
+        const pairings = screen.getByRole('region', { name: 'Pairings' });
+        expect(await within(pairings).findByText('Alpha')).toBeTruthy();
+        expect(within(pairings).getByText('Beta')).toBeTruthy();
+        expect(within(pairings).queryByText('Pending')).toBeNull();
+        expect(within(pairings).getByRole('option').textContent).toBe('Round 1');
+        fireEvent.click(within(pairings).getByRole('button', { name: 'Print pairings' }));
+        expect(print).toHaveBeenCalledOnce();
+        const sheet = document.querySelector('.tournament-print-sheet');
+        expect(sheet.textContent).toContain('Pairings · Round 1');
+        expect(sheet.textContent).not.toMatch(/Pending|missing results|Played at/);
+        print.mockRestore();
+    });
+
+    it('shows a recorded score in the pairing and print sheet after refreshing', async () => {
+        const updated = { ...detail, rounds: [{ ...detail.rounds[0], pairings: [{
+            ...detail.rounds[0].pairings[0], result: 'white', status: 'completed',
+        }] }] };
+        tournamentApi.get.mockResolvedValueOnce(detail).mockResolvedValue(updated);
+        tournamentApi.recordResult.mockResolvedValue({ ratingStatus: 'complete' });
         renderPage();
         fireEvent.click(await screen.findByRole('button', { name: '1–0' }));
-        expect(screen.getByRole('alert').textContent).toContain('valid played date');
-        expect(tournamentApi.recordResult).not.toHaveBeenCalled();
-        expect(screen.getByLabelText('Played at (round 1, board 1)').value).toBe('');
+        await waitFor(() => expect(document.querySelector('.pairing-result').textContent).toBe('1–0'));
+        expect(document.querySelector('.tournament-print-sheet tbody').textContent).toContain('1–0');
+        expect(screen.getByRole('button', { name: '1–0' }).getAttribute('aria-pressed')).toBe('true');
+    });
+
+    it('explains permanent deletion and requires confirmation before deleting', async () => {
+        tournamentApi.delete.mockRejectedValueOnce(new Error('Try deletion again.'));
+        renderPage();
+        fireEvent.click(await screen.findByRole('button', { name: 'Delete', exact: true }));
+        const dialog = screen.getByRole('dialog', { name: 'Permanently delete tournament?' });
+        expect(dialog.textContent).toContain('Your club, players, and unrelated records will remain.');
+        expect(tournamentApi.delete).not.toHaveBeenCalled();
+        fireEvent.click(within(dialog).getByRole('button', { name: 'Delete tournament' }));
+        await waitFor(() => expect(tournamentApi.delete).toHaveBeenCalledWith('club_1', 'tour_1'));
+        expect((await screen.findByRole('alert')).textContent).toContain('Try deletion again.');
+    });
+
+    it('records a new result with the current timestamp without extra setup', async () => {
+        tournamentApi.recordResult.mockResolvedValue({ ratingStatus: 'complete' });
+        const before = Date.now();
+        renderPage();
+        fireEvent.click(await screen.findByRole('button', { name: '1–0' }));
+        await waitFor(() => expect(tournamentApi.recordResult).toHaveBeenCalled());
+        const payload = tournamentApi.recordResult.mock.calls[0][3];
+        expect(new Date(payload.playedAt).valueOf()).toBeGreaterThanOrEqual(before);
+        expect(new Date(payload.playedAt).valueOf()).toBeLessThanOrEqual(Date.now());
+        expect(payload.result).toBe('white');
     });
 
     it('searches the server for new participants and filters registered participants in the window', async () => {
@@ -102,6 +149,40 @@ describe('TournamentPage duplicate result protection', () => {
         await waitFor(() => expect(tournamentApi.recordResult).toHaveBeenCalledWith('club_1', 'tour_1', 'pairing_1', {
             result: 'black', playedAt: '2026-09-01T10:13:37.789Z', notes: 'Original notes', confirmDuplicate: false,
         }));
+    });
+
+    it('keeps another board available while saving and supports score shortcuts', async () => {
+        const first = detail.rounds[0].pairings[0];
+        tournamentApi.get.mockResolvedValue({ ...detail, rounds: [{ ...detail.rounds[0], pairings: [first,
+            { ...first, id: 'pairing_2', board: 2 },
+        ] }] });
+        let finishFirst;
+        tournamentApi.recordResult.mockImplementationOnce(() => new Promise(resolve => { finishFirst = resolve; }))
+            .mockResolvedValueOnce({ ratingStatus: 'complete' });
+        renderPage();
+        const board1 = await screen.findByRole('group', { name: 'Result for round 1, board 1' });
+        const board2 = screen.getByRole('group', { name: 'Result for round 1, board 2' });
+        fireEvent.click(within(board1).getByRole('button', { name: '1–0' }));
+        expect(within(board1).getByRole('button', { name: '1–0' }).getAttribute('aria-disabled')).toBe('true');
+        const next = within(board2).getByRole('button', { name: '1–0' });
+        expect(next.disabled).toBe(false);
+        fireEvent.keyDown(next, { key: '2' });
+        await waitFor(() => expect(tournamentApi.recordResult).toHaveBeenCalledTimes(2));
+        expect(tournamentApi.recordResult.mock.calls[1]).toEqual(['club_1', 'tour_1', 'pairing_2', expect.objectContaining({ result: 'draw' })]);
+        finishFirst({ ratingStatus: 'complete' });
+        await waitFor(() => expect(within(board1).getByRole('button', { name: '1–0' }).getAttribute('aria-disabled')).toBe('false'));
+    });
+
+    it('shows only the selected round, defaulting to the current round', async () => {
+        tournamentApi.get.mockResolvedValue({ ...detail, tournament: { ...detail.tournament, current_round: 2 }, rounds: [
+            detail.rounds[0], { ...detail.rounds[0], id: 'round_2', roundNumber: 2 },
+        ] });
+        renderPage();
+        await screen.findByRole('group', { name: 'Result for round 2, board 1' });
+        expect(screen.queryByRole('group', { name: 'Result for round 1, board 1' })).toBeNull();
+        fireEvent.change(screen.getByLabelText('Select round'), { target: { value: '1' } });
+        expect(screen.getByRole('group', { name: 'Result for round 1, board 1' })).toBeTruthy();
+        expect(screen.queryByRole('group', { name: 'Result for round 2, board 1' })).toBeNull();
     });
 
     it('does not offer result entry to members or for byes', async () => {

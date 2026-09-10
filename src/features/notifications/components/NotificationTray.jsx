@@ -1,3 +1,4 @@
+import Icon from '../../../shared/common/Icon.jsx';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClub } from '../../../app/contextHooks.js';
@@ -154,6 +155,11 @@ export default function NotificationTray() {
         navigate(notificationDestination(notification));
     };
 
+    const dismissAll = () => runMutation(() => notificationApi.dismissAll(), () => {
+        setNotifications([]);
+        setUnreadCount(0);
+    }, 'Could not delete notifications. Please try again.');
+
     const dismiss = async notification => {
         if (mutationPending.current) return;
         setDeletingId(notification.id);
@@ -189,9 +195,12 @@ export default function NotificationTray() {
                             <strong>Notifications</strong>
                             <span>{unreadCount ? `${unreadCount} unread` : 'All caught up'}</span>
                         </div>
+                        <div className="notification-tray__actions">
                         {unreadCount > 0 && (
                             <button type="button" disabled={mutating} onClick={markAllRead}>Mark all read</button>
                         )}
+                        {notifications.length > 0 && <button type="button" disabled={mutating} onClick={dismissAll}>Delete all</button>}
+                        </div>
                     </div>
 
                     {loading && notifications.length === 0 && (
@@ -224,7 +233,7 @@ export default function NotificationTray() {
                                             aria-label={`Delete notification: ${EVENT_COPY[notification.eventType] || 'Club update'}`}
                                             disabled={mutating || deletingId === notification.id}
                                             onClick={() => dismiss(notification)}>
-                                            <span aria-hidden="true">×</span>
+                                            <Icon name="x" />
                                         </button>
                                     </div>
                                 </li>

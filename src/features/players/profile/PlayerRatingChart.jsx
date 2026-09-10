@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function PlayerRatingChart({ history = [], startRating = 1500, category = 'blitz' }) {
+export default function PlayerRatingChart({ history = [], startRating = 1500, category = 'rapid' }) {
     const [hoverPoint, setHoverPoint] = useState(null);
     const categoryLabel = category[0].toUpperCase() + category.slice(1);
 

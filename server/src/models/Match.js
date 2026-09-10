@@ -2,6 +2,21 @@ import db from '../database/database.js';
 
 const qry = trx => trx ? trx.query.bind(trx) : db.query.bind(db);
 
+const ratingColumns = `white_history.rating_before AS white_rating_before,
+    white_history.rating_after AS white_rating_after,
+    black_history.rating_before AS black_rating_before,
+    black_history.rating_after AS black_rating_after,
+    EXISTS (SELECT 1 FROM rating_recalculation_jobs job
+        WHERE job.club_id = match.club_id AND job.category = match.rating_category
+          AND job.status IN ('pending', 'running', 'failed')
+          AND job.affected_from <= match.played_at) AS ratings_pending`;
+const ratingJoins = `LEFT JOIN rating_history white_history
+    ON white_history.match_id = match.id AND white_history.club_id = match.club_id
+    AND white_history.category = match.rating_category AND white_history.player_id = match.white_player_id
+    LEFT JOIN rating_history black_history
+    ON black_history.match_id = match.id AND black_history.club_id = match.club_id
+    AND black_history.category = match.rating_category AND black_history.player_id = match.black_player_id`;
+
 function legacyType(isRated, tournamentId) {
     if (tournamentId) return 'tournament';
     return isRated ? 'rated' : 'casual';
@@ -21,11 +36,12 @@ export const MatchModel = {
     ).then(result => result.first),
 
     findById: async (id, clubId, { includeDeleted = false, forUpdate = false, trx = null } = {}) => qry(trx)(
-        `SELECT match.*, white_player.name AS white_player_name,
+        `SELECT match.*, ${ratingColumns}, white_player.name AS white_player_name,
                 black_player.name AS black_player_name
          FROM matches match
          JOIN players white_player ON white_player.id = match.white_player_id
          JOIN players black_player ON black_player.id = match.black_player_id
+         ${ratingJoins}
          WHERE match.id = $1 AND match.club_id = $2
            AND ($3::BOOLEAN OR match.status <> 'deleted')
          ${forUpdate ? 'FOR UPDATE OF match' : ''}`,
@@ -55,11 +71,12 @@ export const MatchModel = {
         const sortColumn = sortBy === 'createdAt' ? 'match.created_at' : 'match.played_at';
         const direction = sortDirection === 'asc' ? 'ASC' : 'DESC';
         return db.query(
-            `SELECT match.*, white_player.name AS white_player_name,
+            `SELECT match.*, ${ratingColumns}, white_player.name AS white_player_name,
                     black_player.name AS black_player_name, COUNT(*) OVER ()::INTEGER AS total_count
              FROM matches match
              JOIN players white_player ON white_player.id = match.white_player_id
              JOIN players black_player ON black_player.id = match.black_player_id
+         ${ratingJoins}
              WHERE ${conditions.join(' AND ')}
              ORDER BY ${sortColumn} ${direction}, match.id ${direction}
              LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -68,11 +85,12 @@ export const MatchModel = {
     },
 
     findByPlayer: async (clubId, playerId, { limit = 20, offset = 0 } = {}) => db.query(
-        `SELECT match.*, white_player.name AS white_player_name,
+        `SELECT match.*, ${ratingColumns}, white_player.name AS white_player_name,
                 black_player.name AS black_player_name
          FROM matches match
          JOIN players white_player ON white_player.id = match.white_player_id
          JOIN players black_player ON black_player.id = match.black_player_id
+         ${ratingJoins}
          WHERE match.club_id = $1 AND match.status <> 'deleted'
            AND (match.white_player_id = $2 OR match.black_player_id = $2)
          ORDER BY match.played_at DESC, match.id DESC
@@ -81,11 +99,12 @@ export const MatchModel = {
     ).then(result => result.rows),
 
     findHeadToHead: async (clubId, playerAId, playerBId) => db.query(
-        `SELECT match.*, white_player.name AS white_player_name,
+        `SELECT match.*, ${ratingColumns}, white_player.name AS white_player_name,
                 black_player.name AS black_player_name
          FROM matches match
          JOIN players white_player ON white_player.id = match.white_player_id
          JOIN players black_player ON black_player.id = match.black_player_id
+         ${ratingJoins}
          WHERE match.club_id = $1 AND match.status = 'active' AND (
             (match.white_player_id = $2 AND match.black_player_id = $3) OR
             (match.white_player_id = $3 AND match.black_player_id = $2)

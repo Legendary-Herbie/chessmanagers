@@ -1,3 +1,4 @@
+import PlayerSearchSelect from '../components/PlayerSearchSelect.jsx';
 import React, { useState, useEffect, useCallback } from 'react';
 import { playerApi } from '../api/playerApi.js';
 import { matchResultLabel } from '../../matches/matchPresentation.js';
@@ -10,7 +11,7 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const opponentOptions = allPlayers.filter(p => p.id !== playerA?.id);
+    const [opponent, setOpponent] = useState(null);
 
     const fetchHeadToHead = useCallback(async (signal) => {
         if (!clubId || !playerA?.id || !selectedPlayerBId) {
@@ -45,7 +46,7 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
         return () => controller.abort();
     }, [fetchHeadToHead]);
 
-    const playerB = allPlayers.find(p => p.id === selectedPlayerBId);
+    const playerB = opponent || allPlayers.find(p => p.id === selectedPlayerBId);
     const selectedSummary = category === 'overall' ? summary?.overall : summary?.categories?.[category];
 
     return (
@@ -61,22 +62,9 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                 </div>
 
                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <label htmlFor="h2h-select" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>
-                        Select Opponent:
-                    </label>
-                    <select
-                        id="h2h-select"
-                        className="players-filter-select"
-                        value={selectedPlayerBId}
-                        onChange={(e) => setSelectedPlayerBId(e.target.value)}
-                    >
-                        <option value="">-- Select Player --</option>
-                        {opponentOptions.map(p => (
-                            <option key={p.id} value={p.id}>
-                                {p.name}
-                            </option>
-                        ))}
-                    </select>
+                    <PlayerSearchSelect clubId={clubId} label="Select opponent" value={selectedPlayerBId}
+                        excludePlayerId={playerA?.id} allowClear
+                        onChange={setSelectedPlayerBId} onSelect={setOpponent} />
                 </div>
             </div>
 
@@ -92,7 +80,7 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                 </div>
             )}
 
-            {error && <div className="error-box">{error}</div>}
+            {error && <div className="error-box" role="alert">{error}</div>}
 
             {!loading && selectedPlayerBId && summary && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
@@ -102,42 +90,12 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                                 onClick={() => setCategory(value)}>{value[0].toUpperCase() + value.slice(1)}</button>
                         ))}
                     </div>
-                    {/* Scoreboard */}
-                    <div
-                        style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr auto 1fr',
-                            gap: '12px',
-                            alignItems: 'center',
-                            backgroundColor: 'var(--bg-muted)',
-                            padding: '16px 20px',
-                            borderRadius: '12px',
-                            textAlign: 'center',
-                        }}
-                    >
-                        <div>
-                            <strong style={{ display: 'block', fontSize: '1.1rem', color: 'var(--text-strong)' }}>{playerA?.name}</strong>
-                            <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>
-                                {selectedSummary.playerAWins}
-                            </span>
+                    <div className="rivalry-summary">
+                        <p>{selectedSummary.games} rated games</p>
+                        <div className="rivalry-bar" role="img" aria-label={`${playerA?.name}: ${selectedSummary.playerAWins} wins; ${selectedSummary.draws} draws; ${playerB?.name}: ${selectedSummary.playerBWins} wins`}>
+                            {[[selectedSummary.playerAWins, playerA?.name, 'first'], [selectedSummary.draws, 'Draws', 'draw'], [selectedSummary.playerBWins, playerB?.name, 'second']].map(([count, name, tone]) => count > 0 && <span key={tone} className={`rivalry-bar__${tone}`} style={{ flexGrow: count }} title={`${name}: ${count} (${Math.round(count / selectedSummary.games * 100)}%)`} />)}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                Total Played
-                            </span>
-                            <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-strong)' }}>
-                                {selectedSummary.games}
-                            </span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--warning)' }}>
-                                {selectedSummary.draws} Draw(s)
-                            </span>
-                        </div>
-                        <div>
-                            <strong style={{ display: 'block', fontSize: '1.1rem', color: 'var(--text-strong)' }}>{playerB?.name}</strong>
-                            <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent)' }}>
-                                {selectedSummary.playerBWins}
-                            </span>
-                        </div>
+                        <div className="rivalry-legend"><span>{playerA?.name}: {selectedSummary.playerAWins} wins</span><span>{selectedSummary.draws} draws</span><span>{playerB?.name}: {selectedSummary.playerBWins} wins</span></div>
                     </div>
 
                     {/* Match List */}

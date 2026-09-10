@@ -4,7 +4,7 @@ import './dialog.css';
 import { useFocusTrap } from '../hooks/useFocusTrap.jsx';
 import Button from './Button.jsx';
 
-export default function Dialog({ title, onClose, busy = false, children }) {
+export default function Dialog({ title, onClose, busy = false, children, className = '' }) {
     const ref = useRef(null);
     const titleId = useId();
     useFocusTrap(ref);
@@ -17,7 +17,7 @@ export default function Dialog({ title, onClose, busy = false, children }) {
     return createPortal(<div className="app-dialog-backdrop" onMouseDown={event => {
         if (event.target === event.currentTarget && !busy) onClose();
     }}>
-        <div ref={ref} className="app-dialog" role="dialog" aria-modal="true"
+        <div ref={ref} className={`app-dialog ${className}`} role="dialog" aria-modal="true"
             aria-labelledby={titleId} onKeyDown={event => {
                 if (event.key === 'Escape') {
                     event.stopPropagation();

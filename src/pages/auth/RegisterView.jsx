@@ -193,7 +193,7 @@ export default function RegisterView() {
 
             <p className="auth-switch">
                 Already have an account?{' '}
-                <Link to={`/auth/login${continuation}`} className="auth-link">Sign in</Link>
+                <Link to={`/auth/login${continuation}`} className="auth-link text-link">Sign in</Link>
             </p>
         </div>
     );

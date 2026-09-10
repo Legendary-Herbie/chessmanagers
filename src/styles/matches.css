@@ -341,3 +341,40 @@ textarea.input {
 
 .matches-page .page-header { flex-wrap: wrap; }
 .matches-header-actions { max-width: 100%; }
+
+.app-dialog.match-entry-dialog { width: min(100%, 640px); }
+.app-dialog.match-entry-dialog .modal-body { gap: 16px; }
+.match-entry-players { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 14px; align-items: end; }
+.match-entry-players .player-search-select { min-width: 0; }
+.match-entry-versus { padding-bottom: 13px; color: var(--text-muted); font-size: .85rem; }
+.match-entry-result { border: 0; padding: 0; margin: 0; min-width: 0; }
+.match-entry-result legend { text-align: center; width: 100%; padding: 0 0 10px; font-size: .9rem; }
+.match-entry-dialog .match-category-switcher { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.match-entry-dialog .match-category-switcher button { min-width: 0; min-height: 48px; padding: 10px 4px; border-radius: 10px; }
+.match-entry-result button { font-size: 1.3rem; font-weight: 700; }
+.match-entry-dialog .rated-toggle { margin: 0; }
+@media (max-width: 440px) {
+    .match-entry-players { gap: 8px; }
+    .match-entry-players input { padding-inline: 8px; font-size: .85rem; }
+}
+.match-history-cards { display:grid; gap:12px; }
+.match-history-card { padding:18px; background:var(--bg-surface); border:1px solid var(--border); border-radius:14px; min-width:0; }
+.match-history-result { display:grid; grid-template-columns:minmax(0,1fr) auto minmax(0,1fr); align-items:center; gap:16px; }
+.match-history-result strong { overflow-wrap:anywhere; }
+.match-history-result strong:last-child { text-align:right; }
+.match-score { font-size:1.2rem; font-weight:700; padding:8px 12px; border-radius:8px; background:var(--bg-muted); white-space:nowrap; }
+.match-history-meta,.match-history-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-top:12px; }
+.match-history-meta { color:var(--text-muted); font-size:.85rem; }
+.match-history-footer { align-items:flex-start; }
+.match-history-notes { white-space:pre-wrap; overflow-wrap:anywhere; }
+.match-more-actions summary { cursor:pointer; padding:10px; }
+.match-more-actions[open] { display:flex; }
+.match-entry-dialog .modal-footer { flex-wrap:wrap; }
+@media(max-width:600px) { .match-history-card { padding:12px; } .match-history-result { gap:8px; } .match-entry-dialog .modal-body { gap:12px; padding:16px; } }
+.matches-page .matches-list { overflow:visible; }
+.match-history-footer > .disclosure { flex:1; }
+.match-actions { display:flex; gap:8px; align-items:center; }
+@media(max-width:600px) {
+    .match-entry-players .player-search-select__results { width:min(270px,calc(100vw - 64px)); }
+    .match-entry-players .player-search-select:last-child .player-search-select__results { left:auto; right:0; }
+}

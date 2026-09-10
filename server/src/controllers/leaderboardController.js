@@ -4,7 +4,7 @@ import { PlayerModel } from '../models/Player.js';
 export async function getLeaderboard(req, res, next) {
     try {
         const { clubId } = req.params;
-        const { category = 'blitz', limit = 50, offset = 0, q = '' } = req.validatedQuery;
+        const { category = 'rapid', limit = 50, offset = 0, q = '' } = req.validatedQuery;
         const leaderboard = await LeaderboardModel.getByClub(clubId, {
             category, limit, offset, q,
         });
@@ -33,7 +33,7 @@ export async function getLeaderboard(req, res, next) {
 export async function getRatingHistory(req, res, next) {
     try {
         const { clubId, playerId } = req.params;
-        const { category = 'blitz', limit = 30 } = req.validatedQuery;
+        const { category = 'rapid', limit = 30 } = req.validatedQuery;
         const player = await PlayerModel.findByClubAndId(clubId, playerId, req.user.id);
         if (!player) return res.status(404).json({ error: 'Player not found.' });
         const history = await LeaderboardModel.getRatingHistory(clubId, playerId, { category, limit });
@@ -81,7 +81,7 @@ export async function getClubStats(req, res, next) {
 
 export async function getClubDashboard(req, res, next) {
     try {
-        const { category = 'blitz' } = req.validatedQuery;
+        const { category = 'rapid' } = req.validatedQuery;
         const dashboard = await LeaderboardModel.getDashboardStats(req.params.clubId, {
             category,
             includeAdmin: req.clubContext.capabilities.canManageMemberships,

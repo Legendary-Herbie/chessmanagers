@@ -86,7 +86,7 @@ export const TournamentModel = {
         [tournamentId, clubId]
     ).then(result => result.rows),
 
-    addPlayer: async (tournamentId, playerId, clubId) => db.transaction(async trx => {
+    addPlayer: async (tournamentId, playerId, clubId, options = {}) => (options.trx ? async fn => fn(options.trx) : db.transaction)(async trx => {
         const tournament = await TournamentModel.findById(tournamentId, clubId, { forUpdate: true, trx });
         if (!tournament) return { ok: false, code: 'TOURNAMENT_NOT_FOUND' };
         if (tournament.status === 'completed') return { ok: false, code: 'TOURNAMENT_COMPLETED' };
@@ -177,7 +177,7 @@ export const TournamentModel = {
         [name, startDate, endDate !== undefined, endDate ?? null, id, clubId]
     ).then(result => result.first),
 
-    setStatus: async (id, clubId, status) => db.transaction(async trx => {
+    setStatus: async (id, clubId, status, options = {}) => (options.trx ? async fn => fn(options.trx) : db.transaction)(async trx => {
         const tournament = await trx.query(
             `UPDATE tournaments SET status = $1, updated_at = NOW()
              WHERE id = $2 AND club_id = $3 AND deleted_at IS NULL RETURNING *`,
@@ -199,7 +199,7 @@ export const TournamentModel = {
         return tournament;
     }),
 
-    delete: async (id, clubId, reason = null) => db.query(
+    archive: async (id, clubId, reason = null) => db.query(
         `UPDATE tournaments
          SET deleted_at = NOW(), delete_reason = $3, updated_at = NOW()
          WHERE id = $1 AND club_id = $2 AND deleted_at IS NULL RETURNING id`,

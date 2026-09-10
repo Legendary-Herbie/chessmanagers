@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation, useSearchParams } from 'react-router-dom';
+import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useClub } from '../app/contextHooks.js';
 import PendingLinksList from '../features/players/admin/PendingLinksList.jsx';
 import JoinRequestsPanel from '../features/clubs/membership/JoinRequestsPanel.jsx';
@@ -14,7 +14,7 @@ export default function Dashboard() {
     const location = useLocation();
     const [searchParams, setSearchParams] = useSearchParams();
     const requestedCategory = searchParams.get('category');
-    const category = CATEGORIES.includes(requestedCategory) ? requestedCategory : 'blitz';
+    const category = CATEGORIES.includes(requestedCategory) ? requestedCategory : 'rapid';
     const [dashboard, setDashboard] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -48,11 +48,16 @@ export default function Dashboard() {
             description="Choose how you want to begin." />;
     }
 
-    return <div style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '20px' }}>
+    return <div className="page-container page-stack">
         {location.state?.joinMessage && <div className="success-banner" role="status">{location.state.joinMessage}</div>}
-        <div><h1 style={{ margin: 0 }}>Dashboard</h1><p className="muted">{club?.name || 'Your club'}</p></div>
+        <div><h1>Dashboard</h1><p className="muted">{club?.name || 'Your club'}</p></div>
+        <nav className="dashboard-shortcuts" aria-label="Club shortcuts">
+            {capabilities.canManageMatches && <Link className="btn-primary" to="/matches?action=add">Record match</Link>}
+            {capabilities.canManagePlayers && <Link className="btn-secondary" to="/players?action=add">Add players</Link>}
+            {capabilities.canManageAnnouncements && <Link className="btn-secondary" to="/announcements?action=create">Post update</Link>}
+        </nav>
         {capabilities.canManageMemberships && club?.id && (
-            <JoinRequestsPanel clubId={club.id} onQueueChanged={() => setRefreshKey(current => current + 1)} />
+            <JoinRequestsPanel key={club.id} compact clubId={club.id} onQueueChanged={() => setRefreshKey(current => current + 1)} />
         )}
         {loading && <div className="muted">Loading dashboard...</div>}
         {error && <div className="error-banner" role="alert"><p>Couldn’t load dashboard. Try again. {error}</p><button type="button" className="btn-secondary" disabled={loading} onClick={() => setRefreshKey(current => current + 1)}>Retry</button></div>}

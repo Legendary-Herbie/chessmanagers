@@ -132,11 +132,11 @@ export default function LoginView() {
                 </button>
             </form>
 
-            <p className="auth-switch"><Link to={`/auth/forgot-password${continuation}`} className="auth-link">Forgot your password?</Link></p>
+            <p className="auth-switch"><Link to={`/auth/forgot-password${continuation}`} className="auth-link text-link">Forgot your password?</Link></p>
 
             <p className="auth-switch">
                 Don't have an account?{' '}
-                <Link to={`/auth/register${continuation}`} className="auth-link">Create one</Link>
+                <Link to={`/auth/register${continuation}`} className="auth-link text-link">Create one</Link>
             </p>
         </div>
     );

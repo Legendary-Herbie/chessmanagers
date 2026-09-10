@@ -1,6 +1,6 @@
 import React from 'react';
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Route, Routes, useSearchParams } from 'react-router-dom';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, ClubContext, ThemeContext } from '../../app/contextHooks.js';
 import { notificationApi } from '../../features/notifications/api/notificationApi.js';
@@ -20,7 +20,16 @@ vi.mock('../../features/clubs/api/clubApi.js', () => ({
     clubApi: { leave: vi.fn(), restore: vi.fn() },
 }));
 
-function renderLayout({ role = 'owner', refreshClubs = vi.fn(), context = {}, initialPath = '/dashboard' } = {}) {
+function ShortcutProbe() {
+    const [params, setParams] = useSearchParams();
+    const [open, setOpen] = React.useState(false);
+    React.useEffect(() => {
+        if (params.get('action') === 'add') { setOpen(true); setParams({}, { replace: true }); }
+    }, [params, setParams]);
+    return <h1>{open ? 'Entry form stays open' : 'Entry form closed'}</h1>;
+}
+
+function renderLayout({ role = 'owner', refreshClubs = vi.fn(), context = {}, initialPath = '/dashboard', matchElement = <h1>Matches content</h1> } = {}) {
     return render(
         <AuthContext.Provider value={{ user: { id: 'user_1', name: 'Club Owner' }, logout: vi.fn() }}>
             <ClubContext.Provider value={{
@@ -40,7 +49,7 @@ function renderLayout({ role = 'owner', refreshClubs = vi.fn(), context = {}, in
                         <Routes>
                             <Route element={<AppLayout />}>
                                 <Route path="/dashboard" element={<h1>Dashboard content</h1>} />
-                                <Route path="/matches" element={<h1>Matches content</h1>} />
+                                <Route path="/matches" element={matchElement} />
                                 <Route path="/account" element={<h1>Account content</h1>} />
                             </Route>
                         </Routes>
@@ -73,6 +82,11 @@ describe('AppLayout navigation', () => {
     afterEach(cleanup);
     afterAll(() => vi.unstubAllGlobals());
 
+    it('preserves an opened form while consuming a shortcut query parameter', async () => {
+        renderLayout({ initialPath: '/matches?action=add', matchElement: <ShortcutProbe /> });
+        expect(await screen.findByRole('heading', { name: 'Entry form stays open' })).toBeTruthy();
+    });
+
     it('provides icon navigation and persists the collapsed desktop sidebar', async () => {
         const { container } = renderLayout();
 
@@ -83,6 +97,18 @@ describe('AppLayout navigation', () => {
         expect(container.querySelector('.app-shell--sidebar-collapsed')).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Expand sidebar' })).toBeTruthy();
         await waitFor(() => expect(stored.get('chess-managers-sidebar')).toBe('collapsed'));
+    });
+
+    it('preserves the matches workspace when switching clubs', async () => {
+        const selectClub = vi.fn().mockResolvedValue(true);
+        renderLayout({ initialPath: '/matches?category=rapid', context: { selectClub, activeClubs: [
+            { club: { id: 'club_1', name: 'Downtown Chess' }, membership: { role: 'owner' } },
+            { club: { id: 'club_2', name: 'Riverside Chess' }, membership: { role: 'member' } },
+        ] } });
+        fireEvent.change(screen.getByRole('combobox', { name: 'Switch active club' }), { target: { value: 'club_2' } });
+        await waitFor(() => expect(selectClub).toHaveBeenCalledWith('club_2'));
+        expect(await screen.findByRole('heading', { name: 'Matches content' })).toBeTruthy();
+        expect(screen.queryByRole('heading', { name: 'Dashboard content' })).toBeNull();
     });
 
     it('exposes a mobile menu toggle without changing the route links', () => {

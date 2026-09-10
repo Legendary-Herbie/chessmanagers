@@ -9,13 +9,13 @@
     gap: 1rem;
     margin-bottom: 1.5rem;
 }
-.controls {
+.leaderboard-page .controls {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
     align-items: center;
 }
-.input {
+.leaderboard-page .input {
     width: 240px;
     padding: 0.75rem 1rem;
     border: 1px solid var(--border);
@@ -142,9 +142,9 @@
 .leaderboard-card__rank { grid-row: span 3; font-weight: 800; color: var(--primary); }
 @media (max-width: 700px) {
     .leaderboard-page { padding: 16px; }
-    .leaderboard-table { display: none; }
+    .leaderboard-desktop { display: none; }
     .leaderboard-cards { display: grid; gap: 0.75rem; }
-    .controls, .input { width: 100%; }
+    .leaderboard-page .controls, .leaderboard-page .input { width: 100%; }
     .category-switcher { width: 100%; }
     .category-switcher button { flex: 1; }
 }
@@ -153,3 +153,6 @@
 .leaderboard-empty h2 { margin: 10px 0 8px; color: var(--text-strong); }
 .leaderboard-empty p { max-width: 560px; margin: 0 auto 20px; color: var(--text-muted); line-height: 1.6; }
 .leaderboard-empty a { display: inline-flex; min-height: 44px; align-items: center; padding-inline: 18px; text-decoration: none; }
+
+.leaderboard-card strong { min-width:0; overflow-wrap:anywhere; }
+.leaderboard-list { min-width:0; }

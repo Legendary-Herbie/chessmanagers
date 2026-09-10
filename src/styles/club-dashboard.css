@@ -266,3 +266,7 @@
 
 .dash-top-players__name, .dash-matches-table td a { text-decoration: none; }
 .dash-top-players__name:hover, .dash-matches-table td a:hover { text-decoration: underline; }
+
+.dashboard-shortcuts, .queue-caught-up { display:flex; gap:12px; flex-wrap:wrap; align-items:center; }
+.dashboard-shortcuts a { text-decoration:none; padding:12px 18px; border-radius:10px; }
+.queue-caught-up { justify-content:space-between; padding:12px 16px; border:1px solid var(--border); border-radius:12px; color:var(--text-muted); }

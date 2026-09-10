@@ -27,6 +27,34 @@ async function membershipNotification({ user, club, dedupeKey = 'decision:1' }) 
 }
 
 describe('persistent notifications and delivery outbox', () => {
+    it('dismisses all recipient notifications across clubs without affecting another user', async () => {
+        const owner = await createUser();
+        const member = await createUser();
+        const first = await createClub(owner);
+        const second = await createClub(owner);
+        await addClubMember(first, member);
+        await addClubMember(second, member);
+        for (let index = 0; index < 31; index++) {
+            await membershipNotification({ user: member, club: index % 2 ? first : second, dedupeKey: `bulk:${index}` });
+        }
+        const retained = await membershipNotification({ user: owner, club: first, dedupeKey: 'owner' });
+        await request(app).delete('/api/v1/notifications').expect(401);
+        const response = await request(app).delete('/api/v1/notifications')
+            .set('Authorization', authorization(member)).expect(200);
+        expect(response.body.deleted).toBe(31);
+        const list = await request(app).get('/api/v1/notifications')
+            .set('Authorization', authorization(member)).expect(200);
+        expect(list.body.total).toBe(0);
+        const unread = await request(app).get('/api/v1/notifications/unread-count')
+            .set('Authorization', authorization(member)).expect(200);
+        expect(unread.body.count).toBe(0);
+        const other = await request(app).get('/api/v1/notifications')
+            .set('Authorization', authorization(owner)).expect(200);
+        expect(other.body.notifications.map(item => item.id)).toContain(retained.id);
+        const repeat = await request(app).delete('/api/v1/notifications')
+            .set('Authorization', authorization(member)).expect(200);
+        expect(repeat.body.deleted).toBe(0);
+    });
     it('lists only the authenticated user notifications and persists read state', async () => {
         const owner = await createUser();
         const member = await createUser();

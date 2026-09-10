@@ -239,7 +239,7 @@ describe('club management', () => {
         await request(app)
             .delete(`/api/v1/clubs/${club.id}`)
             .set('Authorization', authorization(admin))
-            .send({})
+            .send({ permanent: true })
             .expect(403);
         await request(app)
             .patch(`/api/v1/clubs/${club.id}`)
@@ -446,7 +446,7 @@ describe('club management', () => {
             .expect(201);
     });
 
-    it('soft-deletes a club while preserving memberships, matches, and ratings', async () => {
+    it('permanently deletes a club with its memberships, matches, and ratings', async () => {
         const owner = await createUser();
         const club = await createClub(owner, { isPublic: true });
         const white = await createPlayer(club);
@@ -457,7 +457,7 @@ describe('club management', () => {
         await request(app)
             .delete(`/api/v1/clubs/${club.id}`)
             .set('Authorization', authorization(owner))
-            .send({ reason: 'Club closed' })
+            .send({ reason: 'Club closed', permanent: true })
             .expect(200);
 
         const retained = await db.query(
@@ -468,7 +468,7 @@ describe('club management', () => {
                 (SELECT COUNT(*)::int FROM rating_history WHERE match_id = $2) AS ratings`,
             [club.id, match.id]
         );
-        expect(retained.first).toEqual({ status: 'deleted', memberships: 1, matches: 1, ratings: 1 });
+        expect(retained.first).toEqual({ status: null, memberships: 0, matches: 0, ratings: 0 });
         await request(app).get(`/api/v1/clubs/${club.id}`).expect(404);
         await request(app).get(`/api/v1/public/clubs/${club.id}/leaderboard`).expect(404);
     });

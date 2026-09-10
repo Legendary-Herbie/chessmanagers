@@ -13,6 +13,7 @@ vi.mock('../api/notificationApi.js', () => ({
         markRead: vi.fn(),
         markAllRead: vi.fn(),
         dismiss: vi.fn(),
+        dismissAll: vi.fn(),
     },
 }));
 
@@ -44,8 +45,31 @@ describe('NotificationTray', () => {
         notificationApi.markRead.mockResolvedValue({ notification: { id: notification.id } });
         notificationApi.markAllRead.mockResolvedValue({ updated: 1 });
         notificationApi.dismiss.mockResolvedValue({ notification: { id: notification.id } });
+        notificationApi.dismissAll.mockResolvedValue({ deleted: 1 });
     });
     afterEach(cleanup);
+
+    it('deletes all notifications and clears the unread badge', async () => {
+        renderTray();
+        fireEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Delete all' }));
+        expect(await screen.findByText('No notifications yet.')).toBeTruthy();
+        expect(notificationApi.dismissAll).toHaveBeenCalledOnce();
+        expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Delete all' })).toBeNull();
+    });
+
+    it('keeps notifications and allows retry if deleting all fails', async () => {
+        notificationApi.dismissAll.mockRejectedValueOnce(new Error('Delete failed'));
+        renderTray();
+        fireEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Delete all' }));
+        expect((await screen.findByRole('alert')).textContent).toBe('Delete failed');
+        expect(screen.getByText('Ada vs Grace')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Notifications, 1 unread' })).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
+        expect(await screen.findByText('No notifications yet.')).toBeTruthy();
+    });
 
     it.each(['one', 'all'])('preserves unread state and reports a failed %s read action', async scope => {
         notificationApi.markRead.mockRejectedValue(new Error('Read failed'));

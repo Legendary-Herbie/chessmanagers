@@ -5,7 +5,7 @@ import Button from '../../../shared/common/Button.jsx';
 import ConfirmDialog from '../../../components/ConfirmDialog.jsx';
 import { Link } from 'react-router-dom';
 
-export default function JoinRequestsPanel({ clubId, onQueueChanged }) {
+export default function JoinRequestsPanel({ clubId, onQueueChanged, compact = false }) {
     const { notify } = useNotifications();
     const [requests, setRequests] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -75,18 +75,22 @@ export default function JoinRequestsPanel({ clubId, onQueueChanged }) {
         }
     }
 
+    if (compact && !loading && !error && requests.length === 0) return <div className="queue-caught-up" role="status">
+        <span>All caught up · No pending join requests.</span><Link className="text-link" to="/club?tab=members">Manage members</Link>
+    </div>;
+
     return (
         <section className="invite-section" aria-labelledby="membership-requests-title">
-            <div style={{ display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 }}>
+            <div className="queue-heading">
                 <div>
-                    <h2 id="membership-requests-title" style={{ marginBottom: 4 }}>Membership requests</h2>
-                    <p className="muted" style={{ marginTop: 0 }}>Approve or reject people waiting to join this club.</p>
+                    <h2 id="membership-requests-title">Membership requests</h2>
+                    <p className="muted">Approve or reject people waiting to join this club.</p>
                 </div>
                 {!loading && <strong aria-label={`${requests.length} pending membership requests`}>{requests.length} pending</strong>}
             </div>
 
             <div className="membership-request-links">
-                <Link to="/club?tab=members">Manage invites and member access →</Link>
+                <Link className="text-link" to="/club?tab=members">Manage invites and member access →</Link>
                 <span>Invite people directly or review the club join code.</span>
             </div>
 
@@ -105,7 +109,7 @@ export default function JoinRequestsPanel({ clubId, onQueueChanged }) {
                                 {request.message ? <div className="muted">{request.message}</div> : null}
                                 {request.createdAt ? <div className="muted">Requested {new Date(request.createdAt).toLocaleString()}</div> : null}
                             </div>
-                            <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                            <div className="queue-actions">
                                 <Button onClick={() => approve(request)} disabled={Boolean(busyId)}>
                                     {busyId === request.id ? 'Working…' : 'Approve'}
                                 </Button>

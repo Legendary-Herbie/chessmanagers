@@ -48,7 +48,7 @@ export default function VerifyEmailView() {
             </div>
             {!state.loading && (
                 <p className="auth-switch">
-                    <Link className="auth-link" to={loginTarget}>
+                    <Link className="auth-link text-link" to={loginTarget}>
                         {state.isError ? 'Back to sign in' : 'Continue to sign in'}
                     </Link>
                 </p>

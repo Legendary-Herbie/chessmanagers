@@ -25,6 +25,9 @@ it('sorts by the chosen category with missing ratings last in either direction',
     playerApi.fetchRosterSummary.mockResolvedValue({});
     const { result } = renderHook(() => usePlayers('club_1'));
     await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.ratingCategory).toBe('rapid');
+    expect(result.current.processedPlayers.map(p => p.id)).toEqual(['a', 'b', 'c']);
+    act(() => result.current.setRatingCategory('blitz'));
     expect(result.current.processedPlayers.map(p => p.id)).toEqual(['b', 'a', 'c']);
     act(() => result.current.setRatingCategory('rapid'));
     expect(result.current.processedPlayers.map(p => p.id)).toEqual(['a', 'b', 'c']);

@@ -188,15 +188,24 @@ export const createPlayersBulkSchema = z.object({
     }).strict().superRefine(disallowLegacyAndCategoryRatings)).min(1, 'At least one player is required.').max(250),
 }).strict();
 
+const chessUsername = z.string().trim().min(2).max(40).regex(/^[a-zA-Z0-9_-]+$/, 'Use the account username, not a URL.').nullable().optional();
+
 export const updatePlayerAdminSchema = z.object({
     name: z.string().trim().min(1).max(100).optional(),
     bio: nullableProfileText(500).optional(),
     dateOfBirth: nullableDate.optional(),
     federationId: nullableProfileText(100).optional(),
+    nameLocked: z.boolean().optional(),
+    chesscomUsername: chessUsername,
+    lichessUsername: chessUsername,
 }).strict().refine(data => Object.keys(data).length > 0, { message: 'At least one field must be provided.' });
 
 export const updatePlayerSelfSchema = z.object({
     bio: nullableProfileText(500).optional(),
+    name: z.string().trim().min(1).max(100).optional(),
+    federationId: nullableProfileText(100).optional(),
+    chesscomUsername: chessUsername,
+    lichessUsername: chessUsername,
 }).strict().refine(data => Object.keys(data).length > 0, { message: 'At least one field must be provided.' });
 
 // Transitional alias for callers that have not moved to the explicit admin route yet.
@@ -288,7 +297,7 @@ export const createTournamentSchema = z.object({
     }),
     startDate: z.string().datetime({ message: 'startDate must be a valid ISO datetime.' }),
     endDate:   z.string().datetime().optional().nullable(),
-    ratingCategory: z.enum(['blitz', 'rapid', 'classical']).default('blitz'),
+    ratingCategory: z.enum(['blitz', 'rapid', 'classical']).default('rapid'),
     isRated: z.boolean().default(true),
 }).strict();
 
@@ -440,6 +449,18 @@ export const recordTournamentResultSchema = z.object({
 export const tournamentReasonSchema = z.object({
     reason: z.string().trim().max(500).optional().nullable(),
 }).strict().default({});
+
+export const tournamentSetupSchema = z.object({
+    playerIds: z.array(z.string().trim().min(1)).max(250),
+    allActivePlayers: z.boolean().optional(),
+    start: z.boolean().default(false),
+}).strict();
+
+// Old clients used DELETE for archive/retention. Require the new explicit contract.
+export const permanentDeletionSchema = z.object({
+    permanent: z.literal(true),
+    reason: z.string().trim().max(500).optional().nullable(),
+}).strict();
 
 // Promotes/demotes a club member between 'member' and 'admin'.
 // Used by the (new) PATCH /clubs/:clubId/members/:userId/role route.
