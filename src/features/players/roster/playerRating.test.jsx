@@ -40,3 +40,16 @@ it('labels the selected rating consistently in cards and tables without generic 
     expect(screen.getByRole('columnheader', { name: 'Rapid Elo rating' })).toBeTruthy();
     expect(screen.queryByText(/9999/)).toBeNull();
 });
+
+it('loads beyond 100 players and searches locally without refetching metadata', async () => {
+    const roster = Array.from({ length: 105 }, (_, index) => ({ id: `p${index}`, name: `Player ${index}`, bio: index === 104 ? 'Club champion' : '' }));
+    playerApi.fetchPlayers.mockReset().mockImplementation((_club, { offset }) => Promise.resolve(roster.slice(offset, offset + 100)));
+    playerApi.fetchRosterSummary.mockReset().mockResolvedValue({ totalPlayers: 105 });
+    const { result } = renderHook(() => usePlayers('large_club'));
+    await waitFor(() => expect(result.current.loading).toBe(false));
+    expect(result.current.processedPlayers).toHaveLength(105);
+    act(() => result.current.setSearchTerm(' CHAMPION '));
+    expect(result.current.processedPlayers.map(player => player.id)).toEqual(['p104']);
+    expect(playerApi.fetchPlayers).toHaveBeenCalledTimes(2);
+    expect(playerApi.fetchRosterSummary).toHaveBeenCalledTimes(1);
+});

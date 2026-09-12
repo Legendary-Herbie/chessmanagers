@@ -71,6 +71,7 @@ export default function ClubPage() {
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [creatingInvite, setCreatingInvite] = useState(false);
+    const [shareMode, setShareMode] = useState('code');
     const [invites, setInvites] = useState([]);
     const [savingSettings, setSavingSettings] = useState(false);
     const [managementError, setManagementError] = useState(null);
@@ -664,6 +665,11 @@ export default function ClubPage() {
                     <section className="invite-section invite-share-hub">
                         <h2>Invite & share</h2>
                         <p className="muted">Share a code or invite link to bring people into your club.</p>
+                        <div className="discovery-switch" role="group" aria-label="Share club using">
+                            <Button variant={shareMode === 'code' ? 'primary' : 'secondary'} aria-pressed={shareMode === 'code'} onClick={() => setShareMode('code')}>Join code</Button>
+                            <Button variant={shareMode === 'link' ? 'primary' : 'secondary'} aria-pressed={shareMode === 'link'} onClick={() => setShareMode('link')}>Invite link</Button>
+                        </div>
+                        <div hidden={shareMode !== 'code'} className="share-method">
                         <div className="invite-label">Six-digit join code</div>
                         <div className="muted">
                             {joinCodeStatus.active
@@ -677,17 +683,19 @@ export default function ClubPage() {
                                 <div className="muted">Copy this code now. It is stored securely and cannot be shown again.</div>
                             </div>
                         )}
-                        <div className="invite-row" style={{ margin: '8px 0 20px' }}>
+                        <div className="invite-row share-actions">
                             <Button onClick={rotateJoinCode} disabled={joinCodeLoading}>
                                 {joinCodeLoading ? 'Updating…' : joinCodeStatus.active ? 'Rotate code' : 'Create code'}
                             </Button>
                             {joinCodeStatus.active && (
-                                <Button variant="danger" style={{ marginLeft: 8 }} onClick={revokeJoinCode} disabled={joinCodeLoading}>Disable code</Button>
+                                <Button variant="danger" onClick={revokeJoinCode} disabled={joinCodeLoading}>Disable code</Button>
                             )}
                         </div>
 
-                        <div className="invite-label">Invites</div>
-                        <div className="invite-row" style={{ marginBottom: 8 }}>
+                        </div>
+                        <div hidden={shareMode !== 'link'} className="share-method">
+                        <div className="invite-label">Invite links</div>
+                        <div className="invite-row share-actions">
                             <Button onClick={createInvite} disabled={creatingInvite}>{creatingInvite ? 'Creating…' : 'Create invite'}</Button>
                         </div>
 
@@ -698,14 +706,15 @@ export default function ClubPage() {
                                 {invites.map(invite => (
                                     <li key={invite.id} className="invite-item">
                                         <span className="muted">Club invite</span>
-                                        <div style={{ marginLeft: 'auto' }}>
+                                        <div className="share-invite-actions">
                                             <ShareControls value={`${window.location.origin}/clubs/join?token=${encodeURIComponent(invite.token)}`} />
-                                            <Button variant="danger" style={{ marginLeft: 8 }} onClick={() => revokeInvite(invite)}>Revoke</Button>
+                                            <Button variant="danger" onClick={() => revokeInvite(invite)}>Revoke</Button>
                                         </div>
                                     </li>
                                 ))}
                             </ul>
                         )}
+                        </div>
                     </section>
                 </div>
             ) : activeTab === 'members' ? (
@@ -720,7 +729,7 @@ export default function ClubPage() {
                 </div>
             ) : activeTab === 'exports' ? (
                 <div className="tab-panel">
-                    <div style={{ padding: 'var(--gap-lg)', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <div className="page-empty">
                         Only club owners and admins can export club data.
                     </div>
                 </div>

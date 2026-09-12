@@ -99,6 +99,24 @@ describe('AppLayout navigation', () => {
         await waitFor(() => expect(stored.get('chess-managers-sidebar')).toBe('collapsed'));
     });
 
+    it('switches clubs directly while keeping the sidebar collapsed', async () => {
+        const selectClub = vi.fn().mockResolvedValue(true);
+        const { container } = renderLayout({ context: { selectClub, activeClubs: [
+            { club: { id: 'club_1', name: 'Downtown Chess' }, membership: { role: 'owner' } },
+            { club: { id: 'club_2', name: 'Riverside Chess' }, membership: { role: 'member' } },
+        ] } });
+        fireEvent.click(screen.getByRole('button', { name: 'Collapse sidebar' }));
+        const switcher = screen.getByRole('button', { name: 'Switch club', exact: true });
+        fireEvent.click(switcher);
+        expect(container.querySelector('.app-shell--sidebar-collapsed')).toBeTruthy();
+        expect(screen.getByRole('menuitem', { name: 'Downtown Chess Owner' }).getAttribute('aria-current')).toBe('true');
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Riverside Chess Member' }));
+        expect(screen.queryByRole('menu', { name: 'Switch club' })).toBeNull();
+        await waitFor(() => expect(selectClub).toHaveBeenCalledWith('club_2'));
+        expect(container.querySelector('.app-shell--sidebar-collapsed')).toBeTruthy();
+        expect(stored.get('chess-managers-sidebar')).toBe('collapsed');
+    });
+
     it('preserves the matches workspace when switching clubs', async () => {
         const selectClub = vi.fn().mockResolvedValue(true);
         renderLayout({ initialPath: '/matches?category=rapid', context: { selectClub, activeClubs: [

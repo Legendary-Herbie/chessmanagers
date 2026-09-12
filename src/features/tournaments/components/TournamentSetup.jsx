@@ -1,3 +1,4 @@
+import ClaimedBadge from '../../players/components/ClaimedBadge.jsx';
 import React, { useEffect, useState } from 'react';
 import { playerApi } from '../../players/api/playerApi.js';
 import { tournamentApi } from '../api/tournamentApi.js';
@@ -71,13 +72,13 @@ export default function TournamentSetup({ clubId, tournamentId, participants, on
                 <Button variant="secondary" onClick={() => setSelected(current => ({ ...current, ...Object.fromEntries(results.filter(player => !registered.has(player.id)).map(player => [player.id, player])) }))}>Select all {results.length} active players</Button>
                 <div className="setup-player-options">{filtered.map(player => <label key={player.id}>
                     <input type="checkbox" disabled={registered.has(player.id)} checked={registered.has(player.id) || Boolean(selected[player.id])} onChange={() => toggle(player)} />
-                    {player.name}{registered.has(player.id) && <small> Registered</small>}
+                    {player.name} <ClaimedBadge status={player.link_status} />{registered.has(player.id) && <small> Registered</small>}
                 </label>)}</div>
                 {!filtered.length && <p>No matching players.</p>}
             </>}
             <div><strong>{participants.length + additions.length} players selected</strong>
                 <div className="setup-selection">{participants.map(player => <span key={player.id}>{player.name}</span>)}
-                    {additions.map(player => <button type="button" key={player.id} onClick={() => toggle(player)} aria-label={`Remove ${player.name} from selection`}>{player.name} ×</button>)}
+                    {additions.map(player => <button type="button" key={player.id} onClick={() => toggle(player)} aria-label={`Remove ${player.name} from selection`}>{player.name} <ClaimedBadge status={player.link_status} /> ×</button>)}
                 </div>
             </div>
             <div className="setup-actions"><Button variant="secondary" disabled={additions.length > 250 && !allActiveSelected} onClick={() => save(false)}>Save for later</Button><Button disabled={participants.length + additions.length < 2 || additions.length > 250 && !allActiveSelected} onClick={() => save(true)}>Start and pair round 1</Button></div>

@@ -51,17 +51,17 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
 
     return (
         <div className="chart-card">
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div className="rivalry-heading">
                 <div>
-                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-strong)' }}>
+                    <h3 className="rivalry-title">
                         Head-to-Head Comparison
                     </h3>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <span className="muted">
                         Compare match records between {playerA?.name} and another player.
                     </span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <div className="rivalry-search">
                     <PlayerSearchSelect clubId={clubId} label="Select opponent" value={selectedPlayerBId}
                         excludePlayerId={playerA?.id} allowClear
                         onChange={setSelectedPlayerBId} onSelect={setOpponent} />
@@ -69,13 +69,13 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
             </div>
 
             {!selectedPlayerBId && (
-                <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                <div className="page-empty">
                     Choose an opponent above to view their head-to-head rivalry history.
                 </div>
             )}
 
             {loading && (
-                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <div className="page-empty">
                     Fetching head-to-head record...
                 </div>
             )}
@@ -83,7 +83,7 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
             {error && <div className="error-box" role="alert">{error}</div>}
 
             {!loading && selectedPlayerBId && summary && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
+                <div className="rivalry-content">
                     <div className="category-switcher" role="group" aria-label="Head-to-head category">
                         {['overall', 'blitz', 'rapid', 'classical'].map(value => (
                             <button type="button" key={value} className={category === value ? 'active' : ''}
@@ -116,26 +116,18 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                                         <tr key={m.id}>
                                             <td>{new Date(m.playedAt).toLocaleDateString()}</td>
                                             <td>
-                                                <strong style={{ color: m.whitePlayerId === playerA?.id ? 'var(--primary)' : 'var(--text)' }}>
+                                                <strong className={m.whitePlayerId === playerA?.id ? 'rivalry-player-highlight' : 'entity-name'}>
                                                     {m.whitePlayerName}
                                                 </strong>
                                             </td>
                                             <td>
-                                                <strong style={{ color: m.blackPlayerId === playerA?.id ? 'var(--primary)' : 'var(--text)' }}>
+                                                <strong className={m.blackPlayerId === playerA?.id ? 'rivalry-player-highlight' : 'entity-name'}>
                                                     {m.blackPlayerName}
                                                 </strong>
                                             </td>
                                             <td>
                                                 <span
-                                                    style={{
-                                                        fontWeight: 700,
-                                                        color: m.result === 'draw' ? 'var(--warning)' : (
-                                                            (m.result === 'white' && m.whitePlayerId === playerA?.id) ||
-                                                            (m.result === 'black' && m.blackPlayerId === playerA?.id)
-                                                                ? 'var(--accent)'
-                                                                : 'var(--danger)'
-                                                        )
-                                                    }}
+                                                    className={`rivalry-score rivalry-score--${m.result === 'draw' ? 'draw' : (m.result === 'white' && m.whitePlayerId === playerA?.id) || (m.result === 'black' && m.blackPlayerId === playerA?.id) ? 'win' : 'loss'}`}
                                                 >
                                                     {matchResultLabel(m.result)}
                                                 </span>
@@ -147,7 +139,7 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                             </table>
                         </div>
                     ) : (
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '12px' }}>
+                        <div className="page-empty">
                             No matches registered between these two players yet.
                         </div>
                     )}

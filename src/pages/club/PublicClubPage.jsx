@@ -1,3 +1,4 @@
+import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth, useClub, useNotifications } from '../../app/contextHooks.js';
@@ -171,7 +172,7 @@ export default function PublicClubPage() {
                     </div>
                     {leaderboardLoading ? <p>Loading players…</p> : topPlayers.length > 0 ? (
                         <ol className="public-leaderboard">{topPlayers.map(player => <li key={player.publicPlayerId}>
-                            <Link className="name-link" to={`/clubs/${clubId}/players/${player.publicPlayerId}`}>{player.playerName}</Link>
+                            <Link className="name-link" to={`/clubs/${clubId}/players/${player.publicPlayerId}`}>{player.playerName} <ClaimedBadge status={player.isClaimed ? 'approved' : null} /></Link>
                             <strong>{player.selectedRating}</strong>
                         </li>)}</ol>
                     ) : null}

@@ -1,3 +1,4 @@
+import ClaimedBadge from './ClaimedBadge.jsx';
 import ActionMenu from '../../../shared/common/ActionMenu.jsx';
 import Icon from '../../../shared/common/Icon.jsx';
 import React from 'react';
@@ -9,6 +10,7 @@ export default function PlayerCard({
     player,
     currentUser,
     ratingCategory = 'rapid',
+    showAllRatings = false,
     currentLinkedPlayerId,
     isAdmin,
     onClaim,
@@ -46,13 +48,12 @@ export default function PlayerCard({
                 </div>
                 <div className="player-card__main">
                     <Link to={`/players/${id}`} className="player-card__name name-link" title={name}>
-                        {name}
+                        <span className="player-card__name-text">{name}</span> <ClaimedBadge status={link_status} />
                     </Link>
                     <div className="player-card__meta">
-                        <span className="rating-badge" title={`${ratingCategory[0].toUpperCase() + ratingCategory.slice(1)} Elo rating`}>
-                            {ratingCategory[0].toUpperCase() + ratingCategory.slice(1)} Elo: {playerRating(player, ratingCategory) ?? '—'}
-                        </span>
-                        {isLinked && <span className="link-badge link-badge--approved"><Icon name="check" /> Claimed</span>}
+                        {(showAllRatings ? ['blitz', 'rapid', 'classical'] : [ratingCategory]).map(category => <span key={category} className="rating-badge" title={`${category[0].toUpperCase() + category.slice(1)} Elo rating`}>
+                            {category[0].toUpperCase() + category.slice(1)}{showAllRatings ? ':' : ' Elo:'} {playerRating(player, category) ?? '—'}
+                        </span>)}
                         {isPending && <span className="link-badge link-badge--pending"><Icon name="clock" /> Pending Claim</span>}
 
                     </div>

@@ -850,3 +850,25 @@
     .app-nav .app-nav__mobile-brand .brand-logo__lockup { display:none; }
     .app-nav .app-nav__mobile-brand .brand-logo__icon { display:block; }
 }
+
+.app-nav__club-collapsed { position: relative; text-align: center; padding: 10px; }
+.app-nav__club-collapsed select { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; cursor: pointer; }
+.app-nav__club-collapsed:focus-within { outline: 2px solid var(--primary); outline-offset: 3px; }
+.app-nav__club-collapsed:hover { background: var(--bg-muted); }
+.app-nav__club-collapsed:has(select:disabled) { opacity: .5; }
+.app-nav__club-collapsed select:disabled { cursor: wait; }
+
+.app-nav__club-collapsed-menu { display: none; }
+.app-nav--collapsed .app-nav__club-collapsed-menu { display: flex; justify-content: center; }
+.club-switch-menu { width: min(288px, calc(100vw - 16px)); max-height: min(420px, calc(100dvh - 100px)); overflow-y: auto; padding: 8px; }
+.club-switch-menu .action-menu__heading { padding: 8px 10px; color: var(--text-muted); font-size: .75rem; font-weight: 600; }
+.club-switch-menu__option { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; padding: 12px; border: 0; border-radius: var(--radius-md); background: transparent; color: var(--text); text-align: left; cursor: pointer; }
+.club-switch-menu__identity { display: grid; gap: 4px; min-width: 0; }
+.club-switch-menu__identity strong { overflow-wrap: anywhere; font-size: .9rem; }
+.club-switch-menu__identity > span { color: var(--text-muted); font-size: .75rem; }
+.club-switch-menu__option.is-active { background: var(--bg-muted); color: var(--primary); }
+.club-switch-menu__option:hover { background: var(--bg-muted); }
+.club-switch-menu__option:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+@media (max-width: 900px) {
+    .app-nav--collapsed .app-nav__club-collapsed-menu { display: none; }
+}

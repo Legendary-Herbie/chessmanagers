@@ -49,6 +49,7 @@ describe('canonical leaderboard and statistics', () => {
             .get(`/api/v1/clubs/${club.id}/leaderboard?category=blitz&limit=3`)
             .set('Authorization', authorization(owner)).expect(200);
         expect(response.body.leaderboard.total).toBe(6);
+        expect(response.body.leaderboard.entries.map(entry => entry.isClaimed)).toEqual([false, true, false]);
         expect(response.body.leaderboard.entries.map(entry => entry.playerName)).toEqual([
             'Games More', 'Games Less', 'Alpha',
         ]);

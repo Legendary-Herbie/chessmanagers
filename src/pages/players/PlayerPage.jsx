@@ -1,3 +1,4 @@
+import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
 import MatchRating from '../../features/matches/components/MatchRating.jsx';
 import Icon from '../../shared/common/Icon.jsx';
 import React, { useState } from 'react';
@@ -186,7 +187,7 @@ export default function PlayerPage() {
                         {photo_url ? <img src={resolveAssetUrl(photo_url)} alt={`${name} profile`} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} /> : initials}
                     </div>
                     <div className="player-detail__title-block">
-                        <h1>{name}</h1>
+                        <h1>{name} <ClaimedBadge status={link_status} /></h1>
                         <div className="player-external-links">
                             {player.chesscom_username && <a className="text-link" href={`https://www.chess.com/member/${encodeURIComponent(player.chesscom_username)}`} target="_blank" rel="noopener noreferrer">Chess.com ↗</a>}
                             {player.lichess_username && <a className="text-link" href={`https://lichess.org/@/${encodeURIComponent(player.lichess_username)}`} target="_blank" rel="noopener noreferrer">Lichess ↗</a>}
@@ -195,7 +196,6 @@ export default function PlayerPage() {
                             <span className="rating-badge" style={{ fontSize: '0.85rem', padding: '4px 10px' }}>
                                 <Icon name="trophy" /> {rating} {categoryLabel(ratingCategory)} Elo
                             </span>
-                            {isLinked && <span className="link-badge link-badge--approved"><Icon name="check" /> Claimed Profile</span>}
                             {isPending && <span className="link-badge link-badge--pending"><Icon name="clock" /> Pending Claim</span>}
                             {!isLinked && !isPending && <span className="link-badge link-badge--unlinked">Unlinked Profile</span>}
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '6px' }}>

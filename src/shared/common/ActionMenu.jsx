@@ -3,7 +3,7 @@ import { Children, cloneElement, useLayoutEffect, useId, useRef, useState } from
 import { createPortal } from 'react-dom';
 import Icon from './Icon.jsx';
 
-export default function ActionMenu({ children, label = 'More actions' }) {
+export default function ActionMenu({ children, label = 'More actions', icon = 'more', heading, panelClassName = '', disabled = false }) {
     const [open, setOpen] = useState(false);
     const root = useRef(null);
     const trigger = useRef(null);
@@ -20,13 +20,14 @@ export default function ActionMenu({ children, label = 'More actions' }) {
         panel.current.querySelector('[role="menuitem"]:not(:disabled)')?.focus();
         const dismiss = event => { if (!root.current?.contains(event.target) && !panel.current?.contains(event.target)) setOpen(false); };
         const close = () => setOpen(false);
+        const onScroll = event => { if (!panel.current?.contains(event.target)) close(); };
         document.addEventListener('pointerdown', dismiss);
         window.addEventListener('resize', close);
-        document.addEventListener('scroll', close, true);
+        document.addEventListener('scroll', onScroll, true);
         return () => {
             document.removeEventListener('pointerdown', dismiss);
             window.removeEventListener('resize', close);
-            document.removeEventListener('scroll', close, true);
+            document.removeEventListener('scroll', onScroll, true);
         };
     }, [open]);
     function onKeyDown(event) {
@@ -47,8 +48,9 @@ export default function ActionMenu({ children, label = 'More actions' }) {
     return <div className="action-menu" ref={root} onKeyDown={onKeyDown}
         onBlur={onBlur}>
         <button ref={trigger} type="button" className="btn btn-secondary action-menu__trigger" aria-label={label}
-            aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(value => !value)}><Icon name="more" size="lg" /></button>
-        {open && createPortal(<div ref={panel} id={id} role="menu" aria-label={label} className="action-menu__panel" style={position}>
+            disabled={disabled} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(value => !value)}><Icon name={icon} size="lg" /></button>
+        {open && createPortal(<div ref={panel} id={id} role="menu" aria-label={label} className={`action-menu__panel ${panelClassName}`} style={position}>
+            {heading && <div className="action-menu__heading" role="presentation">{heading}</div>}
             {Children.map(children, child => child && cloneElement(child, { role: 'menuitem', onClick: event => {
                 trigger.current?.focus(); setOpen(false); child.props.onClick?.(event);
             } }))}

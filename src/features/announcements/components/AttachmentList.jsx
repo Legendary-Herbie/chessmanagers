@@ -73,8 +73,8 @@ export default function AttachmentList({ clubId, announcementId, attachments, ca
                             <strong>{attachment.originalName}</strong>
                             <span>{Math.ceil(attachment.sizeBytes / 1024)} KB</span>
                         </div>
-                        <button type="button" disabled={downloading} onClick={() => download(attachment)}>Download</button>
-                        {canManage && <button type="button" onClick={() => onDelete(attachment.id)}>Remove</button>}
+                        <button className="btn btn-secondary" type="button" disabled={downloading} onClick={() => download(attachment)}>Download</button>
+                        {canManage && <button className="btn btn-secondary" type="button" onClick={() => onDelete(attachment.id)}>Remove</button>}
                     </li>
                 ))}
             </ul>

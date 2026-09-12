@@ -1,3 +1,4 @@
+import ActionMenu from '../common/ActionMenu.jsx';
 import Icon from '../common/Icon.jsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
@@ -242,15 +243,19 @@ export default function AppLayout() {
                             ))}
                         </select>
                     </label>
-                    <button
-                        type="button"
-                        className="app-nav__club-collapsed"
-                        title={`Active club: ${clubName}`}
-                        aria-label={`Expand sidebar. Active club: ${clubName}`}
-                        onClick={() => setSidebarCollapsed(false)}
-                    >
-                        <Icon name="club" size="xl" />
-                    </button>
+                    <div className="app-nav__club-collapsed-menu">
+                        <ActionMenu label="Switch club" icon="club" heading="Active club" panelClassName="club-switch-menu"
+                            disabled={clubLoading || switchingClubId !== null || activeClubs.length === 0}>
+                            {activeClubs.map(entry => <button type="button" key={entry.club.id}
+                                className={`club-switch-menu__option${entry.club.id === selectedClubId ? ' is-active' : ''}`}
+                                aria-current={entry.club.id === selectedClubId ? 'true' : undefined}
+                                onClick={() => { if (entry.club.id !== selectedClubId) handleClubChange({ target: { value: entry.club.id } }); }}>
+                                <span className="club-switch-menu__identity"><strong>{entry.club.name}</strong>
+                                    <span>{entry.membership.role[0].toUpperCase() + entry.membership.role.slice(1)}</span></span>
+                                {entry.club.id === selectedClubId && <Icon name="check" />}
+                            </button>)}
+                        </ActionMenu>
+                    </div>
 
                     <nav className={`app-nav__links${mobileNavOpen ? ' app-nav__links--mobile-open' : ''}`} aria-label="Primary navigation">
                         {navItems.map(item => (

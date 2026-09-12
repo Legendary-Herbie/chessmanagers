@@ -185,57 +185,6 @@
     padding-top: 1rem;
     border-top: 1px solid var(--border);
 }
-.modal-header,
-.modal-footer {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-}
-.modal-header h3 {
-    margin: 0;
-}
-.modal-body {
-    margin-top: 1rem;
-    display: grid;
-    gap: 1rem;
-}
-.form-row {
-    display: grid;
-    gap: 0.5rem;
-}
-.form-row .label {
-    font-weight: 700;
-    color: var(--text-strong);
-}
-.input {
-    width: 100%;
-    min-height: 44px;
-    padding: 0.75rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: 0.75rem;
-    background: var(--bg-secondary);
-    color: var(--text);
-}
-.input:focus {
-    outline: 2px solid rgba(59, 130, 246, 0.4);
-    outline-offset: 2px;
-}
-textarea.input {
-    min-height: 100px;
-    resize: vertical;
-}
-.error {
-    background: var(--status-error-bg);
-    border: 1px solid rgba(239, 68, 68, 0.35);
-    color: var(--status-error-text);
-    padding: 0.8rem 1rem;
-    border-radius: 0.75rem;
-}
-.muted {
-    color: var(--text-muted);
-}
-
 .match-notice {
     margin-bottom: 1rem;
     padding: 0.8rem 1rem;
@@ -300,17 +249,6 @@ textarea.input {
 .rated-toggle input {
     width: 1.1rem;
     height: 1.1rem;
-}
-
-.btn-warning {
-    min-height: var(--min-tap-size);
-    padding: 0 16px;
-    border: 1px solid rgba(245, 158, 11, 0.35);
-    border-radius: 8px;
-    background: var(--status-warning-bg);
-    color: var(--status-warning-text);
-    font-weight: 600;
-    cursor: pointer;
 }
 
 @media (max-width: 900px) {

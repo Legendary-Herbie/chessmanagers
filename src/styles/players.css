@@ -446,91 +446,6 @@
   color: var(--primary);
 }
 
-/* Buttons */
-.btn-primary {
-  height: 40px;
-  padding: 0 16px;
-  background-color: var(--primary);
-  color: var(--primary-contrast);
-  border: none;
-  border-radius: var(--radius-md, 8px);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm, 0.875rem);
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: background-color var(--motion-fast) var(--ease), transform var(--motion-fast);
-}
-
-.btn-primary:hover {
-  background-color: var(--primary-600);
-}
-
-.btn-primary:active {
-  background-color: var(--primary-700);
-}
-
-.btn-secondary {
-  height: 40px;
-  padding: 0 16px;
-  background-color: var(--bg-muted);
-  color: var(--text-strong);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md, 8px);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm, 0.875rem);
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: background-color var(--motion-fast), border-color var(--motion-fast);
-}
-
-.btn-secondary:hover {
-  background-color: var(--bg-surface);
-  border-color: var(--border-emphasis);
-}
-
-.btn-danger {
-  height: 40px;
-  padding: 0 16px;
-  background-color: rgba(244, 63, 94, 0.1);
-  color: var(--danger);
-  border: 1px solid rgba(244, 63, 94, 0.3);
-  border-radius: var(--radius-md, 8px);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm, 0.875rem);
-  font-weight: 600;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: background-color var(--motion-fast);
-}
-
-.btn-danger:hover {
-  background-color: rgba(244, 63, 94, 0.2);
-}
-
-.btn-sm {
-  height: 32px;
-  padding: 0 10px;
-  font-size: var(--font-size-xs, 0.75rem);
-}
-
-.btn-icon {
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border-radius: var(--radius-md, 8px);
-}
-
 /* Modals & Forms Overlay with Scroll Lock */
 .modal-overlay {
   position: fixed;
@@ -627,53 +542,6 @@
   color: var(--text);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-}
-
-.form-input, .form-textarea {
-  width: 100%;
-  padding: 10px 14px;
-  background-color: var(--bg-muted);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md, 8px);
-  font-family: var(--font-sans);
-  font-size: var(--font-size-sm, 0.875rem);
-  color: var(--text-strong);
-  box-sizing: border-box;
-}
-
-.form-input:focus, .form-textarea:focus {
-  outline: none;
-  background-color: var(--bg-surface);
-  border-color: var(--primary);
-  box-shadow: var(--focus-ring);
-}
-
-.form-textarea {
-  resize: vertical;
-  min-height: 90px;
-}
-
-.form-helper {
-  font-size: var(--font-size-xs, 0.75rem);
-  color: var(--text-muted);
-}
-
-.error-box {
-  background-color: rgba(244, 63, 94, 0.1);
-  border: 1px solid rgba(244, 63, 94, 0.3);
-  color: var(--danger);
-  padding: 10px 14px;
-  border-radius: var(--radius-md, 8px);
-  font-size: var(--font-size-sm, 0.875rem);
-}
-
-.success-box {
-  background-color: rgba(16, 185, 129, 0.1);
-  border: 1px solid rgba(16, 185, 129, 0.3);
-  color: var(--accent);
-  padding: 10px 14px;
-  border-radius: var(--radius-md, 8px);
-  font-size: var(--font-size-sm, 0.875rem);
 }
 
 /* Individual Player Detail Page */
@@ -820,10 +688,40 @@
   .player-roster-table, .player-roster-table tbody { display:block; width:100%; }
   .player-roster-table thead { display:none; }
   .player-roster-table tbody { display:grid; gap:12px; }
-  .player-roster-table tbody tr { display:grid; grid-template-columns:minmax(0,1fr) auto; padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--bg-surface); }
+  .player-roster-table tbody tr { display:grid; grid-template-columns:minmax(0,1fr); padding:12px; border:1px solid var(--border); border-radius:12px; background:var(--bg-surface); }
   .player-roster-table tbody td { padding:6px 0; border:0; min-width:0; }
   .player-roster-table tbody td:first-child { align-self:center; overflow-wrap:anywhere; }
   .player-roster-table tbody td:nth-child(3) { display:none; }
   .player-roster-table tbody td:last-child { grid-column:1 / -1; }
   .player-roster-table .mobile-rating-label { display:inline; }
 }
+
+/* Roster controls stay visible without pushing player records behind a summary. */
+.players-toolbar.roster-controls { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; }
+.roster-controls .players-toolbar__search { min-width: 0; }
+.roster-controls .players-toolbar__search-input { height: 44px; }
+.roster-controls .players-toolbar__filters { grid-column: 1 / -1; align-items: end; }
+.roster-control-label { display: grid; gap: 5px; color: var(--text-muted); font-size: .8rem; flex: 1; min-width: 0; }
+.roster-control-label select { width: 100%; min-width: 0; height: 44px; }
+.roster-controls .view-toggle__button { height: 40px; }
+.roster-controls .view-toggle__button:hover { color: var(--primary); background: var(--bg-surface); }
+.roster-controls :is(select, button):focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
+.roster-results { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; min-height: 56px; color: var(--text-muted); font-size: .85rem; }
+.roster-results p { margin: 8px 0; }
+.roster-load-more { display: flex; justify-content: center; margin: 20px 0; }
+.roster-archive { margin-top: 24px; }
+.roster-archive__row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.roster-archive__row .name-link { overflow-wrap: anywhere; min-width: 0; }
+.roster-archive__row button { flex-shrink: 0; }
+.player-table-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+@media (max-width: 640px) {
+  .players-toolbar.roster-controls { grid-template-columns: minmax(0, 1fr); padding: 12px; gap: 10px; }
+  .roster-controls .players-toolbar__filters { gap: 10px; }
+  .roster-control-label { flex-basis: calc(50% - 5px); }
+  .roster-controls .view-toggle { margin-left: auto; }
+}
+
+.player-table-ratings { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.player-card__name:has(.claimed-badge) { display: inline-flex; max-width: 100%; align-items: center; overflow: visible; }
+.player-card__name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }

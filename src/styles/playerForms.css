@@ -1,9 +1,8 @@
 .app-dialog.player-entry-dialog { width: min(100%, 620px); }
-.app-dialog.player-identity-dialog { width: min(100%, 540px); display: flex; flex-direction: column; overflow: hidden; }
-.player-identity-dialog > .modal-header { flex-shrink: 0; }
-.player-identity-dialog > form { display: flex; flex-direction: column; min-height: 0; max-height: calc(100dvh - 120px); overflow: hidden; }
-.player-identity-dialog .player-form-body { overflow-y: auto; min-height: 0; flex: 1; }
-.player-identity-dialog .modal-footer { flex-shrink: 0; }
+.app-dialog.player-identity-dialog { width: min(100%, 540px); overflow-y: auto; }
+.player-identity-dialog > form { display: block; }
+.player-identity-dialog .player-form-body { overflow: visible; }
+.player-identity-dialog .modal-footer { z-index: 1; }
 .player-entry-inline { border: 1px solid var(--border); border-radius: 20px; background: var(--bg-surface); overflow: hidden; }
 .player-entry-columns { display: grid; grid-template-columns: minmax(0, 1fr); }
 .player-entry-panel { min-width: 0; }
@@ -29,8 +28,8 @@
 .player-entry-tabs { display: flex; gap: 6px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
 .player-entry-tabs button { flex: 1; min-height: 44px; border: 0; border-radius: 9px; font: inherit; font-size: .85rem; background: var(--bg-muted); color: var(--text); cursor: pointer; }
 .player-entry-tabs button[aria-pressed="true"] { background: var(--primary); color: white; }
-.identity-photo { position: relative; height: 210px; border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: var(--bg-muted); border: 1px solid var(--border); }
-.identity-photo > img { width: 100%; height: 100%; object-fit: contain; }
+.identity-photo { position: relative; height: 210px; flex-shrink: 0; grid-template-rows: minmax(0, 1fr); grid-template-columns: minmax(0, 1fr); border-radius: 14px; overflow: hidden; display: grid; place-items: center; background: var(--bg-muted); border: 1px solid var(--border); }
+.identity-photo > img { display: block; width: 100%; height: 100%; min-height: 0; min-width: 0; object-fit: contain; }
 .identity-photo-placeholder { font-size: 5rem; color: var(--primary); font-weight: 700; }
 .identity-photo-edit { position: absolute; right: 12px; bottom: 12px; padding: 9px 12px; border: 1px solid var(--border); border-radius: 9px; color: var(--text); background: var(--bg-surface); font-size: .8rem; cursor: pointer; }
 .identity-photo-edit input { position: absolute; inset: 0; width: 100%; opacity: 0; cursor: pointer; }

@@ -13,11 +13,13 @@ function withoutTotalCount(row) {
 
 export const LeaderboardModel = {
     // Eligibility and rank are calculated before pagination. Account linking is
-    // deliberately absent: linked and unlinked roster players rank identically.
+    // does not affect eligibility or ordering: all roster players rank identically.
     getByClub: async (clubId, { category = 'rapid', limit = 50, offset = 0, q = '' } = {}) => {
         const result = await db.query(
             `WITH eligible AS (
                 SELECT player.id AS "playerId", player.public_id AS "publicPlayerId", player.name AS "playerName",
+                    EXISTS (SELECT 1 FROM player_links link WHERE link.player_id = player.id
+                        AND link.club_id = player.club_id AND link.status = 'approved') AS "isClaimed",
                     $2::TEXT AS "selectedCategory",
                     ROUND(selected.current_rating)::INTEGER AS "selectedRating",
                     selected.current_rating AS "rawSelectedRating",
@@ -74,7 +76,7 @@ export const LeaderboardModel = {
                 FROM eligible
             )
             SELECT row_rank::INTEGER AS rank,
-                "playerId", "publicPlayerId", "playerName", "selectedCategory", "selectedRating", "peakRating",
+                "playerId", "publicPlayerId", "playerName", "isClaimed", "selectedCategory", "selectedRating", "peakRating",
                 "blitzRating", "rapidRating", "classicalRating", "categoryGames", "categoryWins",
                 "categoryDraws", "categoryLosses", "weightedWinRate", "totalGames",
                 total_count::INTEGER AS "totalCount"

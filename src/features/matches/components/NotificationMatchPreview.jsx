@@ -20,7 +20,7 @@ export default function NotificationMatchPreview({ clubId, matchId }) {
     }, [match]);
     return <section ref={region} tabIndex={-1} className="notification-target" aria-label="Match from notification">
         <h2>Match from notification</h2>
-        {error ? <p role="alert">{error} <button type="button" onClick={() => setRetry(value => value + 1)}>Retry</button></p>
+        {error ? <p role="alert">{error} <button className="btn btn-secondary" type="button" onClick={() => setRetry(value => value + 1)}>Retry</button></p>
             : !match ? <p role="status">Loading match…</p> : <>
                 <p><strong>{match.whitePlayerName} · {matchResultLabel(match.result)} · {match.blackPlayerName}</strong></p>
                 <p>{new Date(match.playedAt).toLocaleString()} · {match.ratingCategory?.replace(/^./, letter => letter.toUpperCase())} · {match.isRated ? 'Rated' : 'Unrated'}</p>

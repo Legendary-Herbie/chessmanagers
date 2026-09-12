@@ -1,3 +1,4 @@
+import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
 import Icon from '../../shared/common/Icon.jsx';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -145,7 +146,7 @@ export default function LeaderboardPage() {
                                         <td className={`rank ${entry.rank <= 3 ? `top${entry.rank}` : ''}`}>{entry.rank}</td>
                                         <td><button type="button" className="name-link"
                                             onClick={event => { event.stopPropagation(); openPlayer(entry); }}
-                                            aria-label={`View ${entry.playerName} rating history`}>{entry.playerName}</button></td>
+                                            aria-label={`View ${entry.playerName} rating history`}>{entry.playerName} <ClaimedBadge status={entry.isClaimed ? 'approved' : null} /></button></td>
                                         <RatingCells entry={entry} selectedCategory={selectedCategory} />
                                         <td>{entry.totalGames}</td>
                                     </tr>
@@ -161,7 +162,7 @@ export default function LeaderboardPage() {
                             {leaderboard.entries.map(entry => (
                                 <button type="button" className="leaderboard-card" key={entry.playerId} onClick={() => openPlayer(entry)}>
                                     <span className="leaderboard-card__rank">#{entry.rank}</span>
-                                    <strong>{entry.playerName}</strong>
+                                    <strong>{entry.playerName} <ClaimedBadge status={entry.isClaimed ? 'approved' : null} /></strong>
                                     <span>{label(selectedCategory)}: {entry.selectedRating}</span>
                                     <span>{entry.totalGames} total games</span>
                                 </button>

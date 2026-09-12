@@ -29,22 +29,6 @@
     border-radius: 1rem;
     padding: 1.5rem;
 }
-.form-row {
-    display: grid;
-    gap: 0.5rem;
-    margin-bottom: 1rem;
-}
-.form-row .label {
-    font-weight: 700;
-    color: var(--text-strong);
-}
-.input {
-    width: 100%;
-    padding: 0.9rem 1rem;
-    border: 1px solid var(--border);
-    border-radius: 0.85rem;
-    background: var(--bg);
-}
 .input[aria-invalid='true'],
 .rating-settings input[aria-invalid='true'] {
     border-color: var(--danger);
@@ -70,10 +54,6 @@
     border-radius: 0.65rem;
     background: var(--bg);
     color: var(--text);
-}
-textarea.input {
-    min-height: 100px;
-    resize: vertical;
 }
 .logo-preview {
     margin: 1rem 0;

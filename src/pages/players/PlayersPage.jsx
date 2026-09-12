@@ -1,3 +1,4 @@
+import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
 import Disclosure from '../../shared/common/Disclosure.jsx';
 import Icon from '../../shared/common/Icon.jsx';
 import React, { useEffect, useState } from 'react';
@@ -30,7 +31,6 @@ export default function PlayersPage() {
         loading,
         error,
         ratingCategory,
-        setRatingCategory,
         searchTerm,
         setSearchTerm,
         statusFilter,
@@ -56,6 +56,22 @@ export default function PlayersPage() {
             setSearchParams(next, { replace: true });
         }
     }, [club?.id, isAdmin, searchParams, setSearchParams]);
+
+    const [visibleCount, setVisibleCount] = useState(24);
+    const [restoringId, setRestoringId] = useState(null);
+    const [archiveSearch, setArchiveSearch] = useState('');
+    useEffect(() => { setVisibleCount(24); }, [club?.id, searchTerm, statusFilter, sortBy, ratingCategory]);
+    const clearFilters = () => { setSearchTerm(''); setStatusFilter('all'); };
+    const hasFilters = Boolean(searchTerm || statusFilter !== 'all');
+    const visiblePlayers = processedPlayers.slice(0, visibleCount);
+    const handleRestore = async (player) => {
+        setRestoringId(player.id);
+        try {
+            await runPlayerAction(() => restorePlayer(player.id), {
+                notify, successMessage: `${player.name} restored.`, fallbackError: 'Could not restore player.',
+            });
+        } finally { setRestoringId(null); }
+    };
 
     // Confirm Modal state
     const [confirmModal, setConfirmModal] = useState({
@@ -147,7 +163,7 @@ export default function PlayersPage() {
                 <div className="players-header__title-group">
                     <h1>Club Players</h1>
                     <p className="players-header__subtitle">
-                        Manage player rosters, Elo ratings, and account linkage for <strong>{club.name}</strong>.
+                        Find players and manage the roster for <strong>{club.name}</strong>.
                     </p>
                 </div>
 
@@ -169,7 +185,7 @@ export default function PlayersPage() {
 
 
             {/* Toolbar: Search, Filters, Sorting & View Toggle */}
-            <div className="players-toolbar">
+            <div className="players-toolbar roster-controls">
                 <div className="players-toolbar__search">
                     <span className="players-toolbar__search-icon"><Icon name="search" /></span>
                     <input
@@ -182,40 +198,38 @@ export default function PlayersPage() {
                     />
                 </div>
 
-                <Disclosure className="players-filter-disclosure" title="Filters and view"><div className="players-toolbar__filters">
-                    <label>Rating category <select className="players-filter-select" value={ratingCategory}
-                        onChange={event => setRatingCategory(event.target.value)}>
-                        <option value="blitz">Blitz</option><option value="rapid">Rapid</option><option value="classical">Classical</option>
-                    </select></label>
+                <div className="players-toolbar__filters">
+                    <label className="roster-control-label">Account link
                     <select
                         className="players-filter-select"
                         value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                         aria-label="Filter by link status"
                     >
-                        <option value="all">All Statuses</option>
-                        <option value="claimed">Claimed Only</option>
-                        <option value="pending">Pending Claim</option>
-                        <option value="unlinked">Unlinked Only</option>
-                    </select>
+                        <option value="all">All players</option>
+                        <option value="claimed">Claimed</option>
+                        <option value="pending">Pending claim</option>
+                        <option value="unlinked">Unlinked</option>
+                    </select></label>
 
-                    <select
+                    <label className="roster-control-label">Sort by<select
                         className="players-filter-select"
                         value={sortBy}
                         onChange={(e) => setSortBy(e.target.value)}
                         aria-label="Sort players"
                     >
-                        <option value="rating_desc">Highest Elo rating first</option>
-                        <option value="rating_asc">Lowest Elo rating first</option>
+                        <option value="rating_desc">Highest Rapid rating first</option>
+                        <option value="rating_asc">Lowest Rapid rating first</option>
                         <option value="name_asc">Name (A-Z)</option>
-                        <option value="games_desc">Most Games Played</option>
-                        <option value="winrate_desc">Highest Win Rate</option>
-                    </select>
+                        <option value="games_desc">Most games (all categories)</option>
+                        <option value="winrate_desc">Highest win rate (all categories)</option>
+                    </select></label>
 
-                    <div className="view-toggle">
+                    <div className="view-toggle" role="group" aria-label="Roster view">
                         <button
                             type="button"
                             className={`view-toggle__button ${viewMode === 'grid' ? 'view-toggle__button--active' : ''}`}
+                            aria-pressed={viewMode === 'grid'}
                             onClick={() => setViewMode('grid')}
                         >
                             <Icon name="grid" /> Grid
@@ -223,19 +237,19 @@ export default function PlayersPage() {
                         <button
                             type="button"
                             className={`view-toggle__button ${viewMode === 'table' ? 'view-toggle__button--active' : ''}`}
+                            aria-pressed={viewMode === 'table'}
                             onClick={() => setViewMode('table')}
                         >
                             <Icon name="list" /> List
                         </button>
                     </div>
-                </div></Disclosure>
+                </div>
             </div>
 
-            <Disclosure className="roster-summary" title={loading ? 'Loading roster…' : `${stats.totalPlayers} players · ${stats.activePlayers} with games played`}>
-                <p>Average Elo ratings: Blitz {stats.averageRatings.blitz ?? '—'} · Rapid {stats.averageRatings.rapid ?? '—'} · Classical {stats.averageRatings.classical ?? '—'}</p>
-            </Disclosure>
-
-
+            <div className="roster-results">
+                <p role="status">{loading ? 'Loading roster…' : `${processedPlayers.length} of ${stats.totalPlayers} players`}</p>
+                {hasFilters && <button type="button" className="btn-secondary btn-sm" onClick={clearFilters}>Clear filters</button>}
+            </div>
 
             {/* Error banner */}
             {error && <div className="error-box" role="alert"><p>Couldn’t load players. Try again. {error}</p><button type="button" className="btn-secondary" disabled={loading} onClick={() => refetch()}>Retry</button></div>}
@@ -252,7 +266,7 @@ export default function PlayersPage() {
                         <h3 className="empty-state__title">No Players Found</h3>
                         <p className="empty-state__description">
                             {searchTerm || statusFilter !== 'all'
-                                ? 'No players matched your search filters. Try clearing search parameters.'
+                                ? 'No players matched your search filters. Clear the filters to see the full roster.'
                                 : 'No players have been added to this club roster yet.'}
                         </p>
                     </div>
@@ -263,10 +277,11 @@ export default function PlayersPage() {
             ) : viewMode === 'grid' ? (
                 /* Grid View */
                 <div className="players-grid">
-                    {processedPlayers.map((player) => (
+                    {visiblePlayers.map((player) => (
                         <PlayerCard
                             key={player.id}
                             player={player}
+                            showAllRatings
                             ratingCategory={ratingCategory}
                             currentUser={user}
                             currentLinkedPlayerId={linkedPlayer?.id}
@@ -281,7 +296,11 @@ export default function PlayersPage() {
             ) : (
                 /* Table View */
                 <PlayerTable
-                    players={processedPlayers}
+                    players={visiblePlayers}
+                    currentUser={user}
+                    onClaim={handleClaimClick}
+                    onUnlink={handleUnlinkClick}
+                    showAllRatings
                     ratingCategory={ratingCategory}
                     currentLinkedPlayerId={linkedPlayer?.id}
                     isAdmin={isAdmin}
@@ -289,6 +308,16 @@ export default function PlayersPage() {
                     onDelete={handleDeleteClick}
                 />
             )}
+
+            {!loading && !error && processedPlayers.length > visibleCount && <div className="roster-load-more">
+                <button type="button" className="btn-secondary" onClick={() => setVisibleCount(count => count + 24)}>
+                    Show more players ({processedPlayers.length - visibleCount} remaining)
+                </button>
+            </div>}
+
+            <Disclosure className="roster-summary" title="Roster statistics">
+                <p>{stats.activePlayers} players with games played. Average Elo ratings: Blitz {stats.averageRatings.blitz ?? '—'} · Rapid {stats.averageRatings.rapid ?? '—'} · Classical {stats.averageRatings.classical ?? '—'}</p>
+            </Disclosure>
 
             {isAdmin && <PendingLinksList clubId={club.id} onActionComplete={refetch} />}
 
@@ -308,18 +337,20 @@ export default function PlayersPage() {
                 onClose={() => setShowInlineAddForm(false)} />}
 
             {isAdmin && inactivePlayers.length > 0 && (
-                <section className="players-table-wrapper" style={{ marginTop: '24px', padding: '16px' }}>
-                    <h2 style={{ marginTop: 0 }}>Archived players</h2>
-                    <p style={{ color: 'var(--text-muted)' }}>Archived records retain their full match and rating history.</p>
-                    {inactivePlayers.map((archived) => (
-                        <div key={archived.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0' }}>
-                            <Link className="name-link" to={`/players/${archived.id}`}>{archived.name}</Link>
-                            <button type="button" className="btn-secondary btn-sm" onClick={() => restorePlayer(archived.id)}>
-                                Restore
+                <Disclosure className="roster-archive" title={`Archived players (${inactivePlayers.length})`}>
+                    <p className="muted">Archived players retain their match and rating history.</p>
+                    <input className="input" aria-label="Search archived players" placeholder="Search archived players"
+                        value={archiveSearch} onChange={event => setArchiveSearch(event.target.value)} />
+                    {inactivePlayers.filter(player => player.name.toLocaleLowerCase().includes(archiveSearch.trim().toLocaleLowerCase())).map(archived => (
+                        <div key={archived.id} className="roster-archive__row">
+                            <Link className="name-link" to={`/players/${archived.id}`}>{archived.name} <ClaimedBadge status={archived.link_status} /></Link>
+                            <button type="button" className="btn-secondary btn-sm" disabled={Boolean(restoringId)} onClick={() => handleRestore(archived)}>
+                                {restoringId === archived.id ? 'Restoring…' : 'Restore'}
                             </button>
                         </div>
                     ))}
-                </section>
+                    {!inactivePlayers.some(player => player.name.toLocaleLowerCase().includes(archiveSearch.trim().toLocaleLowerCase())) && <p role="status">No archived players match your search.</p>}
+                </Disclosure>
             )}
 
             {/* Reusable Confirmation Dialog */}

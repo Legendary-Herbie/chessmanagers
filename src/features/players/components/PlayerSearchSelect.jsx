@@ -1,3 +1,4 @@
+import ClaimedBadge from './ClaimedBadge.jsx';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { isCancelledError } from '../../../config/api.js';
 import { playerApi } from '../api/playerApi.js';
@@ -190,7 +191,7 @@ export default function PlayerSearchSelect({
                             onMouseEnter={() => setActiveIndex(index)}
                             onClick={() => choose(player)}
                         >
-                            <span>{player.name}</span>
+                            <span>{player.name} <ClaimedBadge status={player.link_status} /></span>
                             {player.ratings && <small>
                                 B {player.ratings.blitz?.current_rating ?? '—'} · R {player.ratings.rapid?.current_rating ?? '—'} · C {player.ratings.classical?.current_rating ?? '—'}
                             </small>}

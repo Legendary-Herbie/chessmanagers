@@ -13,6 +13,19 @@
 .rivalry-bar__draw { background:var(--warning); }
 .rivalry-bar__second { background:var(--accent); }
 .rivalry-legend { font-size:.85rem; }
+.rivalry-heading { display:flex; flex-wrap:wrap; gap:16px; align-items:center; justify-content:space-between; }
+.rivalry-title { margin:0 0 6px; font-size:1rem; color:var(--text-strong); }
+.rivalry-search { flex:1 1 240px; max-width:360px; min-width:0; }
+.rivalry-content { display:grid; gap:16px; margin-top:16px; }
+.rivalry-player-highlight { color:var(--primary); }
+.rivalry-score { display:inline-block; padding:4px 8px; border-radius:6px; font-weight:700; }
+.rivalry-score--win { background:var(--status-success-bg); color:var(--status-success-text); }
+.rivalry-score--draw { background:var(--status-warning-bg); color:var(--status-warning-text); }
+.rivalry-score--loss { background:var(--status-error-bg); color:var(--status-error-text); }
+.share-actions,.share-invite-actions { display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:12px 0; }
+.share-invite-actions { margin-left:auto; }
+.share-actions .btn { width:auto; }
+.queue-card > div:last-child { width:100%; min-width:0; }
 .cross-score { min-width:1.8rem; border-radius:6px; margin:2px; font-weight:700; }
 .cross-score--win { background:var(--status-success-bg); color:var(--status-success-text); }
 .cross-score--draw { background:var(--status-warning-bg); color:var(--status-warning-text); }
@@ -26,6 +39,10 @@
 .discovery-hub [hidden] { display:none !important; }
 .discovery-hub .public-input { min-height:48px; }
 .invite-share-hub { margin-top:24px; }
+.invite-share-hub [hidden] { display:none !important; }
+.invite-share-hub .discovery-switch { margin-bottom:16px; }
+.invite-share-hub .discovery-switch .btn { width:auto; flex:0 1 auto; }
+.share-method { padding-top:4px; }
 .share-code { display:grid; gap:10px; margin-top:12px; }
 .share-code > code { font-size:1.4rem; letter-spacing:4px; }
 .share-controls { display:grid; gap:6px; }
