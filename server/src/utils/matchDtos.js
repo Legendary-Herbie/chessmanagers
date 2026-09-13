@@ -11,6 +11,9 @@ export function toMatchDto(match) {
     const snapshot = (before, after) => ({ before, after, change: after - before });
     return {
         ...record,
+        // Compatibility aliases are derived at the API boundary, not stored twice.
+        time_control: match.rating_category,
+        type: match.tournament_id ? 'tournament' : match.is_rated ? 'rated' : 'casual',
         ratings: {
             status,
             white: status === 'applied' ? snapshot(white_rating_before, white_rating_after) : null,

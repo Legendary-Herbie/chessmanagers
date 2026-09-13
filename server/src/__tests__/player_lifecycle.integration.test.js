@@ -12,6 +12,21 @@ import {
 } from '../test/factories.js';
 
 describe('player lifecycle and account linking', () => {
+    it.each(['owner', 'admin'])('allows an active %s to submit a claim without bypassing approval or uniqueness', async role => {
+        const owner = await createUser();
+        const club = await createClub(owner);
+        const actor = role === 'owner' ? owner : await createUser();
+        if (role === 'admin') await addClubMember(club, actor, 'admin');
+        const player = await createPlayer(club);
+        const other = await createPlayer(club);
+        const base = `/api/v1/clubs/${club.id}/players`;
+        const claim = await request(app).post(`${base}/${player.id}/claim`)
+            .set('Authorization', authorization(actor)).send({}).expect(201);
+        expect(claim.body.link.status).toBe('pending');
+        await request(app).post(`${base}/${other.id}/claim`)
+            .set('Authorization', authorization(actor)).send({}).expect(409);
+    });
+
     it('supports claim approval, constrained self editing, self unlink, and persistent events', async () => {
         const owner = await createUser();
         const member = await createUser();

@@ -42,7 +42,7 @@ export default function PlayerTable({
                         const isSelf = currentLinkedPlayerId === id;
                         const canEdit = isAdmin || isSelf;
                         const isLinked = player.link_status === 'approved';
-                        const canClaim = currentUser && !isAdmin && !isLinked && player.link_status !== 'pending' && !currentLinkedPlayerId;
+                        const canClaim = currentUser && !isLinked && player.link_status !== 'pending' && !currentLinkedPlayerId;
 
                         return (
                             <tr key={id}>

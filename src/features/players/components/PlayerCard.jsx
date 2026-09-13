@@ -37,8 +37,8 @@ export default function PlayerCard({
     const isLinked = link_status === 'approved';
     const isPending = link_status === 'pending';
 
-    // A regular user can claim if unlinked and they don't already have an active link
-    const canClaim = currentUser && !isAdmin && !isLinked && !isPending && !currentLinkedPlayerId;
+    // Club role does not prevent an active member from claiming their player identity.
+    const canClaim = currentUser && !isLinked && !isPending && !currentLinkedPlayerId;
 
     return (
         <div className="player-card">

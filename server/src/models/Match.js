@@ -17,22 +17,17 @@ const ratingJoins = `LEFT JOIN rating_history white_history
     ON black_history.match_id = match.id AND black_history.club_id = match.club_id
     AND black_history.category = match.rating_category AND black_history.player_id = match.black_player_id`;
 
-function legacyType(isRated, tournamentId) {
-    if (tournamentId) return 'tournament';
-    return isRated ? 'rated' : 'casual';
-}
-
 export const MatchModel = {
     create: async ({ clubId, whitePlayerId, blackPlayerId, result, ratingCategory,
         isRated, tournamentId = null, notes = null, playedAt }, trx) => qry(trx)(
         `INSERT INTO matches (
             club_id, white_player_id, black_player_id, result,
             rating_category, is_rated, tournament_id, notes, played_at,
-            type, time_control, status
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $5, 'active')
+            status
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active')
          RETURNING *`,
         [clubId, whitePlayerId, blackPlayerId, result, ratingCategory,
-            isRated, tournamentId, notes, playedAt, legacyType(isRated, tournamentId)]
+            isRated, tournamentId, notes, playedAt]
     ).then(result => result.first),
 
     findById: async (id, clubId, { includeDeleted = false, forUpdate = false, trx = null } = {}) => qry(trx)(
@@ -137,14 +132,14 @@ export const MatchModel = {
     update: async (id, clubId, values, trx) => qry(trx)(
         `UPDATE matches SET
              white_player_id = $3, black_player_id = $4, result = $5,
-             rating_category = $6, time_control = $6, is_rated = $7,
-             tournament_id = $8, type = $9, notes = $10, played_at = $11,
+             rating_category = $6, is_rated = $7,
+             tournament_id = $8, notes = $9, played_at = $10,
              updated_at = NOW()
          WHERE id = $1 AND club_id = $2 AND status = 'active'
          RETURNING *`,
         [id, clubId, values.whitePlayerId, values.blackPlayerId, values.result,
             values.ratingCategory, values.isRated, values.tournamentId,
-            legacyType(values.isRated, values.tournamentId), values.notes, values.playedAt]
+            values.notes, values.playedAt]
     ).then(result => result.first),
 
     void: async (id, clubId, actorUserId, reason, trx) => qry(trx)(

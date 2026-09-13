@@ -167,7 +167,7 @@ export default function PlayerPage() {
     const canEdit = isAdmin || isSelf;
     const isLinked = link_status === 'approved';
     const isPending = link_status === 'pending';
-    const canClaim = user && !isAdmin && !isLinked && !isPending && !linkedPlayer;
+    const canClaim = user && !isLinked && !isPending && !linkedPlayer;
 
     return (
         <div className="players-container">
