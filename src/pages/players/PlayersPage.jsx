@@ -11,6 +11,7 @@ import PlayerTable from '../../features/players/roster/PlayerTable.jsx';
 import AddPlayerForm from '../../features/players/admin/AddPlayerForm.jsx';
 import EditPlayerForm from '../../features/players/admin/EditPlayerForm.jsx';
 import PendingLinksList from '../../features/players/admin/PendingLinksList.jsx';
+import SelfRegistrationPanel from '../../features/players/components/SelfRegistrationPanel.jsx';
 import { runPlayerAction } from '../../features/players/playerActionFeedback.js';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 import NoClubState from '../../shared/common/NoClubState.jsx';
@@ -20,7 +21,7 @@ import '../../styles/players.css';
 export default function PlayersPage() {
     const [searchParams, setSearchParams] = useSearchParams();
     const { user } = useAuth();
-    const { club, linkedPlayer, capabilities, loading: clubLoading } = useClub();
+    const { club, linkedPlayer, capabilities, loading: clubLoading, refreshClub } = useClub();
     const { notify } = useNotifications();
     const isAdmin = Boolean(capabilities.canManagePlayers);
 
@@ -91,12 +92,16 @@ export default function PlayersPage() {
         setConfirmModal({
             isOpen: true,
             title: 'Claim Player Profile',
-            message: `Are you sure you want to request to claim the profile "${player.name}"? An admin will review your request.`,
+            message: isAdmin ? `Claim "${player.name}" as your player profile? Your club role allows immediate approval.` : `Are you sure you want to request to claim the profile "${player.name}"? An admin will review your request.`,
             variant: 'primary',
             onConfirm: async () => {
-                await runPlayerAction(() => claimPlayer(player.id), {
+                await runPlayerAction(async () => {
+                    const link = await claimPlayer(player.id);
+                    if (link?.status === 'approved') await refreshClub();
+                    return link;
+                }, {
                     notify,
-                    successMessage: 'Claim request submitted.',
+                    successMessage: link => link?.status === 'approved' ? 'Player profile linked. Your claim was automatically approved.' : 'Claim request submitted.',
                     fallbackError: 'Failed to submit claim request.',
                 });
                 closeConfirmModal();
@@ -182,6 +187,8 @@ export default function PlayersPage() {
             </div>
 
             {/* Admin Pending Requests Banner */}
+            <SelfRegistrationPanel key={club.id} clubId={club.id} userId={user?.id} linkedPlayer={linkedPlayer} isAdmin={isAdmin} onChanged={async () => { await refetch(); await refreshClub(); }} />
+            {isAdmin && <PendingLinksList clubId={club.id} onActionComplete={refetch} />}
 
 
             {/* Toolbar: Search, Filters, Sorting & View Toggle */}
@@ -319,7 +326,6 @@ export default function PlayersPage() {
                 <p>{stats.activePlayers} players with games played. Average Elo ratings: Blitz {stats.averageRatings.blitz ?? '—'} · Rapid {stats.averageRatings.rapid ?? '—'} · Classical {stats.averageRatings.classical ?? '—'}</p>
             </Disclosure>
 
-            {isAdmin && <PendingLinksList clubId={club.id} onActionComplete={refetch} />}
 
             {/* Edit Player Modal */}
             <EditPlayerForm

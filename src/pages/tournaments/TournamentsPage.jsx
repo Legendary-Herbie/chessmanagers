@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import { Link, useNavigate } from 'react-router-dom';
 import '../../styles/tournaments.css';
 import { useClub } from '../../app/contextHooks.js';
@@ -100,7 +101,7 @@ export default function TournamentsPage() {
                         <div className="tournament-card__top"><h2>{tournament.name}</h2><span className={`tournament-status ${tournament.status}`}>{title(tournament.status)}</span></div>
                         <div className="tournament-meta">
                             <span>{title(tournament.type)}</span>
-                            <span>{title(tournament.rating_category)}</span>
+                            <span><RatingCategoryIcon category={tournament.rating_category} />{title(tournament.rating_category)}</span>
                             <span>{tournament.is_rated ? 'Rated' : 'Unrated'}</span>
                         </div>
                         <p>Starts {new Date(tournament.start_date).toLocaleString()}</p>

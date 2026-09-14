@@ -71,6 +71,9 @@ export const PlayerLinkModel = {
         if (!player) return failure('PLAYER_NOT_FOUND');
         if (player.status !== 'active' || player.deleted_at) return failure('PLAYER_NOT_ACTIVE');
         if (await activeConflict(trx, clubId, userId, playerId)) return failure('CLAIM_CONFLICT');
+        if ((await trx.query("SELECT id FROM player_registration_requests WHERE club_id=$1 AND user_id=$2 AND status='pending'", [clubId, userId])).rowCount) {
+            return failure('REGISTRATION_PENDING');
+        }
 
         const link = await trx.query(
             `INSERT INTO player_links (user_id, player_id, club_id, status)
@@ -81,6 +84,22 @@ export const PlayerLinkModel = {
             clubId, playerId, userId, linkId: link.id, actorUserId: userId,
             eventType: 'player_claim.submitted', toStatus: 'pending',
         });
+        if (['owner', 'admin'].includes(membership.role)) {
+            const approved = await trx.query(
+                `UPDATE player_links SET status = 'approved', reviewed_at = NOW(), reviewed_by = $2,
+                    review_reason = NULL, updated_at = NOW() WHERE id = $1 RETURNING *`,
+                [link.id, userId]
+            ).then(result => result.first);
+            await recordLinkEvent(trx, {
+                clubId, playerId, userId, linkId: link.id, actorUserId: userId,
+                eventType: 'player_claim.approved', fromStatus: 'pending', toStatus: 'approved',
+                payload: { automatic: true, membershipRole: membership.role },
+            });
+            await notify(trx, club, userId, 'player_claim.approved', {
+                playerId, playerName: player.name,
+            }, `player-link:${link.id}:approved`);
+            return { ok: true, link: approved };
+        }
         const applicant = await trx.query(
             'SELECT COALESCE(full_name, name, username, email) AS name FROM users WHERE id = $1',
             [userId]

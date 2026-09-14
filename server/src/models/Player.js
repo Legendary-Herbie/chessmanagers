@@ -3,6 +3,7 @@ import db from '../database/database.js';
 
 const qry = (trx) => trx ? trx.query.bind(trx) : db.query.bind(db);
 const failure = (code) => ({ ok: false, code });
+const inTransaction = (trx, action) => trx ? action(trx) : db.transaction(action);
 
 const PLAYER_FIELDS = `
     p.id, p.club_id, p.name, p.rating, p.start_rating,
@@ -107,8 +108,8 @@ export const PlayerModel = {
         [clubId, publicPlayerId]
     ).then(result => result.first),
 
-    create: async ({ clubId, actorUserId, name, rating = null, startRatings = null, bio = null, photoUrl = null, dateOfBirth = null, federationId = null }) => (
-        db.transaction(async (trx) => {
+    create: async ({ clubId, actorUserId, name, rating = null, startRatings = null, bio = null, photoUrl = null, dateOfBirth = null, federationId = null }, transaction = null) => (
+        inTransaction(transaction, async (trx) => {
             const configured = await ratingConfiguration(trx, clubId);
             const resolvedRatings = resolveStartRatings({ rating, startRatings }, configured);
             const player = await trx.query(

@@ -4,6 +4,7 @@ import pgDb from '../database/pg_database.js';
 import { assertTestDatabase } from './testEnvironment.js';
 
 const APP_TABLES = [
+    'player_registration_requests',
     'announcement_views',
     'asset_cleanup_jobs',
     'data_export_audit',

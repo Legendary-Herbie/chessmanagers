@@ -4,8 +4,8 @@ export async function runPlayerAction(action, {
     fallbackError,
 }) {
     try {
-        await action();
-        notify(successMessage, 'success');
+        const result = await action();
+        notify(typeof successMessage === 'function' ? successMessage(result) : successMessage, 'success');
         return true;
     } catch (error) {
         notify(error?.message || fallbackError, 'error');

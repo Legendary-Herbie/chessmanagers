@@ -2,6 +2,7 @@ import { PlayerModel } from '../models/Player.js';
 import { PlayerLinkModel } from '../models/PlayerLink.js';
 
 const MESSAGES = {
+    REGISTRATION_PENDING: [409, 'Your self-registration is awaiting review. You cannot also claim another player.'],
     PLAYER_NAME_LOCKED: [403, 'The club owner has locked this player name.'],
     OWNER_ONLY_NAME_LOCK: [403, 'Only the club owner can lock or unlock player names.'],
     PLAYER_NOT_FOUND: [404, 'Player not found in this club.'],

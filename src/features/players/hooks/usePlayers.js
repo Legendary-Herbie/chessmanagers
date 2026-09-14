@@ -113,8 +113,9 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     // Claim Player Profile
     const claimPlayer = async (playerId) => {
         if (!clubId) return;
-        await playerApi.claimPlayer(clubId, playerId);
+        const link = await playerApi.claimPlayer(clubId, playerId);
         await fetchPlayers(); // Refresh link status
+        return link;
     };
 
     // Unlink Player

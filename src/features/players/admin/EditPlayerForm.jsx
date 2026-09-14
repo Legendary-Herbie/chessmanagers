@@ -75,7 +75,7 @@ export default function EditPlayerForm({ isOpen, onClose, clubId, player, isAdmi
                 {isOwner && <label className="identity-name-lock"><input type="checkbox" checked={form.nameLocked ?? false}
                     onChange={event => setForm(current => ({ ...current, nameLocked: event.target.checked }))} />Lock name to owner edits</label>}
                 {nameLocked && <p className="form-helper">This name is locked by the club owner.</p>}
-                <label className="form-group">FIDE / Federation ID
+                <label className="form-group">FIDE ID
                     <input className="form-input" value={form.federationId ?? ''} onChange={setField('federationId')} maxLength={100} />
                 </label>
                 <label className="form-group">Bio

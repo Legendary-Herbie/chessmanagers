@@ -6,6 +6,9 @@ import { notificationApi } from '../api/notificationApi.js';
 import { notificationDestination } from '../notificationDestination.js';
 
 const EVENT_COPY = {
+    'player_registration.pending': 'A player self-registration needs review.',
+    'player_registration.approved': 'Your self-registration was approved. Your player profile is ready.',
+    'player_registration.rejected': 'Your self-registration was not approved. You can submit a corrected request.',
     'membership.request_pending': 'A membership request needs review.',
     'join_request.approved': 'Your membership request was approved.',
     'join_request.rejected': 'Your membership request was not approved.',
@@ -28,6 +31,7 @@ const EVENT_COPY = {
 
 function notificationDetail(notification) {
     const payload = notification.payload || {};
+    if (notification.eventType === 'player_registration.rejected') return [payload.playerName, payload.reason].filter(Boolean).join(' · ');
     if (notification.eventType.startsWith('match.')) {
         return `${payload.whitePlayerName || 'White player'} vs ${payload.blackPlayerName || 'Black player'}`;
     }

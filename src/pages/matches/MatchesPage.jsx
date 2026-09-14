@@ -1,4 +1,5 @@
 import MatchRating from '../../features/matches/components/MatchRating.jsx';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import NotificationMatchPreview from '../../features/matches/components/NotificationMatchPreview.jsx';
 import Disclosure from '../../shared/common/Disclosure.jsx';
 import ActionMenu from '../../shared/common/ActionMenu.jsx';
@@ -309,7 +310,7 @@ export default function MatchesPage() {
                             </div>
                             <div className="match-history-meta">
                                 <time dateTime={match.playedAt}>{new Date(match.playedAt).toLocaleString()}</time>
-                                <span>{categoryLabel(match.ratingCategory)} · {match.isRated ? 'Rated' : 'Unrated'}</span>
+                                <span><RatingCategoryIcon category={match.ratingCategory} />{categoryLabel(match.ratingCategory)} · {match.isRated ? 'Rated' : 'Unrated'}</span>
                                 {match.status !== 'active' && <span className="match-status">{categoryLabel(match.status)}</span>}
                             </div>
                             <div className="match-history-footer">
@@ -382,7 +383,7 @@ export default function MatchesPage() {
                                 {CATEGORIES.map(category => <button type="button" key={category}
                                     className={form.ratingCategory === category ? 'active' : ''}
                                     aria-pressed={form.ratingCategory === category}
-                                    onClick={() => setRatingField('ratingCategory', category)}>{categoryLabel(category)}</button>)}
+                                    onClick={() => setRatingField('ratingCategory', category)}><RatingCategoryIcon category={category} />{categoryLabel(category)}</button>)}
                             </div>
                         </div>
                         <label className="form-row"><span className="label">Played at</span>

@@ -1,4 +1,5 @@
 import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import Icon from '../../shared/common/Icon.jsx';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -125,7 +126,7 @@ export default function LeaderboardPage() {
                             <button type="button" key={category}
                                 className={selectedCategory === category ? 'active' : ''}
                                 onClick={() => selectCategory(category)}>
-                                {label(category)}
+                                <RatingCategoryIcon category={category} />{label(category)}
                             </button>
                         ))}
                     </div>
@@ -139,7 +140,7 @@ export default function LeaderboardPage() {
                 {loading ? <div className="muted">Loading...</div> : (
                     <>
                         {leaderboard.entries.length > 0 ? <div className="table-scroll leaderboard-desktop" tabIndex={0} role="region" aria-label="Leaderboard ratings"><table className="leaderboard-table">
-                            <thead><tr><th>Rank</th><th>Player</th><th>Blitz</th><th>Rapid</th><th>Classical</th><th>Total Games</th></tr></thead>
+                            <thead><tr><th>Rank</th><th>Player</th><th><RatingCategoryIcon category="blitz" />Blitz</th><th><RatingCategoryIcon category="rapid" />Rapid</th><th><RatingCategoryIcon category="classical" />Classical</th><th>Total Games</th></tr></thead>
                             <tbody>
                                 {leaderboard.entries.map(entry => (
                                     <tr key={entry.playerId} className="leaderboard-row" onClick={() => openPlayer(entry)}>
@@ -163,7 +164,7 @@ export default function LeaderboardPage() {
                                 <button type="button" className="leaderboard-card" key={entry.playerId} onClick={() => openPlayer(entry)}>
                                     <span className="leaderboard-card__rank">#{entry.rank}</span>
                                     <strong>{entry.playerName} <ClaimedBadge status={entry.isClaimed ? 'approved' : null} /></strong>
-                                    <span>{label(selectedCategory)}: {entry.selectedRating}</span>
+                                    <span><RatingCategoryIcon category={selectedCategory} />{label(selectedCategory)}: {entry.selectedRating}</span>
                                     <span>{entry.totalGames} total games</span>
                                 </button>
                             ))}

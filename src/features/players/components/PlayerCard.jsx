@@ -1,4 +1,5 @@
 import ClaimedBadge from './ClaimedBadge.jsx';
+import RatingCategoryIcon from '../../../shared/common/RatingCategoryIcon.jsx';
 import ActionMenu from '../../../shared/common/ActionMenu.jsx';
 import Icon from '../../../shared/common/Icon.jsx';
 import React from 'react';
@@ -52,7 +53,7 @@ export default function PlayerCard({
                     </Link>
                     <div className="player-card__meta">
                         {(showAllRatings ? ['blitz', 'rapid', 'classical'] : [ratingCategory]).map(category => <span key={category} className="rating-badge" title={`${category[0].toUpperCase() + category.slice(1)} Elo rating`}>
-                            {category[0].toUpperCase() + category.slice(1)}{showAllRatings ? ':' : ' Elo:'} {playerRating(player, category) ?? '—'}
+                            <RatingCategoryIcon category={category} />{category[0].toUpperCase() + category.slice(1)}{showAllRatings ? ':' : ' Elo:'} {playerRating(player, category) ?? '—'}
                         </span>)}
                         {isPending && <span className="link-badge link-badge--pending"><Icon name="clock" /> Pending Claim</span>}
 

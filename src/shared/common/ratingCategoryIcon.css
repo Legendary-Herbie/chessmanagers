@@ -1,0 +1,19 @@
+.rating-category-icon {
+    display: inline-block;
+    width: 1.15em;
+    height: 1.15em;
+    flex: 0 0 auto;
+    vertical-align: -0.18em;
+    margin-inline-end: 0.3em;
+}
+.rating-category-icon--blitz { color: #b38400; }
+.rating-category-icon--rapid { color: #588528; }
+.rating-category-icon--classical {
+    color: #5276a5;
+    background: currentColor;
+    mask: url('/icons/classical-clock-pawn.png') center / contain no-repeat;
+    -webkit-mask: url('/icons/classical-clock-pawn.png') center / contain no-repeat;
+}
+[data-theme='dark'] .rating-category-icon--blitz { color: #f4d03f; }
+[data-theme='dark'] .rating-category-icon--rapid { color: #8fbc48; }
+[data-theme='dark'] .rating-category-icon--classical { color: #8aadd8; }

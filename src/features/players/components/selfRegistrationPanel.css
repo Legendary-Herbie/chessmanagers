@@ -1,0 +1,10 @@
+.self-registration-panel {
+    margin-block: 16px;
+    padding: 18px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg-surface);
+}
+.self-registration-panel h2 { margin: 0 0 8px; font-size: 1.1rem; }
+.self-registration-panel p { overflow-wrap: anywhere; }
+.self-registration-panel .queue-item > div { min-width: 0; }

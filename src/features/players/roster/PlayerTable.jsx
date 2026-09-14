@@ -1,6 +1,6 @@
 import ClaimedBadge from '../components/ClaimedBadge.jsx';
 import ActionMenu from '../../../shared/common/ActionMenu.jsx';
-import Icon from '../../../shared/common/Icon.jsx';
+import RatingCategoryIcon from '../../../shared/common/RatingCategoryIcon.jsx';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { playerRating } from '../roster/playerRating.js';
@@ -53,7 +53,7 @@ export default function PlayerTable({
                                 </td>
                                 <td>
                                     <div className="player-table-ratings">{(showAllRatings ? ['blitz', 'rapid', 'classical'] : [ratingCategory]).map(category =>
-                                        <span key={category} className="rating-badge"><Icon name="trophy" /><span className={showAllRatings ? '' : 'mobile-rating-label'}>{category[0].toUpperCase() + category.slice(1)} </span> {playerRating(player, category) ?? '—'}</span>
+                                        <span key={category} className="rating-badge"><RatingCategoryIcon category={category} /><span className={showAllRatings ? '' : 'mobile-rating-label'}>{category[0].toUpperCase() + category.slice(1)} </span> {playerRating(player, category) ?? '—'}</span>
                                     )}</div>
                                 </td>
                                 <td>{games}</td>

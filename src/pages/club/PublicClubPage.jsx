@@ -1,4 +1,5 @@
 import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import React, { useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth, useClub, useNotifications } from '../../app/contextHooks.js';
@@ -167,7 +168,7 @@ export default function PublicClubPage() {
                     <h2>Top players</h2>
                     <div className="public-category-tabs" aria-label="Leaderboard category">
                         {CATEGORIES.map(item => <button key={item} type="button" className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>
-                            {item[0].toUpperCase() + item.slice(1)}
+                            <RatingCategoryIcon category={item} />{item[0].toUpperCase() + item.slice(1)}
                         </button>)}
                     </div>
                     {leaderboardLoading ? <p>Loading players…</p> : topPlayers.length > 0 ? (

@@ -1,4 +1,5 @@
 import PairingsPrintSheet from '../../features/tournaments/components/PairingsPrintSheet.jsx';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import Disclosure from '../../shared/common/Disclosure.jsx';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
@@ -221,7 +222,7 @@ export default function TournamentPage() {
             <div className="page-header tournament-detail-header">
                 <div>
                     <div className="tournament-heading"><h1>{tournament.name}</h1><span className={`tournament-status ${tournament.status}`}>{title(tournament.status)}</span></div>
-                    <p className="muted">{title(tournament.type)} · {title(tournament.rating_category)} · {tournament.is_rated ? 'Rated — affects club ratings' : 'Unrated — no rating changes'}</p>
+                    <p className="muted">{title(tournament.type)} · <RatingCategoryIcon category={tournament.rating_category} />{title(tournament.rating_category)} · {tournament.is_rated ? 'Rated — affects club ratings' : 'Unrated — no rating changes'}</p>
                     {isAdmin && tournament.status !== 'upcoming' && <p>{rounds.filter(round => round.status === 'completed').length} of {rounds.length} paired rounds complete · {missingResults ? `${missingResults} missing result${missingResults === 1 ? '' : 's'}` : 'No missing results'}</p>}
                     {club.visibility === 'public' && <CopyPublicLink path={`/clubs/${club.id}/tournaments/${tournamentId}`} />}
                 </div>

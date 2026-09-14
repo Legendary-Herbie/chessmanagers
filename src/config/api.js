@@ -422,6 +422,8 @@ export const endpoints = {
         joinByCode:  ()                  => '/clubs/join-by-code',
     },
     players: {
+        registrations: (clubId) => `/clubs/${clubId}/players/self-registrations`,
+        registration: (clubId, requestId) => `/clubs/${clubId}/players/self-registrations/${requestId}`,
         list:          (clubId)            => `/clubs/${clubId}/players`,
         summary:       (clubId)            => `/clubs/${clubId}/players/summary`,
         bulk:          (clubId)            => `/clubs/${clubId}/players/bulk`,

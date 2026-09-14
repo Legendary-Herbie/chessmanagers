@@ -48,6 +48,13 @@ describe('NotificationTray', () => {
         notificationApi.dismissAll.mockResolvedValue({ deleted: 1 });
     });
     afterEach(cleanup);
+    it('shows self-registration rejection and its review reason in the tray', async () => {
+        notificationApi.list.mockResolvedValue({ notifications: [{ ...notification, eventType: 'player_registration.rejected', payload: { requestId: 'r1', playerName: 'Ada', reason: 'Use your full name.' } }], total: 1 });
+        renderTray();
+        fireEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
+        expect(await screen.findByText('Your self-registration was not approved. You can submit a corrected request.')).toBeTruthy();
+        expect(screen.getByText('Ada · Use your full name.')).toBeTruthy();
+    });
 
     it('deletes all notifications and clears the unread badge', async () => {
         renderTray();

@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import { Link, useParams } from 'react-router-dom';
 import { publicApi } from '../../features/public/api/publicApi.js';
 
@@ -23,7 +24,7 @@ export default function PublicTournamentPage() {
     </section>;
     return <div className="public-page">
         <header className="public-page__header"><h1>{data.tournament.name}</h1>
-            <p>{data.tournament.ratingCategory[0].toUpperCase() + data.tournament.ratingCategory.slice(1)} · {data.tournament.isRated ? 'Rated' : 'Unrated'}</p></header>
+            <p><RatingCategoryIcon category={data.tournament.ratingCategory} />{data.tournament.ratingCategory[0].toUpperCase() + data.tournament.ratingCategory.slice(1)} · {data.tournament.isRated ? 'Rated' : 'Unrated'}</p></header>
         <section className="public-card public-section"><h2>Standings</h2>
             {data.standings.length ? <div className="public-table-wrap"><table className="public-table">
                 <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Score</th></tr></thead>

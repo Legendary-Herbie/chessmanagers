@@ -39,6 +39,9 @@ const pendingClaimPayload = z.object({
 }).strict();
 
 const EVENT_POLICIES = {
+    'player_registration.pending': { setting: 'playerClaimEvents', schema: z.object({ requestId: z.string().min(1), playerName: z.string().min(1).max(200) }).strict() },
+    'player_registration.approved': { setting: 'playerClaimEvents', schema: playerDecisionPayload.extend({ requestId: z.string().min(1) }) },
+    'player_registration.rejected': { setting: 'playerClaimEvents', schema: z.object({ requestId: z.string().min(1), playerName: z.string().min(1).max(200), reason: nullableReason }).strict() },
     'membership.request_pending': { setting: 'membershipEvents', schema: pendingMembershipPayload },
     'join_request.approved': {
         setting: 'membershipEvents',

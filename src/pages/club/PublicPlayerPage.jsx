@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import { Link, useParams } from 'react-router-dom';
 import { resolveAssetUrl } from '../../config/api.js';
 import { publicApi } from '../../features/public/api/publicApi.js';
@@ -28,7 +29,7 @@ export default function PublicPlayerPage() {
             {player.photoUrl && <img className="public-profile__photo" src={resolveAssetUrl(player.photoUrl)} alt={`${player.name} profile`} />}
             <div><h1>{player.name}</h1>{player.bio && <p>{player.bio}</p>}</div>
             <dl className="public-ratings">{Object.entries(player.ratings).map(([category, rating]) =>
-                <div className="public-rating" key={category}><dt>{category[0].toUpperCase() + category.slice(1)}</dt><dd>{rating}</dd></div>
+                <div className="public-rating" key={category}><dt><RatingCategoryIcon category={category} />{category[0].toUpperCase() + category.slice(1)}</dt><dd>{rating}</dd></div>
             )}</dl>
         </article>
         <div><Link className="public-back-link text-link" to={`/clubs/${clubId}`}>← Back to club</Link></div>

@@ -179,6 +179,17 @@ export const createPlayerSchema = z.object({
     federationId: nullableProfileText(100).optional(),
 }).strict().superRefine(disallowLegacyAndCategoryRatings);
 
+export const playerRegistrationSchema = z.object({
+    name: z.string().trim().min(1, 'Your name is required.').max(100),
+    bio: nullableProfileText(500).optional(),
+    federationId: nullableProfileText(100).optional(),
+}).strict();
+export const playerRegistrationParamsSchema = z.object({ clubId: z.string().min(1), requestId: z.string().min(1) }).strict();
+export const playerRegistrationReviewSchema = z.object({
+    decision: z.enum(['approved', 'rejected']),
+    reason: z.string().trim().max(500).nullable().optional(),
+}).strict();
+
 export const createPlayersBulkSchema = z.object({
     players: z.array(z.object({
         name: z.string().trim().min(1, 'Player name is required.').max(100),

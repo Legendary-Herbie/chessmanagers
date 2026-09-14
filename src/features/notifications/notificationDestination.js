@@ -1,5 +1,6 @@
 export function notificationDestination(notification) {
     const payload = notification.payload || {};
+    if (notification.eventType.startsWith('player_registration.')) return payload.playerId ? `/players/${payload.playerId}` : '/players';
     if (notification.eventType === 'membership.request_pending') return '/dashboard';
     if (notification.eventType === 'join_request.rejected') return `/clubs/${notification.clubId}`;
     if (notification.eventType === 'join_request.approved') return '/dashboard';

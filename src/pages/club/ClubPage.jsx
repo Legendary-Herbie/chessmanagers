@@ -526,7 +526,7 @@ export default function ClubPage() {
                     </label>
 
                     <label className="form-row">
-                        <div className="label">Player claim notifications</div>
+                        <div className="label">Player claim and self-registration notifications</div>
                         <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.playerClaimEvents !== false} onChange={e => updateStructuredSetting('notifications', 'playerClaimEvents', e.target.checked)} />
                     </label>
 

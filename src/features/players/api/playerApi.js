@@ -1,6 +1,9 @@
 import { api, endpoints } from '../../../config/api.js';
 
 export const playerApi = {
+    fetchRegistrations: async (clubId, options = {}) => (await api.get(endpoints.players.registrations(clubId), options)).registrations,
+    registerSelf: async (clubId, values) => (await api.post(endpoints.players.registrations(clubId), values)).registration,
+    reviewRegistration: async (clubId, requestId, values) => (await api.patch(endpoints.players.registration(clubId, requestId), values)).registration,
     searchPlayers: async (clubId, { q = '', limit = 20, offset = 0, signal } = {}) => {
         const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
         if (q) params.set('q', q);

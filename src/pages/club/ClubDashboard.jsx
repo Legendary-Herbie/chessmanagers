@@ -1,4 +1,5 @@
 import React from 'react';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import { Link } from 'react-router-dom';
 import '../../styles/club-dashboard.css';
 
@@ -40,7 +41,7 @@ export default function ClubDashboard({ data, onCategoryChange, canManageMembers
                 <div className="dash-category-bars">{CATEGORIES.map(category => {
                     const count = categoryCounts[category];
                     return <div key={category} className="dash-category-row">
-                        <span className="dash-category-label">{title(category)}</span>
+                        <span className="dash-category-label"><RatingCategoryIcon category={category} />{title(category)}</span>
                         <div className="dash-category-track"><div className="dash-category-fill" style={{ width: `${Math.round(count / maxCategoryCount * 100)}%` }} /></div>
                         <span className="dash-category-count">{count}</span>
                     </div>;
@@ -71,7 +72,7 @@ export default function ClubDashboard({ data, onCategoryChange, canManageMembers
                 <tbody>{recentMatches.map(match => <tr key={match.id}>
                     <td>{new Date(match.playedAt).toLocaleDateString()}</td>
                     <td>{match.whitePlayerId ? <Link className="name-link" to={`/players/${match.whitePlayerId}`}>{match.whitePlayerName}</Link> : match.whitePlayerName}</td><td>{match.blackPlayerId ? <Link className="name-link" to={`/players/${match.blackPlayerId}`}>{match.blackPlayerName}</Link> : match.blackPlayerName}</td>
-                    <td>{RESULT_LABELS[match.result]}</td><td>{title(match.ratingCategory)}</td>
+                    <td>{RESULT_LABELS[match.result]}</td><td><RatingCategoryIcon category={match.ratingCategory} />{title(match.ratingCategory)}</td>
                 </tr>)}</tbody>
             </table></div>}
         </div>

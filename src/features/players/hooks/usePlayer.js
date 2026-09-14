@@ -52,8 +52,9 @@ export function usePlayer(clubId, playerId, ratingCategory = 'rapid') {
 
     const claimPlayer = async () => {
         if (!clubId || !player) return;
-        await playerApi.claimPlayer(clubId, player.id);
+        const link = await playerApi.claimPlayer(clubId, player.id);
         await fetchPlayerData();
+        return link;
     };
 
     const unlinkPlayer = async () => {

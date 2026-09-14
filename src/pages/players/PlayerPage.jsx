@@ -1,4 +1,5 @@
 import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import MatchRating from '../../features/matches/components/MatchRating.jsx';
 import Icon from '../../shared/common/Icon.jsx';
 import React, { useState } from 'react';
@@ -22,7 +23,7 @@ export default function PlayerPage() {
     const { playerId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { club, linkedPlayer, capabilities, loading: clubLoading } = useClub();
+    const { club, linkedPlayer, capabilities, loading: clubLoading, refreshClub } = useClub();
     const { notify } = useNotifications();
     const isAdmin = Boolean(capabilities.canManagePlayers);
     const [ratingCategory, setRatingCategory] = useState('rapid');
@@ -62,12 +63,16 @@ export default function PlayerPage() {
         setConfirmModal({
             isOpen: true,
             title: 'Claim Player Profile',
-            message: `Request to claim player profile "${player?.name}"? An admin will review your request.`,
+            message: isAdmin ? `Claim "${player?.name}" as your player profile? Your club role allows immediate approval.` : `Request to claim player profile "${player?.name}"? An admin will review your request.`,
             variant: 'primary',
             onConfirm: async () => {
-                await runPlayerAction(claimPlayer, {
+                await runPlayerAction(async () => {
+                    const link = await claimPlayer();
+                    if (link?.status === 'approved') await refreshClub();
+                    return link;
+                }, {
                     notify,
-                    successMessage: 'Claim request submitted.',
+                    successMessage: link => link?.status === 'approved' ? 'Player profile linked. Your claim was automatically approved.' : 'Claim request submitted.',
                     fallbackError: 'Failed to submit claim request.',
                 });
                 closeConfirmModal();
@@ -194,7 +199,7 @@ export default function PlayerPage() {
                         </div>
                         <div className="player-detail__badges">
                             <span className="rating-badge" style={{ fontSize: '0.85rem', padding: '4px 10px' }}>
-                                <Icon name="trophy" /> {rating} {categoryLabel(ratingCategory)} Elo
+                                <RatingCategoryIcon category={ratingCategory} /> {rating} {categoryLabel(ratingCategory)} Elo
                             </span>
                             {isPending && <span className="link-badge link-badge--pending"><Icon name="clock" /> Pending Claim</span>}
                             {!isLinked && !isPending && <span className="link-badge link-badge--unlinked">Unlinked Profile</span>}
@@ -237,7 +242,7 @@ export default function PlayerPage() {
                         className={`player-tab-btn ${ratingCategory === category ? 'player-tab-btn--active' : ''}`}
                         onClick={() => setRatingCategory(category)}
                     >
-                        {categoryLabel(category)}
+                        <RatingCategoryIcon category={category} />{categoryLabel(category)}
                     </button>
                 ))}
             </div>

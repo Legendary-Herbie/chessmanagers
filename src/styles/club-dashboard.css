@@ -110,7 +110,7 @@
 
 .dash-category-row {
     display: grid;
-    grid-template-columns: 70px 1fr 32px;
+    grid-template-columns: 100px minmax(0, 1fr) 32px;
     align-items: center;
     gap: 10px;
 }
