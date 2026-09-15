@@ -46,6 +46,7 @@ export default function TournamentPage() {
     const [error, setError] = useState('');
     const [notice, setNotice] = useState('');
     const [resultDrafts, setResultDrafts] = useState({});
+    const [pendingResults, setPendingResults] = useState({});
     const resultSaving = useRef(new Set());
     const [resultPending, setResultPending] = useState(new Set());
     const [selectedRound, setSelectedRound] = useState(null);
@@ -138,6 +139,7 @@ export default function TournamentPage() {
             return;
         }
         resultSaving.current.add(pairingId);
+        setPendingResults(current => ({ ...current, [pairingId]: values.result }));
         setResultPending(new Set(resultSaving.current));
         setError('');
         const payload = { ...values, playedAt: new Date(values.playedAt).toISOString(), notes: values.notes || null, confirmDuplicate };
@@ -159,6 +161,7 @@ export default function TournamentPage() {
             }
             setError(requestError.message || 'Unable to save result.');
         } finally {
+            setPendingResults(current => { const next = { ...current }; delete next[pairingId]; return next; });
             resultSaving.current.delete(pairingId);
             setResultPending(new Set(resultSaving.current));
         }
@@ -276,8 +279,8 @@ export default function TournamentPage() {
                             <span className="pairing-player black entity-name">{pairing.isBye ? 'Bye' : pairing.blackPlayerName || participants.find(player => player.id === pairing.blackPlayerId)?.name}</span>
                             {isAdmin && !pairing.isBye && <div className="pairing-score-buttons" role="group" aria-label={`Result for round ${round.roundNumber}, board ${pairing.board}`}>
                                 {['white', 'draw', 'black'].map(result => <Button key={result}
-                                    variant={pairing.result === result ? 'primary' : 'secondary'}
-                                    aria-pressed={pairing.result === result} disabled={saving || Boolean(duplicateConfirmation)}
+                                    variant={(pendingResults[pairing.id] ?? pairing.result) === result ? 'primary' : 'secondary'}
+                                    aria-pressed={(pendingResults[pairing.id] ?? pairing.result) === result} disabled={saving || Boolean(duplicateConfirmation)}
                                     aria-disabled={resultPending.has(pairing.id)} aria-busy={resultPending.has(pairing.id)}
                                     onClick={() => saveResult(pairing.id, { ...resultValues(pairing), result })}>{resultLabel(result)}</Button>)}
                             </div>}

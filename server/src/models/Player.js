@@ -188,7 +188,7 @@ export const PlayerModel = {
         [clubId, playerId, viewerUserId]
     ).then(result => result.first),
 
-    findByClub: async (clubId, viewerUserId = null, { q = '', limit = 50, offset = 0 } = {}) => db.query(
+    findByClub: async (clubId, viewerUserId = null, { q = '', limit = 50, offset = 0, category = 'rapid', status = 'all', sortBy = 'rating_desc' } = {}) => db.query(
         `SELECT ${PLAYER_FIELDS}, COALESCE(rating_state.ratings, '{}'::JSONB) AS ratings,
                 link.status AS link_status,
                 COALESCE(link.user_id = $2, FALSE) AS is_self,
@@ -205,9 +205,16 @@ export const PlayerModel = {
          ) link ON TRUE
          WHERE p.club_id = $1 AND p.status = 'active' AND p.deleted_at IS NULL
            AND ($3 = '' OR p.name ILIKE '%' || $3 || '%' OR COALESCE(p.bio, '') ILIKE '%' || $3 || '%')
-         ORDER BY p.rating DESC, p.name ASC
+           AND ($6 = 'all' OR ($6 = 'claimed' AND link.status = 'approved')
+                OR ($6 = 'pending' AND link.status = 'pending') OR ($6 = 'unlinked' AND link.status IS NULL))
+         ORDER BY
+            CASE WHEN $8 = 'rating_desc' THEN (rating_state.ratings -> $7 ->> 'current_rating')::NUMERIC END DESC NULLS LAST,
+            CASE WHEN $8 = 'rating_asc' THEN (rating_state.ratings -> $7 ->> 'current_rating')::NUMERIC END ASC NULLS LAST,
+            CASE WHEN $8 = 'games_desc' THEN p.games END DESC NULLS LAST,
+            CASE WHEN $8 = 'winrate_desc' THEN COALESCE((p.wins + p.draws * 0.5) / NULLIF(p.games, 0), 0) END DESC,
+            p.name ASC, p.id ASC
          LIMIT $4 OFFSET $5`,
-        [clubId, viewerUserId, q, limit, offset]
+        [clubId, viewerUserId, q, limit, offset, status, category, sortBy]
     ).then(result => ({
         players: result.rows.map(row => {
             const player = { ...row };

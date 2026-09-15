@@ -19,20 +19,6 @@ const navItems = [
     { to: '/announcements', label: 'Announcements', icon: 'announcements' },
 ];
 
-const iconPaths = {
-    dashboard: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
-    leaderboard: <><path d="M5 21V11h4v10" /><path d="M10 21V3h4v18" /><path d="M15 21v-6h4v6" /></>,
-    players: <><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6" /><path d="M14 15c3.8-.7 7 1 7 5" /></>,
-    matches: <><path d="M7 3l10 18" /><path d="M17 3L7 21" /><circle cx="12" cy="12" r="2" /></>,
-    clubs: <><path d="M12 21s7-3.5 7-10V5l-7-2-7 2v6c0 6.5 7 10 7 10z" /><circle cx="12" cy="9" r="2" /><path d="M8.5 15c.7-2 2-3 3.5-3s2.8 1 3.5 3" /></>,
-    tournaments: <><path d="M8 4h8v4a4 4 0 01-8 0V4z" /><path d="M8 6H4v1a5 5 0 005 5M16 6h4v1a5 5 0 01-5 5" /><path d="M12 12v5M8 21h8M9 17h6" /></>,
-    announcements: <><path d="M4 13V8l13-4v13L4 13z" /><path d="M7 14l2 6h4l-2-7" /><path d="M20 8v5" /></>,
-};
-
-function NavIcon({ name }) {
-    return <svg className="app-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconPaths[name]}</svg>;
-}
-
 function navLinkClass({ isActive }) {
     return `app-nav__link${isActive ? ' app-nav__link--active' : ''}`;
 }
@@ -265,7 +251,7 @@ export default function AppLayout() {
                                 end={item.end}
                                 className={navLinkClass}
                             >
-                                <NavIcon name={item.icon} />
+                                <Icon className="app-nav__icon" name={item.icon} size="xl" />
                                 <span className="app-nav__link-label">{item.label}</span>
                             </NavLink>
                         ))}

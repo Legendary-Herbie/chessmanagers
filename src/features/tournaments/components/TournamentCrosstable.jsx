@@ -1,9 +1,11 @@
-import React from 'react';
+import React, { memo, useMemo } from 'react';
 
 // Presentation only: scores and ordering come from the server standings.
-export default function TournamentCrosstable({ participants, rounds, standings }) {
+function TournamentCrosstable({ participants, rounds, standings }) {
+    const { players, results, ranks } = useMemo(() => {
+    const ranks = new Map(standings.map(row => [row.playerId, row]));
     const players = [...participants].sort((a, b) => {
-        const rank = id => standings.find(row => row.playerId === id)?.rank ?? Infinity;
+        const rank = id => ranks.get(id)?.rank ?? Infinity;
         return rank(a.id) - rank(b.id) || a.name.localeCompare(b.name);
     });
     const results = new Map();
@@ -23,6 +25,8 @@ export default function TournamentCrosstable({ participants, rounds, standings }
             }
         }
     }
+    return { players, results, ranks };
+    }, [participants, rounds, standings]);
     return <>
         <div className="tournament-table-wrap table-scroll" tabIndex={0} role="region" aria-label="Tournament crosstable">
             <table className="tournament-table tournament-crosstable">
@@ -32,7 +36,7 @@ export default function TournamentCrosstable({ participants, rounds, standings }
                     {players.map(opponent => <td className={player.id === opponent.id ? 'cross-self' : undefined} key={opponent.id} aria-label={`${player.name} against ${opponent.name}`}>
                         {player.id === opponent.id ? '—' : results.get(`${player.id}:${opponent.id}`)?.map(cell => <span className={`cross-score cross-score--${cell.score === '1' ? 'win' : cell.score === '½' ? 'draw' : cell.score === '0' ? 'loss' : 'empty'}`} key={cell.id} title={cell.description} aria-label={cell.description}>{cell.score}</span>) || '·'}
                     </td>)}
-                    <td>{player.byeCount ?? 0}</td><td><strong>{standings.find(row => row.playerId === player.id)?.matchPoints ?? '—'}</strong></td>
+                    <td>{player.byeCount ?? 0}</td><td><strong>{ranks.get(player.id)?.matchPoints ?? '—'}</strong></td>
                 </tr>)}</tbody>
             </table>
             {!players.length && <p>No participants yet.</p>}
@@ -40,3 +44,5 @@ export default function TournamentCrosstable({ participants, rounds, standings }
         <p className="muted">1 win · ½ draw · 0 loss · ? awaiting result · · not paired · — self. Byes are shown separately; points include the server’s bye awards. Score labels include round and colour.</p>
     </>;
 }
+
+export default memo(TournamentCrosstable);

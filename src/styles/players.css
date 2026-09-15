@@ -725,3 +725,5 @@
 
 .player-card__name:has(.claimed-badge) { display: inline-flex; max-width: 100%; align-items: center; overflow: visible; }
 .player-card__name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+
+.roster-load-more { align-items: center; gap: 16px; }

@@ -1,6 +1,5 @@
-import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { playerApi } from '../api/playerApi.js';
-import { playerRating } from '../roster/playerRating.js';
 import { isCancelledError } from '../../../config/api.js';
 
 export function usePlayers(clubId, { includeInactive = false } = {}) {
@@ -13,6 +12,7 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [metadataError, setMetadataError] = useState(null);
 
     // Toolbar filtering & sorting state
     const [searchTerm, setSearchTerm] = useState('');
@@ -21,6 +21,27 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     const [sortBy, setSortBy] = useState('rating_desc');     // 'rating_desc' | 'rating_asc' | 'name_asc' | 'games_desc' | 'winrate_desc'
     const [viewMode, setViewMode] = useState('grid');       // 'grid' | 'table'
 
+    const [page, setPage] = useState(0);
+    const [total, setTotal] = useState(0);
+    const [query, setQuery] = useState('');
+    const [revision, setRevision] = useState(0);
+    useEffect(() => { setPage(0); }, [clubId]);
+    useEffect(() => {
+        const timer = setTimeout(() => { setQuery(searchTerm.trim()); setPage(0); }, 250);
+        return () => clearTimeout(timer);
+    }, [searchTerm]);
+    useEffect(() => {
+        const controller = new AbortController();
+        if (!clubId) return;
+        setMetadataError(null);
+        Promise.all([
+            includeInactive ? playerApi.fetchInactivePlayers(clubId, { signal: controller.signal }) : [],
+            playerApi.fetchRosterSummary(clubId, { signal: controller.signal }),
+        ]).then(([inactive, summary]) => {
+            if (!controller.signal.aborted) { setInactivePlayers(inactive); setRosterSummary(summary); }
+        }).catch(err => { if (!controller.signal.aborted && !isCancelledError(err)) setMetadataError(err.message); });
+        return () => controller.abort();
+    }, [clubId, includeInactive, revision]);
     const requestId = useRef(0);
     const fetchPlayers = useCallback(async (signal) => {
         const currentRequest = ++requestId.current;
@@ -37,25 +58,13 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
         }
         setLoading(true);
         try {
-            const loadRoster = async () => {
-                const roster = [];
-                let page;
-                do {
-                    page = await playerApi.fetchPlayers(clubId, { limit: 100, offset: roster.length, signal });
-                    if (signal?.aborted || currentRequest !== requestId.current) return [];
-                    roster.push(...page);
-                } while (page.length === 100);
-                return roster;
-            };
-            const [data, inactive, summary] = await Promise.all([
-                loadRoster(),
-                includeInactive ? playerApi.fetchInactivePlayers(clubId, { signal }) : Promise.resolve([]),
-                playerApi.fetchRosterSummary(clubId, { signal }),
-            ]);
+            const data = await playerApi.searchPlayers(clubId, {
+                q: query, limit: 24, offset: page * 24, status: statusFilter, sortBy, category: ratingCategory, signal,
+            });
             if (signal?.aborted || currentRequest !== requestId.current) return;
-            setPlayers(data);
-            setInactivePlayers(inactive);
-            setRosterSummary(summary);
+            if (!data.players.length && page > 0) { setPage(value => value - 1); return; }
+            setPlayers(data.players);
+            setTotal(data.total);
             setError(null);
         } catch (err) {
             if (signal?.aborted || currentRequest !== requestId.current || isCancelledError(err)) return;
@@ -64,7 +73,7 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
         } finally {
             if (!signal?.aborted && currentRequest === requestId.current) setLoading(false);
         }
-    }, [clubId, includeInactive]);
+    }, [clubId, query, page, statusFilter, sortBy, ratingCategory]);
 
     useEffect(() => {
         const controller = new AbortController();
@@ -101,12 +110,14 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     const archivePlayer = async (playerId) => {
         if (!clubId) return;
         await playerApi.archivePlayer(clubId, playerId);
+        setRevision(value => value + 1);
         await fetchPlayers();
     };
 
     const restorePlayer = async (playerId) => {
         if (!clubId) return;
         await playerApi.restorePlayer(clubId, playerId);
+        setRevision(value => value + 1);
         await fetchPlayers();
     };
 
@@ -114,6 +125,7 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     const claimPlayer = async (playerId) => {
         if (!clubId) return;
         const link = await playerApi.claimPlayer(clubId, playerId);
+        setRevision(value => value + 1);
         await fetchPlayers(); // Refresh link status
         return link;
     };
@@ -122,63 +134,29 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     const unlinkPlayer = async (playerId) => {
         if (!clubId) return;
         await playerApi.unlinkPlayer(clubId, playerId);
+        setRevision(value => value + 1);
         await fetchPlayers();
     };
-
-    // Process Search, Filtering, and Sorting
-    const processedPlayers = useMemo(() => {
-        const query = searchTerm.trim().toLocaleLowerCase();
-        let result = players.filter(player => !query ||
-            `${player.name || ''} ${player.bio || ''}`.toLocaleLowerCase().includes(query));
-
-        if (statusFilter === 'claimed') {
-            result = result.filter((p) => p.link_status === 'approved');
-        } else if (statusFilter === 'pending') {
-            result = result.filter((p) => p.link_status === 'pending');
-        } else if (statusFilter === 'unlinked') {
-            result = result.filter((p) => !p.link_status || p.link_status === 'none');
-        }
-
-        result.sort((a, b) => {
-            if (sortBy === 'rating_desc' || sortBy === 'rating_asc') {
-                const first = playerRating(a, ratingCategory);
-                const second = playerRating(b, ratingCategory);
-                if (first == null && second != null) return 1;
-                if (second == null && first != null) return -1;
-                const difference = sortBy === 'rating_desc' ? second - first : first - second;
-                return difference || (a.name || '').localeCompare(b.name || '') || a.id.localeCompare(b.id);
-            }
-            if (sortBy === 'name_asc') return (a.name || '').localeCompare(b.name || '');
-            if (sortBy === 'games_desc') return (b.games || 0) - (a.games || 0);
-            if (sortBy === 'winrate_desc') {
-                const wrA = a.games > 0 ? (a.wins + (a.draws || 0) * 0.5) / a.games : 0;
-                const wrB = b.games > 0 ? (b.wins + (b.draws || 0) * 0.5) / b.games : 0;
-                return wrB - wrA;
-            }
-            return 0;
-        });
-
-        return result;
-    }, [players, searchTerm, statusFilter, sortBy, ratingCategory]);
 
     return {
         players,
         inactivePlayers,
-        processedPlayers,
+        processedPlayers: players,
+        page, setPage, total, pageSize: 24,
         stats: rosterSummary,
         loading,
-        error,
+        error: error || metadataError,
         searchTerm,
         setSearchTerm,
         ratingCategory,
-        setRatingCategory,
+        setRatingCategory: value => { setRatingCategory(value); setPage(0); },
         statusFilter,
-        setStatusFilter,
+        setStatusFilter: value => { setStatusFilter(value); setPage(0); },
         sortBy,
-        setSortBy,
+        setSortBy: value => { setSortBy(value); setPage(0); },
         viewMode,
         setViewMode,
-        refetch: fetchPlayers,
+        refetch: async () => { setRevision(value => value + 1); await fetchPlayers(); },
         addPlayer,
         addPlayersBulk,
         updatePlayer,

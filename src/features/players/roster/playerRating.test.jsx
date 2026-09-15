@@ -7,7 +7,7 @@ import { usePlayers } from '../hooks/usePlayers.js';
 import { playerApi } from '../api/playerApi.js';
 import PlayerCard from '../components/PlayerCard.jsx';
 import PlayerTable from './PlayerTable.jsx';
-vi.mock('../api/playerApi.js', () => ({ playerApi: { fetchPlayers: vi.fn(), fetchRosterSummary: vi.fn() } }));
+vi.mock('../api/playerApi.js', () => ({ playerApi: { fetchPlayers: vi.fn(), searchPlayers: vi.fn(), fetchRosterSummary: vi.fn() } }));
 afterEach(cleanup);
 const players = [
     { id: 'a', name: 'Ada', rating: 9999, blitz_rating: 900, ratings: { blitz: { current_rating: 1200 }, rapid: { current_rating: 1800 } } },
@@ -20,19 +20,14 @@ it('uses category state, falls back only to the same category, and preserves zer
     expect(playerRating({ blitz_rating: 0 }, 'blitz')).toBe(0);
     expect(playerRating(players[2], 'rapid')).toBeNull();
 });
-it('sorts by the chosen category with missing ratings last in either direction', async () => {
-    playerApi.fetchPlayers.mockResolvedValue(players);
+it('sends category and sorting to the paginated endpoint', async () => {
+    playerApi.searchPlayers.mockResolvedValue({ players, total: 3 });
     playerApi.fetchRosterSummary.mockResolvedValue({});
     const { result } = renderHook(() => usePlayers('club_1'));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.ratingCategory).toBe('rapid');
-    expect(result.current.processedPlayers.map(p => p.id)).toEqual(['a', 'b', 'c']);
+    expect(playerApi.searchPlayers).toHaveBeenLastCalledWith('club_1', expect.objectContaining({ category: 'rapid', limit: 24, offset: 0 }));
     act(() => result.current.setRatingCategory('blitz'));
-    expect(result.current.processedPlayers.map(p => p.id)).toEqual(['b', 'a', 'c']);
-    act(() => result.current.setRatingCategory('rapid'));
-    expect(result.current.processedPlayers.map(p => p.id)).toEqual(['a', 'b', 'c']);
-    act(() => result.current.setSortBy('rating_asc'));
-    expect(result.current.processedPlayers.map(p => p.id)).toEqual(['b', 'a', 'c']);
+    await waitFor(() => expect(playerApi.searchPlayers).toHaveBeenLastCalledWith('club_1', expect.objectContaining({ category: 'blitz' })));
 });
 it('labels the selected rating consistently in cards and tables without generic fallback', () => {
     render(<MemoryRouter><PlayerCard player={players[0]} ratingCategory="rapid" /><PlayerTable players={players} ratingCategory="rapid" /></MemoryRouter>);
@@ -41,15 +36,15 @@ it('labels the selected rating consistently in cards and tables without generic 
     expect(screen.queryByText(/9999/)).toBeNull();
 });
 
-it('loads beyond 100 players and searches locally without refetching metadata', async () => {
-    const roster = Array.from({ length: 105 }, (_, index) => ({ id: `p${index}`, name: `Player ${index}`, bio: index === 104 ? 'Club champion' : '' }));
-    playerApi.fetchPlayers.mockReset().mockImplementation((_club, { offset }) => Promise.resolve(roster.slice(offset, offset + 100)));
+it('loads one page and searches without refetching metadata', async () => {
+    playerApi.searchPlayers.mockReset().mockResolvedValue({ players: players.slice(0, 2), total: 105 });
     playerApi.fetchRosterSummary.mockReset().mockResolvedValue({ totalPlayers: 105 });
     const { result } = renderHook(() => usePlayers('large_club'));
     await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(result.current.processedPlayers).toHaveLength(105);
+    expect(playerApi.searchPlayers).toHaveBeenCalledTimes(1);
     act(() => result.current.setSearchTerm(' CHAMPION '));
-    expect(result.current.processedPlayers.map(player => player.id)).toEqual(['p104']);
-    expect(playerApi.fetchPlayers).toHaveBeenCalledTimes(2);
+    await waitFor(() => expect(playerApi.searchPlayers).toHaveBeenLastCalledWith('large_club', expect.objectContaining({ q: 'CHAMPION', limit: 24 })));
     expect(playerApi.fetchRosterSummary).toHaveBeenCalledTimes(1);
+    act(() => result.current.setPage(1));
+    await waitFor(() => expect(playerApi.searchPlayers).toHaveBeenLastCalledWith('large_club', expect.objectContaining({ offset: 24 })));
 });

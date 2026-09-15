@@ -26,8 +26,8 @@ function sendFailure(res, result) {
 
 export async function getPlayers(req, res, next) {
     try {
-        const { q = '', limit = 50, offset = 0 } = req.validatedQuery;
-        const result = await PlayerModel.findByClub(req.params.clubId, req.user.id, { q, limit, offset });
+        const { q = '', limit = 50, offset = 0, category, status, sortBy } = req.validatedQuery;
+        const result = await PlayerModel.findByClub(req.params.clubId, req.user.id, { q, limit, offset, category, status, sortBy });
         res.json({ players: result.players, total: result.total, limit, offset });
     } catch (error) {
         next(error);

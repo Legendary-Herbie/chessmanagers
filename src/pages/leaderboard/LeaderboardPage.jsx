@@ -1,7 +1,7 @@
 import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
 import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import Icon from '../../shared/common/Icon.jsx';
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import '../../styles/leaderboard.css';
 import Button from '../../shared/common/Button.jsx';
@@ -15,7 +15,7 @@ const CATEGORIES = ['blitz', 'rapid', 'classical'];
 const PAGE_SIZE = 25;
 const label = category => category[0].toUpperCase() + category.slice(1);
 
-function Sparkline({ points = [] }) {
+const Sparkline = memo(function Sparkline({ points = [] }) {
     if (!points.length) return <div className="sparkline empty">No rating history yet.</div>;
     const width = 360;
     const height = 120;
@@ -34,7 +34,7 @@ function Sparkline({ points = [] }) {
             <path d={path} fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     );
-}
+});
 
 function RatingCells({ entry, selectedCategory }) {
     return CATEGORIES.map(category => (

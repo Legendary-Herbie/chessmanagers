@@ -1,5 +1,12 @@
 import React from 'react';
 const paths = {
+    bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4',
+    dashboard: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
+    leaderboard: 'M5 21V11h4v10M10 21V3h4v18M15 21v-6h4v6',
+    clubs: 'M12 21s7-3.5 7-10V5l-7-2-7 2v6c0 6.5 7 10 7 10z',
+    tournaments: 'M8 3h8v5a4 4 0 0 1-8 0zM8 5H4v2a5 5 0 0 0 5 5M16 5h4v2a5 5 0 0 1-5 5M12 12v6M8 21h8M9 18h6',
+    announcements: 'M4 13V8l13-4v13L4 13zM7 14l2 6h4l-2-7M20 8v5',
+
     x: 'M6 6l12 12M6 18L18 6', check: 'M5 12l4 4L19 6',
     clock: 'M12 8v4l3 2M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
     edit: 'm15 5 4 4M4 20l4-1L20 7a2.8 2.8 0 0 0-4-4L4 15z',

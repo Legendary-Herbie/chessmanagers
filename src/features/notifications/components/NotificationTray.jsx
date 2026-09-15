@@ -1,3 +1,4 @@
+import { useVisiblePolling } from '../../../shared/hooks/useVisiblePolling.js';
 import Icon from '../../../shared/common/Icon.jsx';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
@@ -43,14 +44,6 @@ function notificationDetail(notification) {
     return null;
 }
 
-function BellIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-    );
-}
-
 export default function NotificationTray() {
     const navigate = useNavigate();
     const { selectClub, activeClubs = [] } = useClub();
@@ -85,12 +78,11 @@ export default function NotificationTray() {
         }
     }, []);
 
+    useVisiblePolling(load, 60_000);
     useEffect(() => {
-        const requestState = loadVersion.current;
-        load();
-        const timer = setInterval(load, 60_000);
-        return () => { clearInterval(timer); requestState.value++; };
-    }, [load]);
+        const state = loadVersion.current;
+        return () => { state.value++; };
+    }, []);
 
     useEffect(() => {
         if (!open) return undefined;
@@ -121,11 +113,14 @@ export default function NotificationTray() {
         setLoading(false);
         setMutating(true);
         setError(null);
+        const previous = { notifications, unreadCount };
+        update();
         try {
             await request();
-            update();
             return true;
         } catch (requestError) {
+            setNotifications(previous.notifications);
+            setUnreadCount(previous.unreadCount);
             setError(requestError.message || fallback);
             return false;
         } finally {
@@ -184,7 +179,7 @@ export default function NotificationTray() {
                 aria-expanded={open}
                 onClick={toggle}
             >
-                <BellIcon />
+                <Icon name="bell" size="lg" />
                 {unreadCount > 0 && (
                     <span className="notification-tray__badge" aria-hidden="true">
                         {unreadCount > 99 ? '99+' : unreadCount}

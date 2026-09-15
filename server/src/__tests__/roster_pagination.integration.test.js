@@ -1,0 +1,22 @@
+import { expect, it } from 'vitest';
+import request from 'supertest';
+import app from '../../index.js';
+import { createUser, createClub, createPlayer, createPlayerLink, addClubMember, authorization } from '../test/factories.js';
+it('filters and sorts the full club roster before paginating and rejects unsupported sorts', async () => {
+    const owner = await createUser();
+    const club = await createClub(owner);
+    const ada = await createPlayer(club, { name: 'Ada', rating: 1200 });
+    await createPlayer(club, { name: 'Beth', rating: 1800, bio: 'Champion' });
+    const user = await createUser();
+    await addClubMember(club, user);
+    await createPlayerLink(user, ada, { status: 'approved', reviewedAt: new Date() });
+    const get = query => request(app).get(`/api/v1/clubs/${club.id}/players?${query}`).set('Authorization', authorization(owner));
+    const page = await get('limit=1&offset=1&sortBy=rating_desc&category=rapid').expect(200);
+    expect(page.body.total).toBe(2);
+    expect(page.body.players.map(p => p.name)).toEqual(['Ada']);
+    const claimed = await get('status=claimed').expect(200);
+    expect(claimed.body.players.map(p => p.name)).toEqual(['Ada']);
+    const unlinked = await get('status=unlinked&q=Champion').expect(200);
+    expect(unlinked.body.players.map(p => p.name)).toEqual(['Beth']);
+    await get('sortBy=invalid').expect(400);
+});

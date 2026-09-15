@@ -26,7 +26,7 @@ export default function PlayersPage() {
     const isAdmin = Boolean(capabilities.canManagePlayers);
 
     const {
-        processedPlayers,
+        processedPlayers, page, setPage, total, pageSize,
         inactivePlayers,
         stats,
         loading,
@@ -58,13 +58,11 @@ export default function PlayersPage() {
         }
     }, [club?.id, isAdmin, searchParams, setSearchParams]);
 
-    const [visibleCount, setVisibleCount] = useState(24);
     const [restoringId, setRestoringId] = useState(null);
     const [archiveSearch, setArchiveSearch] = useState('');
-    useEffect(() => { setVisibleCount(24); }, [club?.id, searchTerm, statusFilter, sortBy, ratingCategory]);
     const clearFilters = () => { setSearchTerm(''); setStatusFilter('all'); };
     const hasFilters = Boolean(searchTerm || statusFilter !== 'all');
-    const visiblePlayers = processedPlayers.slice(0, visibleCount);
+    const visiblePlayers = processedPlayers;
     const handleRestore = async (player) => {
         setRestoringId(player.id);
         try {
@@ -200,6 +198,7 @@ export default function PlayersPage() {
                         className="players-toolbar__search-input"
                         placeholder="Search players by name or bio..."
                         aria-label="Search players"
+                        maxLength={100}
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
                     />
@@ -254,7 +253,7 @@ export default function PlayersPage() {
             </div>
 
             <div className="roster-results">
-                <p role="status">{loading ? 'Loading roster…' : `${processedPlayers.length} of ${stats.totalPlayers} players`}</p>
+                <p role="status">{loading ? 'Loading roster…' : `${total} of ${stats.totalPlayers} players`}</p>
                 {hasFilters && <button type="button" className="btn-secondary btn-sm" onClick={clearFilters}>Clear filters</button>}
             </div>
 
@@ -316,11 +315,11 @@ export default function PlayersPage() {
                 />
             )}
 
-            {!loading && !error && processedPlayers.length > visibleCount && <div className="roster-load-more">
-                <button type="button" className="btn-secondary" onClick={() => setVisibleCount(count => count + 24)}>
-                    Show more players ({processedPlayers.length - visibleCount} remaining)
-                </button>
-            </div>}
+            {!loading && !error && (page > 0 || total > pageSize) && <nav className="roster-load-more" aria-label="Player pages">
+                <button type="button" className="btn-secondary" disabled={page === 0} onClick={() => setPage(value => value - 1)}>Previous</button>
+                <span>Page {page + 1} of {Math.max(page + 1, Math.ceil(total / pageSize))}</span>
+                <button type="button" className="btn-secondary" disabled={(page + 1) * pageSize >= total} onClick={() => setPage(value => value + 1)}>Next</button>
+            </nav>}
 
             <Disclosure className="roster-summary" title="Roster statistics">
                 <p>{stats.activePlayers} players with games played. Average Elo ratings: Blitz {stats.averageRatings.blitz ?? '—'} · Rapid {stats.averageRatings.rapid ?? '—'} · Classical {stats.averageRatings.classical ?? '—'}</p>

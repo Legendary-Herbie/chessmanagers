@@ -82,6 +82,9 @@ export const publicClubListQuerySchema = z.object({
 }).strict();
 export const paginationQuerySchema = z.object(paginationFields).strict();
 export const playerListQuerySchema = z.object({
+    category: z.enum(['blitz', 'rapid', 'classical']).optional(),
+    status: z.enum(['all', 'claimed', 'pending', 'unlinked']).optional(),
+    sortBy: z.enum(['rating_desc', 'rating_asc', 'name_asc', 'games_desc', 'winrate_desc']).optional(),
     q: z.string().trim().max(100).optional(),
     ...paginationFields,
 }).strict();

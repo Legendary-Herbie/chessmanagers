@@ -4,8 +4,11 @@ export const playerApi = {
     fetchRegistrations: async (clubId, options = {}) => (await api.get(endpoints.players.registrations(clubId), options)).registrations,
     registerSelf: async (clubId, values) => (await api.post(endpoints.players.registrations(clubId), values)).registration,
     reviewRegistration: async (clubId, requestId, values) => (await api.patch(endpoints.players.registration(clubId, requestId), values)).registration,
-    searchPlayers: async (clubId, { q = '', limit = 20, offset = 0, signal } = {}) => {
+    searchPlayers: async (clubId, { q = '', limit = 20, offset = 0, signal, status, sortBy, category } = {}) => {
         const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
+        if (status) params.set('status', status);
+        if (sortBy) params.set('sortBy', sortBy);
+        if (category) params.set('category', category);
         if (q) params.set('q', q);
         return await api.get(`${endpoints.players.list(clubId)}?${params}`, { signal });
     },
