@@ -9,7 +9,7 @@ import { AuthProvider } from '../../app/AuthProvider.jsx';
 import { refreshAccessToken } from '../../config/api.js';
 import LoginView from './LoginView.jsx';
 
-vi.mock('../../features/auth/api/authApi.js', () => ({ authApi: { changePassword: vi.fn(), deleteAccount: vi.fn() } }));
+vi.mock('../../features/auth/api/authApi.js', () => ({ authApi: { changePassword: vi.fn(), logoutAll: vi.fn(), deleteAccount: vi.fn() } }));
 vi.mock('../../config/api.js', async importOriginal => ({ ...(await importOriginal()), getToken: () => null, refreshAccessToken: vi.fn() }));
 afterEach(cleanup);
 beforeEach(() => {
@@ -58,4 +58,11 @@ it('requires a separate deletion confirmation and retains the account when cance
     fireEvent.click(screen.getByRole('button', { name: 'Close' }));
     expect(screen.queryByRole('dialog')).toBeNull();
     expect(authApi.deleteAccount).not.toHaveBeenCalled();
+});
+
+it('confirms that every session ended after signing out everywhere', async () => {
+    authApi.logoutAll.mockResolvedValue({});
+    render(<AuthProvider><Harness /></AuthProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Sign out everywhere' }));
+    expect((await screen.findByRole('status')).textContent).toContain('All sessions were ended.');
 });

@@ -446,66 +446,6 @@
   color: var(--primary);
 }
 
-/* Modals & Forms Overlay with Scroll Lock */
-.modal-overlay {
-  position: fixed;
-  inset: 0;
-  background-color: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(4px);
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 20px;
-  overflow-y: auto;
-}
-
-.modal-card {
-  background-color: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-xl, 16px);
-  width: 100%;
-  max-width: 520px;
-  padding: 28px;
-  box-shadow: var(--shadow-lg);
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  position: relative;
-  max-height: 90vh;
-  overflow-y: auto;
-}
-
-.modal-card__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.modal-card__title {
-  font-size: var(--font-size-xl, 1.25rem);
-  font-weight: 800;
-  color: var(--text-strong);
-  margin: 0;
-}
-
-.modal-card__close {
-  background: transparent;
-  border: none;
-  color: var(--text-muted);
-  cursor: pointer;
-  padding: 4px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.modal-card__close:hover {
-  color: var(--text-strong);
-  background-color: var(--bg-muted);
-}
-
 /* Form Styling */
 .form-tabs {
   display: flex;

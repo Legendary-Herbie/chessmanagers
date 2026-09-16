@@ -34,6 +34,8 @@ describe('club night operations', () => {
         const summary = await request(app).get(`/api/v1/clubs/${club.id}/leaderboard/dashboard`).set('Authorization', token).expect(200);
         expect(summary.body.dashboard.myChessSummary.player.id).toBe(white.id);
         expect(summary.body.dashboard.myChessSummary.categories.rapid.currentWinStreak).toBe(1);
+        expect(summary.body.dashboard.myChessSummary.categories.rapid.lastRatingChange).toBeGreaterThan(0);
+        expect(summary.body.dashboard.myChessSummary.categories.blitz.lastRatingChange).toBeUndefined();
         const history = await request(app).get(`/api/v1/clubs/${club.id}/players/${white.id}/rating-history?category=all&limit=100&offset=0`).set('Authorization', token).expect(200);
         expect(history.body.history[0]).toMatchObject({ opponentName:'Sam', outcome:'win', category:'rapid' });
         const other = await createClub(owner);

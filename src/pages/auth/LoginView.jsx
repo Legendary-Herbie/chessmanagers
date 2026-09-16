@@ -64,6 +64,7 @@ export default function LoginView() {
                 <p className="auth-form-subtitle">Sign in to your account</p>
             </div>
 
+            {sessionNotice === 'sessionsEnded' && <div className="success-banner" role="status">All sessions were ended. Sign in to start a new session.</div>}
             {sessionNotice === 'passwordChanged' && <div className="success-banner" role="status">Password changed successfully. All sessions were ended. Sign in with your new password.</div>}
 
             {error && (

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../app/contextHooks.js';
 import { authApi } from '../../features/auth/api/authApi.js';
-import Dialog from '../../shared/common/Dialog.jsx';
+import ConfirmDialog from '../../components/ConfirmDialog.jsx';
+import Icon from '../../shared/common/Icon.jsx';
 import Button from '../../shared/common/Button.jsx';
 import '../../styles/account.css';
 
@@ -25,20 +26,20 @@ export default function AccountPage() {
     }
     async function logoutAll() {
         setBusy(true);
-        try { await authApi.logoutAll(); await logout(false); navigate('/auth/login', { replace: true }); }
+        try { await authApi.logoutAll(); await logout(false, 'sessionsEnded'); navigate('/auth/login', { replace: true }); }
         catch (error) { setMessage(error.message); setBusy(false); }
     }
     async function deleteAccount(event) {
-        event.preventDefault(); setBusy(true); setMessage('');
+        event?.preventDefault(); setBusy(true); setMessage('');
         try { await authApi.deleteAccount({ ...deletion, reason: deletion.reason || null }); await logout(false); navigate('/', { replace: true }); }
         catch (error) { setMessage(error.message); setBusy(false); }
     }
     return <div className="account-page"><div className="page-header"><div><h1>Account</h1><p className="muted">{user.fullName || user.name} · @{user.username}</p></div></div>
         {message && <div className="error" role="alert">{message}</div>}
-        <section className="settings-card"><h2>Account profile</h2><dl className="account-profile"><div><dt>Name</dt><dd>{user.fullName || user.name}</dd></div><div><dt>Username</dt><dd>@{user.username}</dd></div><div><dt>Email</dt><dd>{user.email}</dd></div></dl></section>
-        <section className="settings-card"><h2>Password &amp; security</h2><form className="form-card" onSubmit={changePassword}><label className="form-row"><span className="label">Current password</span><input className="input" type="password" required value={passwords.currentPassword} onChange={event => setPasswords({ ...passwords, currentPassword: event.target.value })} /></label><label className="form-row"><span className="label">New password</span><input className="input" type="password" minLength={8} required value={passwords.newPassword} onChange={event => setPasswords({ ...passwords, newPassword: event.target.value })} /></label><Button type="submit" loading={busy}>Change password</Button></form></section>
-        <section className="settings-card"><h2>Active sessions</h2><p className="muted">Sign out every browser and device connected to this account.</p><Button variant="secondary" disabled={busy} onClick={logoutAll}>Sign out everywhere</Button></section>
-        <section className="settings-card danger-zone"><h2>Danger zone</h2><p className="muted">Your account will be disabled while historical club and chess records are preserved.</p><Button variant="danger" disabled={busy} onClick={() => { setDeletion({ confirmation: '', currentPassword: '', reason: '' }); setMessage(''); setDeleteOpen(true); }}>Delete account…</Button>
-        {deleteOpen && <Dialog title="Confirm account deletion" busy={busy} onClose={() => setDeleteOpen(false)}><div className="account-delete-content"><p>Your account will be disabled and you will be signed out. Historical club and chess records will remain.</p>{message && <p role="alert">{message}</p>}<form className="form-card" onSubmit={deleteAccount}><label className="form-row"><span className="label">Current password</span><input className="input" type="password" value={deletion.currentPassword} onChange={event => setDeletion({ ...deletion, currentPassword: event.target.value })} /></label><label className="form-row"><span className="label">Type DELETE to confirm</span><input className="input" required value={deletion.confirmation} onChange={event => setDeletion({ ...deletion, confirmation: event.target.value })} /></label><label className="form-row"><span className="label">Reason (optional)</span><textarea className="input" value={deletion.reason} onChange={event => setDeletion({ ...deletion, reason: event.target.value })} /></label><Button variant="danger" type="submit" loading={busy} disabled={deletion.confirmation !== 'DELETE'}>Delete account</Button></form></div></Dialog>}</section>
+        <section className="settings-card"><h2><Icon name="players" />Account profile</h2><span className="account-member-badge">Registered member</span><dl className="account-profile"><div><dt>Name</dt><dd>{user.fullName || user.name}</dd></div><div><dt>Username</dt><dd>@{user.username}</dd></div><div><dt>Email</dt><dd>{user.email}</dd></div></dl></section>
+        <section className="settings-card"><h2><Icon name="clubs" />Password &amp; security</h2><form className="form-card" onSubmit={changePassword}><label className="form-row"><span className="label">Current password</span><input className="input" type="password" autoComplete="current-password" required value={passwords.currentPassword} onChange={event => setPasswords({ ...passwords, currentPassword: event.target.value })} /></label><label className="form-row"><span className="label">New password</span><input className="input" type="password" autoComplete="new-password" aria-describedby="password-hint" minLength={8} required value={passwords.newPassword} onChange={event => setPasswords({ ...passwords, newPassword: event.target.value })} /></label><p id="password-hint" className="muted">Use at least 8 characters. Changing your password signs out all sessions.</p><Button type="submit" loading={busy}>Change password</Button></form></section>
+        <section className="settings-card"><h2><Icon name="clock" />Active sessions</h2><p className="muted">Sign out every browser and device connected to this account.</p><Button variant="secondary" disabled={busy} onClick={logoutAll}>Sign out everywhere</Button></section>
+        <section className="settings-card danger-zone"><h2><Icon name="warning" />Danger zone</h2><p className="muted">Your account will be disabled while historical club and chess records are preserved.</p><Button variant="danger" disabled={busy} onClick={() => { setDeletion({ confirmation: '', currentPassword: '', reason: '' }); setMessage(''); setDeleteOpen(true); }}>Delete account…</Button>
+        <ConfirmDialog isOpen={deleteOpen} title="Confirm account deletion" variant="danger" loading={busy} onClose={() => setDeleteOpen(false)} message="Your account will be disabled and you will be signed out. Historical club and chess records will remain." confirmLabel="Delete account" confirmDisabled={deletion.confirmation !== 'DELETE'} onConfirm={deleteAccount} error={message}><label className="form-row"><span className="label">Current password</span><input className="input" type="password" value={deletion.currentPassword} onChange={event => setDeletion({ ...deletion, currentPassword: event.target.value })} /></label><label className="form-row"><span className="label">Type DELETE to confirm</span><input className="input" required value={deletion.confirmation} onChange={event => setDeletion({ ...deletion, confirmation: event.target.value })} /></label><label className="form-row"><span className="label">Reason (optional)</span><textarea className="input" value={deletion.reason} onChange={event => setDeletion({ ...deletion, reason: event.target.value })} /></label></ConfirmDialog></section>
     </div>;
 }

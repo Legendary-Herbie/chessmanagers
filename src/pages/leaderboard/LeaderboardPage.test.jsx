@@ -45,7 +45,7 @@ describe('LeaderboardPage URL state', () => {
         fireEvent.click(screen.getByRole('button', { name: 'View Beth rating history' }));
         await screen.findByText('No rating history yet.');
         await act(async () => resolveAda([{ ratingAfter: 900 }, { ratingAfter: 1900 }]));
-        expect(screen.getByRole('dialog', { name: 'Beth' }).querySelector('svg')).toBeNull();
+        expect(screen.getByRole('dialog', { name: 'Beth' }).querySelector('svg.chart-svg')).toBeNull();
         expect(screen.getByText('No rating history yet.')).toBeTruthy();
     });
 

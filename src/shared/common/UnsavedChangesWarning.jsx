@@ -2,7 +2,7 @@ import React, { useEffect, useRef } from 'react';
 import { useBlocker } from 'react-router-dom';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
 
-export default function UnsavedChangesWarning({ dirty, saving = false, onDiscard }) {
+export default function UnsavedChangesWarning({ dirty, saving = false, onDiscard, onSave }) {
     const discarding = useRef(false);
     const blocker = useBlocker(() => !discarding.current && (dirty || saving));
     useEffect(() => {
@@ -27,8 +27,8 @@ export default function UnsavedChangesWarning({ dirty, saving = false, onDiscard
         window.addEventListener('beforeunload', warn);
         return () => window.removeEventListener('beforeunload', warn);
     }, [dirty, saving]);
-    return <ConfirmDialog isOpen={blocker.state === 'blocked'} title="Leave without saving?"
+    return <>{dirty && onSave && <div className="unsaved-settings-bar"><span role="status">You have unsaved changes</span><button type="button" className="btn-secondary" disabled={saving} onClick={onDiscard}>Discard</button><button type="button" className="btn-primary" disabled={saving} onClick={onSave}>{saving ? 'Saving…' : 'Save Changes'}</button></div>}<ConfirmDialog isOpen={blocker.state === 'blocked'} title="Leave without saving?"
         message="Your unsaved settings will be discarded. Stay here to save them."
         confirmLabel="Discard changes and leave" cancelLabel="Keep editing" loading={saving}
-        onClose={() => blocker.reset?.()} onConfirm={() => { onDiscard(); blocker.proceed?.(); }} />;
+        onClose={() => blocker.reset?.()} onConfirm={() => { onDiscard(); blocker.proceed?.(); }} /></>;
 }

@@ -32,8 +32,8 @@ const detail = {
     }],
 };
 
-function renderPage(canManageMatches = true) {
-    return render(<MemoryRouter initialEntries={['/tournaments/tour_1']}>
+function renderPage(canManageMatches = true, tab = 'pairings') {
+    return render(<MemoryRouter initialEntries={[`/tournaments/tour_1${tab ? `?tab=${tab}` : ''}`]}>
         <ClubContext.Provider value={{
             club: { id: 'club_1' }, capabilities: { canManageMatches },
         }}><Routes><Route path="/tournaments/:tournamentId" element={<TournamentPage />} /></Routes>
@@ -49,11 +49,27 @@ describe('TournamentPage duplicate result protection', () => {
     });
     afterEach(cleanup);
 
+    it('supports keyboard tab navigation and hides settings from members', async () => {
+        renderPage(false, 'settings');
+        const standings = await screen.findByRole('tab', { name: 'Standings & Crosstable' });
+        expect(standings.getAttribute('aria-selected')).toBe('true');
+        expect(screen.queryByRole('tab', { name: 'Settings & Tiebreaks' })).toBeNull();
+        standings.focus();
+        fireEvent.keyDown(standings, { key: 'ArrowRight' });
+        const pairings = screen.getByRole('tab', { name: 'Pairings & Scoreboard' });
+        expect(pairings.getAttribute('aria-selected')).toBe('true');
+        expect(document.activeElement).toBe(pairings);
+        fireEvent.keyDown(pairings, { key: 'Home' });
+        expect(standings.getAttribute('aria-selected')).toBe('true');
+        expect(document.activeElement).toBe(standings);
+    });
+
     it('puts standings first and gives members plain, printable pairings', async () => {
         const print = vi.spyOn(window, 'print').mockImplementation(() => {});
-        renderPage(false);
+        renderPage(false, null);
         await screen.findByRole('heading', { name: 'Standings' });
         expect(screen.getAllByRole('heading', { level: 2 })[0].textContent).toBe('Standings');
+        fireEvent.click(screen.getByRole('tab', { name: 'Pairings & Scoreboard' }));
         const pairings = screen.getByRole('region', { name: 'Pairings' });
         expect(await within(pairings).findByText('Alpha')).toBeTruthy();
         expect(within(pairings).getByText('Beta')).toBeTruthy();
@@ -73,6 +89,7 @@ describe('TournamentPage duplicate result protection', () => {
         renderPage(false);
         fireEvent.click(await screen.findByRole('button',{ name:'Print pairings' }));
         expect(document.querySelector('.tournament-print-sheet').textContent).toContain('□ 1–0');
+        fireEvent.click(screen.getByRole('tab', { name: 'Standings & Crosstable' }));
         fireEvent.click(screen.getByRole('button',{ name:'Print standings' }));
         const sheet = document.querySelector('.tournament-print-sheet');
         expect(sheet.textContent).toContain('Standings'); expect(sheet.textContent).toContain('Alpha');
@@ -121,7 +138,8 @@ describe('TournamentPage duplicate result protection', () => {
         playerApi.searchPlayers.mockResolvedValue({ players: [{ id: 'player_101', name: 'Zoe' }] });
         tournamentApi.addPlayer.mockResolvedValue({});
         renderPage();
-        fireEvent.click(await screen.findByRole('button', { name: 'Manage participants' }));
+        fireEvent.click(await screen.findByRole('tab', { name: 'Participants' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Manage participants' }));
         const dialog = screen.getByRole('dialog', { name: 'Manage participants' });
         fireEvent.change(within(dialog).getByLabelText('Search registered participants'), { target: { value: 'Alpha' } });
         expect(within(dialog).queryByText('Beta · Active')).toBeNull();

@@ -1,5 +1,7 @@
 import ShareControls from '../../features/clubs/components/ShareControls.jsx';
-import Disclosure from '../../shared/common/Disclosure.jsx';
+import ToggleSwitch from '../../shared/common/ToggleSwitch.jsx';
+import Icon from '../../shared/common/Icon.jsx';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import '../../styles/club.css';
@@ -55,7 +57,16 @@ function ProfileFieldError({ field, errors }) {
     return <div className="profile-field-error" id={`${profileFieldId(field)}-error`}>{message}</div>;
 }
 
+const RATING_PRESETS = {
+    club: { initialRating:1500, ratingFloor:500, establishedKFactor:32, provisionalKFactor:40, provisionalGames:10 },
+    fide: { initialRating:1500, ratingFloor:1400, establishedKFactor:20, provisionalKFactor:40, provisionalGames:30 },
+};
+function ratingPreset(settings) {
+    return Object.entries(RATING_PRESETS).find(([, values]) => Object.entries(values).every(([key, value]) => Number(settings?.[key] ?? RATING_PRESETS.club[key]) === value))?.[0] || 'custom';
+}
+
 export default function ClubPage() {
+    const [customRatingCategories, setCustomRatingCategories] = useState([]);
     const { club, capabilities, refreshClub } = useClub();
     const { user } = useAuth();
     const { notify } = useNotifications();
@@ -285,6 +296,7 @@ export default function ClubPage() {
             setTransferTarget('');
         } catch (err) {
             setManagementError(err.message || 'Failed to transfer ownership');
+            throw err;
         }
     }
 
@@ -371,7 +383,9 @@ export default function ClubPage() {
         setDialogBusy(true);
         setManagementError(null);
         try {
-            if (action.kind === 'archiveClub') {
+            if (action.kind === 'transferOwnership') {
+                await transferOwnership();
+            } else if (action.kind === 'archiveClub') {
                 await clubApi.archive(club.id);
                 await refreshClub();
                 notify('Club archived', 'success');
@@ -416,16 +430,11 @@ export default function ClubPage() {
             {managementError && <div className="error" role="alert">{managementError}</div>}
 
             {/* Club profile and administration tabs. Operational work lives on the main dashboard. */}
-            <div className="tabs">
-                <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => setActiveTab('profile')}>Club profile</button>
-                {isOwner && ['notifications', 'ratings', 'ownership'].map(tab => <button key={tab} className={activeTab === tab ? 'active' : ''} onClick={() => setActiveTab(tab)}>{tab === 'ratings' ? 'Rating rules' : tab === 'ownership' ? 'Ownership' : 'Notifications'}</button>)}
-                {isClubAdmin && (
-                    <button className={activeTab === 'members' ? 'active' : ''} onClick={() => setActiveTab('members')}>Members &amp; access</button>
-                )}
-                {canExportData && (
-                    <button className={activeTab === 'exports' ? 'active' : ''} onClick={() => setActiveTab('exports')}>Data exports</button>
-                )}
-            </div>
+            <nav className="tabs settings-tabs" aria-label="Club settings">{[
+                ['profile', 'Club profile', 'settings', true], ['notifications', 'Notifications', 'bell', isOwner],
+                ['ratings', 'Rating rules', 'chart', isOwner], ['members', 'Members & access', 'players', isClubAdmin],
+                ['exports', 'Data exports', 'download', canExportData], ['ownership', 'Ownership', 'warning', isOwner],
+            ].filter(([, , , allowed]) => allowed).map(([key, label, icon]) => <button type="button" key={key} className={activeTab === key ? 'active' : ''} aria-current={activeTab === key ? 'page' : undefined} onClick={() => setActiveTab(key)}><Icon name={icon} />{label}</button>)}</nav>
 
             {/* Profile tab — club info editing (name, federation, description, logo) */}
             {(activeTab === 'profile' || isOwner && ['notifications', 'ratings', 'ownership'].includes(activeTab)) && (
@@ -514,46 +523,29 @@ export default function ClubPage() {
                     </label>
 
                     </>}
-                    {activeTab === 'notifications' && <>
-                    <label className="form-row">
-                        <div className="label">Allow notification email delivery</div>
-                        <input type="checkbox" disabled={!isOwner} checked={Boolean(profile?.settings_json?.notifications?.emailEnabled)} onChange={e => updateStructuredSetting('notifications', 'emailEnabled', e.target.checked)} />
-                    </label>
-
-                    <label className="form-row">
-                        <div className="label">Membership decision notifications</div>
-                        <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.membershipEvents !== false} onChange={e => updateStructuredSetting('notifications', 'membershipEvents', e.target.checked)} />
-                    </label>
-
-                    <label className="form-row">
-                        <div className="label">Player claim and self-registration notifications</div>
-                        <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.playerClaimEvents !== false} onChange={e => updateStructuredSetting('notifications', 'playerClaimEvents', e.target.checked)} />
-                    </label>
-
-                    <label className="form-row">
-                        <div className="label">Match notifications</div>
-                        <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.matchEvents !== false} onChange={e => updateStructuredSetting('notifications', 'matchEvents', e.target.checked)} />
-                    </label>
-
-                    <label className="form-row">
-                        <div className="label">Tournament notifications</div>
-                        <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.tournamentEvents !== false} onChange={e => updateStructuredSetting('notifications', 'tournamentEvents', e.target.checked)} />
-                    </label>
-
-                    <label className="form-row">
-                        <div className="label">Announcement notifications</div>
-                        <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.announcementEvents !== false} onChange={e => updateStructuredSetting('notifications', 'announcementEvents', e.target.checked)} />
-                    </label>
-
-                    </>}
+                    {activeTab === 'notifications' && <div className="notification-settings"><h2>Notifications</h2><p className="muted">Choose which club events members hear about.</p>{[
+                        ['emailEnabled', 'Allow notification email delivery', 'Allow email delivery for significant club events.'],
+                        ['membershipEvents', 'Membership decision notifications', 'Keep members informed about joining and membership decisions.'],
+                        ['playerClaimEvents', 'Player claim and self-registration notifications', 'Updates when members claim or register a player profile.'],
+                        ['matchEvents', 'Match notifications', 'Notify linked players when their matches are recorded or changed.'],
+                        ['tournamentEvents', 'Tournament notifications', 'Share tournament pairings and round updates.'],
+                        ['announcementEvents', 'Announcement notifications', 'Notify members when a club update is published.'],
+                    ].map(([key, label, description]) => <ToggleSwitch key={key} label={label} description={description} disabled={!isOwner || savingSettings} checked={key === 'emailEnabled' ? Boolean(profile?.settings_json?.notifications?.[key]) : profile?.settings_json?.notifications?.[key] !== false} onChange={value => updateStructuredSetting('notifications', key, value)} />)}</div>}
                     {activeTab === 'ratings' && <>
                     <h2>Rating rules</h2><p className="muted">Blitz, Rapid, and Classical use independent Elo ratings.</p>
-                    <Disclosure forceOpen={Object.keys(profileErrors).some(field => field.startsWith('ratingSettings.'))} title="Advanced rating controls">
+                    <div className="rating-settings-grid">
                     {['blitz', 'rapid', 'classical'].map(category => {
                         const field = key => `ratingSettings.${category}.${key}`;
                         return (
                             <fieldset key={category} className="form-row rating-settings" disabled={!isOwner}>
-                                <legend>{category[0].toUpperCase() + category.slice(1)} Elo settings</legend>
+                                <legend><RatingCategoryIcon category={category} />{category[0].toUpperCase() + category.slice(1)} Elo settings</legend>
+                                <label>Preset<select className="input" aria-label={`${category} rating preset`} value={customRatingCategories.includes(category) ? 'custom' : ratingPreset(profile?.rating_settings?.[category])} onChange={event => {
+                                    setCustomRatingCategories(current => event.target.value === 'custom' ? [...current, category] : current.filter(value => value !== category));
+                                    if (event.target.value === 'custom') return;
+                                    setProfile(current => ({ ...current, rating_settings: { ...current.rating_settings, [category]: { ...RATING_PRESETS[event.target.value] } } }));
+                                    setProfileErrors({});
+                                }}><option value="club">Club Default</option><option value="fide">FIDE-inspired</option><option value="custom">Custom</option></select></label>
+                                <p className="muted rating-preset-note">Edit any value to customize. FIDE-inspired uses K 40 for 30 games, then 20, with a 1400 floor and a club starting rating of 1500. It omits age, title and rating-period rules and does not produce official FIDE ratings.</p>
                                 <label>Initial rating
                                     <input {...validationProps(field('initialRating'))} type="number" min="100" max="4000" step="1" value={profile?.rating_settings?.[category]?.initialRating ?? 1500} onChange={e => updateRatingSetting(category, 'initialRating', e.target.value)} />
                                     <ProfileFieldError field={field('initialRating')} errors={profileErrors} />
@@ -578,7 +570,7 @@ export default function ClubPage() {
                         );
                     })}
 
-                    </Disclosure></>}
+                    </div></>}
                     {activeTab === 'profile' && profile?.logo && <div className="logo-preview"><img src={resolveAssetUrl(profile.logo)} alt="Club badge" /></div>}
 
                     <div className="form-actions">
@@ -595,10 +587,10 @@ export default function ClubPage() {
                     </form>}
                     {activeTab === 'profile' && club.visibility === 'public' && <CopyPublicLink path={`/clubs/${club.id}`} />}
                     <UnsavedChangesWarning dirty={Boolean(profile && savedProfile && (badgeFile || JSON.stringify(profile) !== JSON.stringify(savedProfile)))} saving={savingSettings}
-                        onDiscard={() => { setProfile(savedProfile); setBadgeFile(null); setProfileErrors({}); }} />
+                        onSave={saveProfile} onDiscard={() => { setProfile(savedProfile); setBadgeFile(null); setProfileErrors({}); }} />
 
                     {isOwner && activeTab === 'ownership' && (
-                        <div className="dashboard-settings-card">
+                        <div className="dashboard-settings-card settings-danger-zone">
                             <h3>Ownership and lifecycle</h3>
                             <label className="form-row">
                                 <div className="label">New owner</div>
@@ -617,7 +609,7 @@ export default function ClubPage() {
                                 </select>
                             </label>
                             <div className="form-actions">
-                                <Button onClick={transferOwnership} disabled={!transferTarget}>Transfer ownership</Button>
+                                <Button onClick={() => openDialog({ kind: 'transferOwnership', title: 'Transfer ownership', confirmLabel: 'Transfer ownership', variant: 'warning', message: 'Give the selected member ownership of this club? Your permissions will change to the selected role.' })} disabled={!transferTarget}>Transfer ownership</Button>
                                 <Button variant="secondary" onClick={archiveClub}>Archive club</Button>
                                 <Button variant="danger" onClick={deleteClub}>Delete club</Button>
                             </div>
@@ -738,7 +730,8 @@ export default function ClubPage() {
 
             <ConfirmDialog isOpen={Boolean(dialogAction)} title={dialogAction?.title}
                 message={dialogAction?.message} confirmLabel={dialogAction?.confirmLabel}
-                variant={dialogAction?.variant} loading={dialogBusy}
+                variant={dialogAction?.variant} loading={dialogBusy} error={managementError}
+                confirmationText={dialogAction?.kind === 'deleteClub' ? 'DELETE' : dialogAction?.kind === 'archiveClub' ? 'ARCHIVE' : dialogAction?.kind === 'transferOwnership' ? 'TRANSFER' : undefined}
                 onClose={() => {
                     if (!dialogBusy) {
                         setDialogAction(null);

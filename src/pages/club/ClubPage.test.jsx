@@ -15,6 +15,7 @@ vi.mock('../../features/clubs/api/clubApi.js', () => ({
         update: vi.fn(),
         updatePresentation: vi.fn(),
         uploadBadge: vi.fn(),
+        delete: vi.fn(),
     },
 }));
 
@@ -74,6 +75,29 @@ describe('ClubPage profile validation', () => {
         clubApi.update.mockResolvedValue({ club });
     });
     afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+    it('applies a rating preset only to the chosen category and saves through the floating bar', async () => {
+        renderPage();
+        fireEvent.click(screen.getByRole('button', { name: 'Rating rules' }));
+        fireEvent.change(await screen.findByLabelText('rapid rating preset'), { target: { value: 'fide' } });
+        expect(screen.getByLabelText('blitz rating preset').value).toBe('club');
+        fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+        await waitFor(() => expect(clubApi.update).toHaveBeenCalledWith('club_1', { ratingSettings: {
+            ...ratingSettings, rapid: { initialRating: 1500, ratingFloor: 1400, establishedKFactor: 20, provisionalKFactor: 40, provisionalGames: 30 },
+        } }));
+    });
+
+    it('does not delete a club without typing the confirmation', async () => {
+        renderPage();
+        fireEvent.click(screen.getByRole('button', { name: 'Ownership' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Delete club' }));
+        const buttons = screen.getAllByRole('button', { name: 'Delete club' });
+        expect(buttons.at(-1).disabled).toBe(true);
+        expect(clubApi.delete).not.toHaveBeenCalled();
+        fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+        fireEvent.click(buttons.at(-1));
+        await waitFor(() => expect(clubApi.delete).toHaveBeenCalledWith('club_1'));
+    });
 
     it('blocks submission and identifies the malformed field', async () => {
         renderPage();

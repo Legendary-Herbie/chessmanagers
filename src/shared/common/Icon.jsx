@@ -1,5 +1,9 @@
 import React from 'react';
 const paths = {
+    warning: 'M12 3 2 21h20L12 3zM12 9v5M12 17h.01',
+    info: 'M12 8h.01M12 11v6M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
+    settings: 'M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M8 15v6',
+    download: 'M12 3v12m-5-5 5 5 5-5M4 17v4h16v-4',
     bell: 'M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4',
     dashboard: 'M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3zM14 14h7v7h-7z',
     leaderboard: 'M5 21V11h4v10M10 21V3h4v18M15 21v-6h4v6',

@@ -287,7 +287,7 @@
 .my-chess-summary__rating-value strong { font-size:28px; color:var(--text-strong); letter-spacing:-.03em; }
 .my-chess-summary__rating-value > span, .my-chess-summary__change { font-size:12px; color:var(--text-muted); }
 .my-chess-summary__change.positive, .my-chess-summary__streak { color:var(--status-success-text); }
-.my-chess-summary__change.negative { color:var(--status-danger-text); }
+.my-chess-summary__change.negative { color:var(--status-error-text); }
 .my-chess-summary__change span { color:var(--text-muted); }
 .my-chess-summary__streak { background:var(--status-success-bg); border-radius:6px; padding:4px 6px; }
 .my-chess-summary__pairings { display:grid; gap:12px; margin-top:20px; }

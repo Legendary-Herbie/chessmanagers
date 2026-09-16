@@ -1,3 +1,4 @@
+import Icon from '../../shared/common/Icon.jsx';
 import ErrorBoundary from '../../shared/common/ErrorBoundary.jsx';
 import { TIEBREAKS, DEFAULT_TIEBREAKS } from '../../features/tournaments/tiebreaks.js';
 import TiebreakSettings, { TiebreakHelp } from '../../features/tournaments/components/TiebreakSettings.jsx';
@@ -6,7 +7,7 @@ import PairingsPrintSheet from '../../features/tournaments/components/PairingsPr
 import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import Disclosure from '../../shared/common/Disclosure.jsx';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import '../../styles/tournaments.css';
 import { useClub } from '../../app/contextHooks.js';
 import { tournamentApi } from '../../features/tournaments/api/tournamentApi.js';
@@ -37,6 +38,7 @@ function resultLabel(result) {
 export default function TournamentPage() {
     const { tournamentId } = useParams();
     const navigate = useNavigate();
+    const [searchParams, setSearchParams] = useSearchParams();
     const { club, capabilities } = useClub();
     const isAdmin = Boolean(capabilities.canManageMatches);
     const [detail, setDetail] = useState(null);
@@ -226,49 +228,76 @@ export default function TournamentPage() {
     const { tournament, participants, rounds, standings } = detail;
     const missingResults = rounds.flatMap(round => round.pairings).filter(pairing => !pairing.isBye && !['white', 'black', 'draw'].includes(pairing.result)).length;
 
+    const archived = Boolean(tournament.archived_at) || tournament.status === 'archived';
+    const canEdit = isAdmin && !archived;
+    const tabs = [
+        { id: 'standings', label: 'Standings & Crosstable', icon: 'trophy' },
+        { id: 'pairings', label: 'Pairings & Scoreboard', icon: 'matches' },
+        { id: 'participants', label: 'Participants', icon: 'players' },
+        ...(isAdmin ? [{ id: 'settings', label: 'Settings & Tiebreaks', icon: 'edit' }] : []),
+    ];
+    const requestedTab = searchParams.get('tab');
+    const workspaceTab = tabs.some(tab => tab.id === requestedTab) ? requestedTab : (canEdit && tournament.status === 'upcoming' ? 'participants' : 'standings');
+    function selectTab(tab) {
+        const next = new URLSearchParams(searchParams); next.set('tab', tab); setSearchParams(next, { replace: true });
+    }
+    function tabKeyDown(event) {
+        const keys = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
+        if (!keys.includes(event.key)) return;
+        event.preventDefault();
+        const index = tabs.findIndex(tab => tab.id === workspaceTab);
+        const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabs.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + tabs.length) % tabs.length;
+        selectTab(tabs[next].id);
+        event.currentTarget.querySelectorAll('[role="tab"]')[next]?.focus();
+    }
     return (
-        <div className="tournament-detail-page">
-            <div className="page-header tournament-detail-header">
-                <div>
-                    <div className="tournament-heading"><h1>{tournament.name}</h1><span className={`tournament-status ${tournament.status}`}>{title(tournament.status)}</span></div>
-                    <p className="muted">{title(tournament.type)} · <RatingCategoryIcon category={tournament.rating_category} />{title(tournament.rating_category)} · {tournament.is_rated ? 'Rated — affects club ratings' : 'Unrated — no rating changes'}</p>
-                    {isAdmin && tournament.status !== 'upcoming' && <p>{rounds.filter(round => round.status === 'completed').length} of {rounds.length} paired rounds complete · {missingResults ? `${missingResults} missing result${missingResults === 1 ? '' : 's'}` : 'No missing results'}</p>}
+        <div className="tournament-detail-page tournament-workspace">
+            <header className="tournament-hero">
+                <div className="tournament-hero__top"><div>
+                    <Link className="text-link tournament-back" to="/tournaments">← Tournaments</Link>
+                    <div className="tournament-heading"><h1>{tournament.name}</h1><span className={`tournament-status tournament-status--dot ${archived ? 'archived' : tournament.status}`}>{archived ? 'Archived' : title(tournament.status)}</span></div>
+                    <div className="tournament-hero__chips">
+                        <span><Icon name="trophy" />{title(tournament.type)}</span>
+                        <span><RatingCategoryIcon category={tournament.rating_category} />{title(tournament.rating_category)}</span>
+                        <span title={tournament.is_rated ? 'Results affect club ratings' : 'Results do not affect club ratings'}><Icon name="chart" />{tournament.is_rated ? 'Rated' : 'Unrated'}</span>
+                    </div>
                     {club.visibility === 'public' && <CopyPublicLink path={`/clubs/${club.id}/tournaments/${tournamentId}`} />}
                 </div>
-                {isAdmin && <div className="tournament-actions">
-                    {tournament.status === 'active' && <Button variant="secondary" loading={saving} disabled={resultPending.size > 0} onClick={() => runAction(() => tournamentApi.setStatus(club.id, tournamentId, 'completed'), 'Tournament completed.')}>Complete</Button>}
-                    {tournament.status === 'completed' && <Button loading={saving} onClick={() => setResumeConfirmation(true)}>Resume tournament</Button>}
-                    <Button variant="secondary" disabled={saving || resultPending.size > 0} onClick={() => setArchiveConfirmation(true)}>Archive</Button>
-                    <Button variant="danger" disabled={saving || resultPending.size > 0} onClick={() => setDeleteConfirmation(true)}>Delete</Button>
-                </div>}
+                <div className="tournament-actions">
+                    {canEdit && tournament.status === 'active' && <Button variant="secondary" loading={saving} disabled={resultPending.size > 0} onClick={() => runAction(() => tournamentApi.setStatus(club.id, tournamentId, 'completed'), 'Tournament completed.')}>Complete</Button>}
+                    {canEdit && tournament.status === 'completed' && <Button loading={saving} onClick={() => setResumeConfirmation(true)}>Resume tournament</Button>}
+                    {canEdit && <Button variant="secondary" disabled={saving || resultPending.size > 0} onClick={() => setArchiveConfirmation(true)}>Archive</Button>}
+                    {isAdmin && <Button variant="danger" disabled={saving || resultPending.size > 0} onClick={() => setDeleteConfirmation(true)}>Delete</Button>}
+                    <Button variant="secondary" disabled={workspaceTab === 'pairings' ? !rounds.length : !standings.length} onClick={() => printTournament(workspaceTab === 'pairings' ? 'pairings' : 'standings')}>Print</Button>
+                </div></div>
+                <dl className="tournament-hero__metrics">
+                    <div><dt>Participants</dt><dd>{participants.length}</dd></div>
+                    <div><dt>Rounds paired</dt><dd>{rounds.length}</dd></div>
+                    <div><dt>Rounds complete</dt><dd>{rounds.filter(round => round.status === 'completed').length}</dd></div>
+                    {isAdmin && <div className={missingResults ? 'needs-attention' : ''}><dt>Missing results</dt><dd>{missingResults}</dd></div>}
+                </dl>
+            </header>
+            <div className="tournament-workspace-tabs" role="tablist" aria-label="Tournament workspace" onKeyDown={tabKeyDown}>
+                {tabs.map(tab => <button type="button" role="tab" id={`tournament-tab-${tab.id}`} aria-controls={`tournament-panel-${tab.id}`} aria-selected={workspaceTab === tab.id} tabIndex={workspaceTab === tab.id ? 0 : -1} key={tab.id} onClick={() => selectTab(tab.id)}><Icon name={tab.icon} />{tab.label}</button>)}
             </div>
             {error && <div className="error" role="alert">{error}</div>}
             {notice && <div className="match-notice" role="status">{notice}</div>}
-            <section className="tournament-section">
+            <section className="tournament-section" role="tabpanel" id="tournament-panel-standings" aria-labelledby="tournament-tab-standings" hidden={workspaceTab !== 'standings'}>
                 <div className="section-heading"><div><h2>{tableView === 'standings' ? 'Standings' : 'Crosstable'}</h2><p className="muted">Match points{(tournament.tiebreaks || DEFAULT_TIEBREAKS).map(key => ` → ${TIEBREAKS[key].label}`).join('')}.</p></div>
                     <div className="tournament-actions" role="group" aria-label="Tournament table view"><Button variant="secondary" disabled={!standings.length} onClick={() => printTournament('standings')}>Print standings</Button>{['standings', 'crosstable'].map(view => <Button key={view} variant={tableView === view ? 'primary' : 'secondary'} aria-pressed={tableView === view} onClick={() => setTableView(view)}>{title(view)}</Button>)}</div>
                 </div>
                 {tableView === 'crosstable' ? <ErrorBoundary resetKey={`${club.id}:${tournament.id}`} message="Unable to display the crosstable."><TournamentCrosstable participants={participants} rounds={rounds} standings={standings} /></ErrorBoundary> : <><div className="tournament-table-wrap table-scroll" tabIndex={0} role="region" aria-label="Tournament standings"><table className="tournament-table tournament-standings">
                     <thead><tr><th>#</th><th>Player</th><th>Pts</th><th>W</th><th>D</th><th>L</th>{(tournament.tiebreaks || DEFAULT_TIEBREAKS).map(key => <th key={key}><TiebreakHelp name={key} /></th>)}</tr></thead>
-                    <tbody>{standings.map(row => <tr key={row.playerId}><td>{row.rank}</td><td>{row.playerName}</td><td><strong>{row.matchPoints}</strong></td><td>{row.wins}</td><td>{row.draws}</td><td>{row.losses}</td>{(tournament.tiebreaks || DEFAULT_TIEBREAKS).map(key => <td key={key}>{row[key]}</td>)}</tr>)}
+                    <tbody>{standings.map(row => <tr key={row.playerId}><td><span className={`rank-badge rank-badge--${row.rank}`} aria-label={`Rank ${row.rank}`}>{row.rank}</span></td><td><Link className="name-link" to={`/players/${row.playerId}`}>{row.playerName}</Link></td><td><strong>{row.matchPoints}</strong></td><td>{row.wins}</td><td>{row.draws}</td><td>{row.losses}</td>{(tournament.tiebreaks || DEFAULT_TIEBREAKS).map(key => <td key={key}>{row[key]}</td>)}</tr>)}
                         {!standings.length && <tr><td colSpan={6 + (tournament.tiebreaks || DEFAULT_TIEBREAKS).length} className="muted">No participants yet.</td></tr>}
                     </tbody>
                 </table></div><p className="muted standings-legend">Pts: match points · W/D/L: wins/draws/losses · SB: Sonneborn-Berger · H2H: head-to-head. Standings are calculated by the server.</p></>}
             </section>
-            {isAdmin && <TiebreakSettings key={`${tournament.id}:${(tournament.tiebreaks || DEFAULT_TIEBREAKS).join(',')}`} clubId={club.id} tournament={tournament} onSaved={load} />}
-            {isAdmin && tournament.status === 'upcoming' && <TournamentSetup key={`${club.id}-${tournamentId}`} clubId={club.id} tournamentId={tournamentId} participants={participants}
-                onComplete={load} onSaveLater={() => navigate('/tournaments')} />}
-
-            {tournament.status !== 'upcoming' && <><div className="tournament-summary">
-                <div><strong>{participants.length}</strong><span>Participants</span></div>
-                <div><strong>{tournament.current_round || 0}</strong><span>Rounds paired</span></div>
-                <div><strong>{rounds.filter(round => round.status === 'completed').length}</strong><span>Rounds complete</span></div>
-            </div>
-
+            <div role="tabpanel" id="tournament-panel-pairings" aria-labelledby="tournament-tab-pairings" hidden={workspaceTab !== 'pairings'}>
             <section className="tournament-section tournament-pairings" aria-label="Pairings">
                 <div className="section-heading"><div><h2>Pairings</h2></div>
                     <Button variant="secondary" disabled={!rounds.length} onClick={() => printTournament('pairings')}>Print pairings</Button>
-                    {isAdmin && tournament.status === 'active' && <Button disabled={!canGenerate || saving || resultPending.size > 0} loading={saving} onClick={() => runAction(() => tournamentApi.generateRound(club.id, tournamentId), 'Next round paired.')}>Generate next round</Button>}
+                    {canEdit && tournament.status === 'active' && <Button disabled={!canGenerate || saving || resultPending.size > 0} loading={saving} onClick={() => runAction(() => tournamentApi.generateRound(club.id, tournamentId), 'Next round paired.')}>Generate next round</Button>}
                 </div>
                 <div className="scoreboard-toolbar">
                     <label>Round<select className="input" aria-label="Select round" value={selectedRound || tournament.current_round || ''} onChange={event => setSelectedRound(Number(event.target.value))}>
@@ -280,11 +309,11 @@ export default function TournamentPage() {
                     {rounds.filter(round => round.roundNumber === (selectedRound || tournament.current_round)).map(round => <div className="round-card" key={round.id}>
                         <div className="round-card__header"><strong>Round {round.roundNumber}</strong><span hidden={!isAdmin} className={`tournament-status ${round.status}`}>{title(round.status)}</span><span hidden={!isAdmin}>{round.pairings.filter(pairing => !pairing.isBye && !['white', 'black', 'draw'].includes(pairing.result)).length} missing results · {round.pairings.filter(pairing => pairing.isBye).length} byes</span></div>
                         <div className="pairing-list" ref={scoreboard} onKeyDown={scoreboardKeyDown}>{round.pairings.map(pairing => <div className="pairing-item" data-board={pairing.board} key={pairing.id}><div className={`pairing-row${isAdmin ? '' : ' pairing-row--read-only'}`}>
-                            <span className="board-number">{pairing.board}</span>
-                            <span className="pairing-player entity-name">{pairing.whitePlayerName || participants.find(player => player.id === pairing.whitePlayerId)?.name}</span>
+                            <span className="board-number"><small>Board</small>{pairing.board}</span>
+                            <span className="pairing-player entity-name"><small>♔ White</small><Link className="name-link" to={`/players/${pairing.whitePlayerId}`}>{pairing.whitePlayerName || participants.find(player => player.id === pairing.whitePlayerId)?.name}</Link></span>
                             <strong className="pairing-result">{resultLabel(pairing.result)}</strong>
-                            <span className="pairing-player black entity-name">{pairing.isBye ? 'Bye' : pairing.blackPlayerName || participants.find(player => player.id === pairing.blackPlayerId)?.name}</span>
-                            {isAdmin && !pairing.isBye && <div className="pairing-score-buttons" role="group" aria-label={`Result for round ${round.roundNumber}, board ${pairing.board}`}>
+                            <span className="pairing-player black entity-name">{pairing.isBye ? 'Bye' : <><small>♚ Black</small><Link className="name-link" to={`/players/${pairing.blackPlayerId}`}>{pairing.blackPlayerName || participants.find(player => player.id === pairing.blackPlayerId)?.name}</Link></>}</span>
+                            {canEdit && !pairing.isBye && <div className="pairing-score-buttons" role="group" aria-label={`Result for round ${round.roundNumber}, board ${pairing.board}`}>
                                 {['white', 'draw', 'black'].map(result => <Button key={result}
                                     variant={(pendingResults[pairing.id] ?? pairing.result) === result ? 'primary' : 'secondary'}
                                     aria-pressed={(pendingResults[pairing.id] ?? pairing.result) === result} disabled={saving || Boolean(duplicateConfirmation)}
@@ -292,8 +321,9 @@ export default function TournamentPage() {
                                     onClick={() => saveResult(pairing.id, { ...resultValues(pairing), result })}>{resultLabel(result)}</Button>)}
                             </div>}
                         </div>
+                        {isAdmin && <span className={`board-result-state ${pairing.result ? 'recorded' : 'missing'}`}>{pairing.isBye ? 'Bye' : pairing.result ? 'Recorded' : 'Needs result'}</span>}
                         {resultPending.has(pairing.id) && <p role="status">Saving board {pairing.board}…</p>}
-                        {isAdmin && !pairing.isBye && <Disclosure className="pairing-result-details" title="Played at & notes">
+                        {canEdit && !pairing.isBye && <Disclosure className="pairing-result-details" title="Played at & notes">
                             <label>Played at (round {round.roundNumber}, board {pairing.board})
                                 <input type="datetime-local" step="1" className="input" required disabled={saving || resultPending.has(pairing.id) || Boolean(duplicateConfirmation)}
                                     value={resultValues(pairing).playedAt ? localDateTime(resultValues(pairing).playedAt) : ''} onChange={event => updateResultDraft(pairing, 'playedAt', event.target.value)} /></label>
@@ -315,15 +345,25 @@ export default function TournamentPage() {
 
 
 
-            </>}
-            <section className="tournament-section">
+            </div>
+            <section className="tournament-section" role="tabpanel" id="tournament-panel-participants" aria-labelledby="tournament-tab-participants" hidden={workspaceTab !== 'participants'}>
+                {canEdit && tournament.status === 'upcoming' && <TournamentSetup key={`${club.id}-${tournamentId}`} clubId={club.id} tournamentId={tournamentId} participants={participants}
+                    onComplete={async () => { await load(); selectTab('pairings'); }} onSaveLater={() => navigate('/tournaments')} />}
+
                 <div className="section-heading"><div><h2>Participants</h2><p className="muted">Late registrations become eligible for the next round.</p></div>
-                    {isAdmin && <Button onClick={() => setParticipantsOpen(true)}>Manage participants</Button>}
+                    {canEdit && <Button onClick={() => setParticipantsOpen(true)}>Manage participants</Button>}
                 </div>
                 <div className="tournament-table-wrap table-scroll"><table className="tournament-table tournament-participants"><thead><tr><th>Player</th><th>Rating</th><th>Entered</th><th>Status</th><th>Byes</th>{isAdmin && <th>Action</th>}</tr></thead>
-                    <tbody>{participants.map(player => <tr key={player.id}><td>{player.name}</td><td>{player.rating}</td><td>Round {player.registrationRound}</td><td>{title(player.status)}</td><td>{player.byeCount}</td>{isAdmin && <td>Use Manage participants</td>}</tr>)}</tbody>
+                    <tbody>{participants.map(player => <tr key={player.id}><td><Link className="name-link" to={`/players/${player.id}`}>{player.name}</Link></td><td>{player.rating}</td><td>Round {player.registrationRound}</td><td>{title(player.status)}</td><td>{player.byeCount}</td>{isAdmin && <td>{canEdit && tournament.status !== 'completed' && player.status === 'active' && <Button variant="secondary" disabled={saving || resultPending.size > 0} onClick={() => runAction(() => tournament.current_round > 0 ? tournamentApi.withdrawPlayer(club.id, tournamentId, player.id) : tournamentApi.removePlayer(club.id, tournamentId, player.id), `${player.name} ${tournament.current_round > 0 ? 'withdrawn' : 'removed'}.`)}>{tournament.current_round > 0 ? 'Withdraw' : 'Remove'}</Button>}</td>}</tr>)}</tbody>
                 </table></div>
             </section>
+
+            {isAdmin && <section className="tournament-section" role="tabpanel" id="tournament-panel-settings" aria-labelledby="tournament-tab-settings" hidden={workspaceTab !== 'settings'}>
+                <h2>Settings & Tiebreaks</h2>
+                <p className="muted">Points come first. Choose the order used to separate tied players.</p>
+                {!archived && <TiebreakSettings key={`${tournament.id}:${(tournament.tiebreaks || DEFAULT_TIEBREAKS).join(',')}`} clubId={club.id} tournament={tournament} onSaved={load} />}
+                <div className="tournament-lifecycle-note"><h3>Tournament lifecycle</h3><p>Complete pauses play; resume reopens it. Archive keeps the results. Delete permanently removes this tournament and its matches.</p><p className="muted">Use the controls in the tournament header to change its status.</p></div>
+            </section>}
 
             {participantsOpen && isAdmin && <Dialog title="Manage participants" busy={saving} onClose={() => setParticipantsOpen(false)}>
                 <div className="modal-body">
