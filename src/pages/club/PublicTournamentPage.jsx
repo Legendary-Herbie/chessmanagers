@@ -1,3 +1,4 @@
+import PublicBreadcrumbs from '../../features/public/components/PublicBreadcrumbs.jsx';
 import React, { useEffect, useState } from 'react';
 import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import { Link, useParams } from 'react-router-dom';
@@ -23,6 +24,7 @@ export default function PublicTournamentPage() {
         <h1>Loading tournament…</h1><p>Retrieving the public standings.</p>
     </section>;
     return <div className="public-page">
+        <PublicBreadcrumbs clubId={clubId} name={data.tournament.name} />
         <header className="public-page__header"><h1>{data.tournament.name}</h1>
             <p><RatingCategoryIcon category={data.tournament.ratingCategory} />{data.tournament.ratingCategory[0].toUpperCase() + data.tournament.ratingCategory.slice(1)} · {data.tournament.isRated ? 'Rated' : 'Unrated'}</p></header>
         <section className="public-card public-section"><h2>Standings</h2>

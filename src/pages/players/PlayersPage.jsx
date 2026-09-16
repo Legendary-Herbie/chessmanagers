@@ -1,3 +1,4 @@
+import SkeletonCards from '../../shared/common/SkeletonCards.jsx';
 import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
 import Disclosure from '../../shared/common/Disclosure.jsx';
 import Icon from '../../shared/common/Icon.jsx';
@@ -262,9 +263,7 @@ export default function PlayersPage() {
 
             {/* Loading & Empty states */}
             {loading ? (
-                <div className="page-empty">
-                    Fetching player records...
-                </div>
+                <SkeletonCards label="Loading players" />
             ) : error ? null : processedPlayers.length === 0 ? (
                 <div className="page-stack">
                     <div className="empty-state">

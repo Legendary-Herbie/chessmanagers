@@ -89,7 +89,7 @@ function pointsFor(pairing, playerId) {
     return 0;
 }
 
-export function calculateStandings(participants, pairings) {
+export function calculateStandings(participants, pairings, tiebreaks = ['buchholz', 'sonnebornBerger', 'directHeadToHead']) {
     const completed = pairings.filter(pairing => pairing.status === 'completed');
     const rows = participants.map(player => {
         const games = completed.filter(pairing => (
@@ -122,15 +122,13 @@ export function calculateStandings(participants, pairings) {
     }
     for (const row of rows) {
         const tied = new Set(rows.filter(other => other.matchPoints === row.matchPoints
-            && other.buchholz === row.buchholz
-            && other.sonnebornBerger === row.sonnebornBerger).map(other => other.playerId));
+            && tiebreaks.slice(0, tiebreaks.indexOf('directHeadToHead')).every(key => other[key] === row[key])).map(other => other.playerId));
         row.directHeadToHead = completed.filter(pairing => !pairing.isBye
             && tied.has(pairing.whitePlayerId) && tied.has(pairing.blackPlayerId)
             && (pairing.whitePlayerId === row.playerId || pairing.blackPlayerId === row.playerId))
             .reduce((sum, pairing) => sum + pointsFor(pairing, row.playerId), 0);
     }
-    rows.sort((a, b) => b.matchPoints - a.matchPoints || b.buchholz - a.buchholz
-        || b.sonnebornBerger - a.sonnebornBerger || b.directHeadToHead - a.directHeadToHead
-        || a.playerName.localeCompare(b.playerName));
+    rows.sort((a, b) => b.matchPoints - a.matchPoints || tiebreaks.reduce((difference, key) => difference || b[key] - a[key], 0)
+        || a.playerName.localeCompare(b.playerName) || a.playerId.localeCompare(b.playerId));
     return rows.map((row, index) => ({ rank: index + 1, ...row }));
 }

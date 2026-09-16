@@ -9,7 +9,7 @@ import { AuthProvider } from '../../app/AuthProvider.jsx';
 import { refreshAccessToken } from '../../config/api.js';
 import LoginView from './LoginView.jsx';
 
-vi.mock('../../features/auth/api/authApi.js', () => ({ authApi: { changePassword: vi.fn() } }));
+vi.mock('../../features/auth/api/authApi.js', () => ({ authApi: { changePassword: vi.fn(), deleteAccount: vi.fn() } }));
 vi.mock('../../config/api.js', async importOriginal => ({ ...(await importOriginal()), getToken: () => null, refreshAccessToken: vi.fn() }));
 afterEach(cleanup);
 beforeEach(() => {
@@ -46,4 +46,16 @@ it('announces password errors and keeps the account form available', async () =>
     submit();
     expect((await screen.findByRole('alert')).textContent).toBe('Current password is incorrect');
     expect(screen.getByRole('heading', { name: 'Account' })).toBeTruthy();
+});
+
+it('requires a separate deletion confirmation and retains the account when cancelled', async () => {
+    render(<AuthProvider><Harness /></AuthProvider>);
+    fireEvent.click(await screen.findByRole('button', { name: 'Delete account…' }));
+    expect(screen.getByRole('dialog', { name: 'Confirm account deletion' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Delete account' }).disabled).toBe(true);
+    fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+    expect(screen.getByRole('button', { name: 'Delete account' }).disabled).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(authApi.deleteAccount).not.toHaveBeenCalled();
 });

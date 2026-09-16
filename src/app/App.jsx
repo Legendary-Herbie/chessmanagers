@@ -1,3 +1,4 @@
+import ErrorBoundary, { CardError } from '../shared/common/ErrorBoundary.jsx';
 import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import Providers from './providers.jsx';
 import AppRoutes from './routes.jsx';
@@ -23,7 +24,7 @@ function AuthLogoutListener() {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
-const router = createBrowserRouter([{ path: '*', element:
+const router = createBrowserRouter([{ path: '*', errorElement: <CardError message="The app could not be displayed." onRetry={() => window.location.reload()} />, element:
             <Providers>
                 <AuthLogoutListener />
                 <AppRoutes />
@@ -31,5 +32,5 @@ const router = createBrowserRouter([{ path: '*', element:
 }]);
 
 export default function App() {
-    return <RouterProvider router={router} />;
+    return <ErrorBoundary message="The app could not be displayed."><RouterProvider router={router} /></ErrorBoundary>;
 }

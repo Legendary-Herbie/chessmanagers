@@ -9,6 +9,7 @@ import {
 import { toMatchDto } from '../utils/matchDtos.js';
 
 const FAILURES = {
+    REQUEST_ID_CONFLICT: [409, 'This submission ID was already used for a different match.'],
     MATCH_NOT_FOUND: [404, 'Match not found.'],
     MATCH_NOT_ACTIVE: [409, 'Only an active match can be changed.'],
     SAME_PLAYER: [400, 'White and black must be different players.'],

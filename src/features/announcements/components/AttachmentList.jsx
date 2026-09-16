@@ -1,13 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
+import Dialog from '../../../shared/common/Dialog.jsx';
+import './imagePreview.css';
 import { announcementApi } from '../api/announcementApi.js';
 
 export function ImageAttachment({ clubId, announcementId, attachment }) {
+    const [preview, setPreview] = useState(false);
+    const [zoom, setZoom] = useState(false);
     const [url, setUrl] = useState(null);
     const [error, setError] = useState('');
     useEffect(() => {
         let active = true;
         let objectUrl;
         setUrl(null);
+        setPreview(false);
+        setZoom(false);
         setError('');
         announcementApi.fetchAttachment(clubId, announcementId, attachment.id)
             .then(blob => {
@@ -22,7 +28,13 @@ export function ImageAttachment({ clubId, announcementId, attachment }) {
         };
     }, [announcementId, attachment.id, clubId]);
     return error ? <span role="alert">{error}</span>
-        : url ? <img src={url} alt={attachment.originalName} /> : <span>Loading image…</span>;
+         : url ? <>
+            <button type="button" className="image-preview-trigger" aria-label={`Preview ${attachment.originalName}`} onClick={() => { setZoom(false); setPreview(true); }}><img src={url} alt={attachment.originalName} /></button>
+            {preview && <Dialog title={attachment.originalName} onClose={() => setPreview(false)} className="image-preview-dialog">
+                <div className="image-preview-toolbar"><button className="btn btn-secondary" type="button" aria-pressed={zoom} onClick={() => setZoom(value => !value)}>{zoom ? 'Fit image' : 'Zoom in'}</button></div>
+                <div className={`image-preview-canvas${zoom ? ' is-zoomed' : ''}`} tabIndex={0} aria-label="Image preview"><img src={url} alt={attachment.originalName} /></div>
+            </Dialog>}
+        </> : <span>Loading image…</span>;
 }
 
 export default function AttachmentList({ clubId, announcementId, attachments, canManage, onDelete }) {

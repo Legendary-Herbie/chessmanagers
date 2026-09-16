@@ -419,19 +419,21 @@ describe('club membership lifecycle', () => {
         expect(['ACTIVE_MEMBER', 'REVOKED']).toContain(membership.first.status);
     });
 
-    it('rate-limits repeated join-code guesses per authenticated account', async () => {
+    it('rate-limits repeated join-code guesses per IP', async () => {
         const attacker = await createUser();
         const token = authorization(attacker);
         for (let attempt = 0; attempt < 10; attempt += 1) {
             await request(app)
                 .post('/api/v1/clubs/join-by-code')
                 .set('Authorization', token)
+                .set('X-Forwarded-For', '198.51.100.190')
                 .send({ code: String(attempt).padStart(6, '0') })
                 .expect(404);
         }
         await request(app)
             .post('/api/v1/clubs/join-by-code')
             .set('Authorization', token)
+            .set('X-Forwarded-For', '198.51.100.190')
             .send({ code: '999999' })
             .expect(429);
     });

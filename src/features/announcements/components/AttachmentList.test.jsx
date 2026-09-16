@@ -34,6 +34,21 @@ describe('AttachmentList', () => {
         expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:preview');
     });
 
+    it('opens a preview, zooms, and restores focus after Escape without refetching', async () => {
+        announcementApi.fetchAttachment.mockResolvedValue(new Blob(['image']));
+        render(<AttachmentList {...props} />);
+        const trigger = await screen.findByRole('button', { name: 'Preview Club photo' });
+        trigger.focus();
+        fireEvent.click(trigger);
+        expect(screen.getByRole('dialog', { name: 'Club photo' })).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Zoom in' }));
+        expect(screen.getByRole('button', { name: 'Fit image' }).getAttribute('aria-pressed')).toBe('true');
+        fireEvent.keyDown(screen.getByRole('dialog'), { key: 'Escape' });
+        expect(screen.queryByRole('dialog')).toBeNull();
+        expect(document.activeElement).toBe(trigger);
+        expect(announcementApi.fetchAttachment).toHaveBeenCalledTimes(1);
+    });
+
     it('reports a failed download and permits another attempt', async () => {
         announcementApi.fetchAttachment.mockRejectedValue(new Error('Download unavailable'));
         render(<AttachmentList {...props} attachments={[{ ...attachment, kind: 'file' }]} />);

@@ -1,3 +1,5 @@
+import { useClubQuery } from '../../shared/query/useClubQuery.js';
+import { queryClient } from '../../shared/query/queryClient.js';
 import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
 import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import React, { useEffect, useState } from 'react';
@@ -18,11 +20,18 @@ export default function PublicClubPage() {
     const [opening, setOpening] = useState(false);
     const [openError, setOpenError] = useState('');
     const { notify } = useNotifications();
-    const [club, setClub] = useState(null);
-    const [loading, setLoading] = useState(true);
+    const { data: club, isLoading: loading, error: loadError } = useClubQuery(
+        clubId, ['presentation'], () => clubApi.fetchPresentation(clubId), { enabled: Boolean(clubId && clubId !== 'join') },
+    );
+    const error = loadError?.message || null;
+    const setClub = updater => queryClient.setQueryData(['club', clubId, 'presentation'], updater);
     const [joining, setJoining] = useState(false);
-    const [error, setError] = useState(null);
     const [category, setCategory] = useState('rapid');
+    const [expanded, setExpanded] = useState(false);
+    const [page, setPage] = useState(0);
+    const [total, setTotal] = useState(0);
+    const [rankingError, setRankingError] = useState('');
+    const [retry, setRetry] = useState(0);
     const [topPlayers, setTopPlayers] = useState([]);
     const [leaderboardLoading, setLeaderboardLoading] = useState(false);
 
@@ -31,14 +40,6 @@ export default function PublicClubPage() {
             navigate(`/clubs/join${window.location.search}`, { replace: true });
             return;
         }
-        let active = true;
-        setLoading(true);
-        setError(null);
-        clubApi.fetchPresentation(clubId)
-            .then(result => active && setClub(result))
-            .catch(loadError => active && setError(loadError?.message || 'Failed to load club'))
-            .finally(() => active && setLoading(false));
-        return () => { active = false; };
     }, [clubId, navigate]);
 
     useEffect(() => {
@@ -48,12 +49,13 @@ export default function PublicClubPage() {
         }
         let active = true;
         setLeaderboardLoading(true);
-        leaderboardApi.fetchPublicLeaderboard(clubId, { category, limit: 5 })
-            .then(result => active && setTopPlayers(result.entries))
-            .catch(() => active && setTopPlayers([]))
+        setRankingError('');
+        leaderboardApi.fetchPublicLeaderboard(clubId, { category, limit: expanded ? 25 : 5, offset: expanded ? page * 25 : 0 })
+            .then(result => { if (active) { setTopPlayers(result.entries); setTotal(result.total); } })
+            .catch(() => { if (active) { setTopPlayers([]); setRankingError('Couldn’t load rankings. Try again.'); } })
             .finally(() => active && setLeaderboardLoading(false));
         return () => { active = false; };
-    }, [club, clubId, category]);
+    }, [club, clubId, category, expanded, page, retry]);
 
     async function openDashboard() {
         setOpening(true);
@@ -150,7 +152,7 @@ export default function PublicClubPage() {
                 </div>)}
             </section>}
 
-            {(hasAbout || leaderboardLoading || topPlayers.length > 0) && <div className="public-content-grid">
+            {(hasAbout || (club.visibility === 'public' && club.public_leaderboard)) && <div className="public-content-grid">
                 {hasAbout && <section className="public-card public-section">
                     <h2>About</h2>
                     {club.description && <p>{club.description}</p>}
@@ -164,19 +166,27 @@ export default function PublicClubPage() {
                     </div>}
                 </section>}
 
-                {club.visibility === 'public' && club.public_leaderboard && (leaderboardLoading || topPlayers.length > 0) && <section className="public-card public-section">
-                    <h2>Top players</h2>
+                {club.visibility === 'public' && club.public_leaderboard && <section className="public-card public-section">
+                    <h2>{expanded ? 'Club standings' : 'Top players'}</h2>
                     <div className="public-category-tabs" aria-label="Leaderboard category">
-                        {CATEGORIES.map(item => <button key={item} type="button" className={category === item ? 'active' : ''} onClick={() => setCategory(item)}>
+                        {CATEGORIES.map(item => <button key={item} type="button" className={category === item ? 'active' : ''} onClick={() => { setCategory(item); setPage(0); }} aria-pressed={category === item}>
                             <RatingCategoryIcon category={item} />{item[0].toUpperCase() + item.slice(1)}
                         </button>)}
                     </div>
                     {leaderboardLoading ? <p>Loading players…</p> : topPlayers.length > 0 ? (
-                        <ol className="public-leaderboard">{topPlayers.map(player => <li key={player.publicPlayerId}>
+                        <ol className="public-leaderboard" start={expanded ? page * 25 + 1 : 1}>{topPlayers.map(player => <li key={player.publicPlayerId}>
                             <Link className="name-link" to={`/clubs/${clubId}/players/${player.publicPlayerId}`}>{player.playerName} <ClaimedBadge status={player.isClaimed ? 'approved' : null} /></Link>
                             <strong>{player.selectedRating}</strong>
                         </li>)}</ol>
-                    ) : null}
+                     ) : !rankingError && <p>No ranked players in this category yet.</p>}
+                    {rankingError && <div role="alert"><p>{rankingError}</p><button className="public-button" onClick={() => setRetry(value => value + 1)}>Retry</button></div>}
+                    {!expanded && total > 5 && <button className="public-button" onClick={() => { setExpanded(true); setPage(0); }}>View all {total} ranked players</button>}
+                    {expanded && <div className="public-ranking-actions">
+                        <button className="public-button" disabled={leaderboardLoading || page === 0} onClick={() => setPage(value => value - 1)}>Previous</button>
+                        <span role="status">Page {page + 1}</span>
+                        <button className="public-button" disabled={leaderboardLoading || (page + 1) * 25 >= total} onClick={() => setPage(value => value + 1)}>Next</button>
+                        <button className="public-button public-button--secondary" onClick={() => { setExpanded(false); setPage(0); }}>Show top five</button>
+                    </div>}
                 </section>}
             </div>}
             <Link className="public-back-link public-club-back text-link" to="/clubs">← Back to clubs</Link>

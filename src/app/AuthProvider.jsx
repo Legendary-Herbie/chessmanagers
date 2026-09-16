@@ -1,3 +1,4 @@
+import { setQueryAccount } from '../shared/query/queryClient.js';
 import React, { useState, useEffect, useCallback } from 'react';
 import { getToken, setToken, setCsrfToken, clearToken, refreshAccessToken } from '../config/api.js';
 import { authApi } from '../features/auth/api/authApi.js';
@@ -18,7 +19,7 @@ export function AuthProvider({ children }) {
                     if (active) setUser(refreshed.user);
                 } else {
                     const data = await authApi.me();
-                    if (active) setUser(data.user);
+                    if (active) { setQueryAccount(data.user.id); setUser(data.user); }
                 }
             } catch {
                 clearToken();
@@ -35,6 +36,7 @@ export function AuthProvider({ children }) {
         setToken(data.accessToken);
         setCsrfToken(data.csrfToken);
         setSessionNotice(null);
+        setQueryAccount(data.user.id);
         setUser(data.user);
         return data.user;
     }, []);
@@ -55,6 +57,7 @@ export function AuthProvider({ children }) {
     const establishSession = useCallback(async () => {
         const data = await refreshAccessToken();
         setSessionNotice(null);
+        setQueryAccount(data.user.id);
         setUser(data.user);
         return data.user;
     }, []);
@@ -64,6 +67,7 @@ export function AuthProvider({ children }) {
     const updateSession = useCallback((token, freshUser) => {
         setToken(token);
         setSessionNotice(null);
+        setQueryAccount(freshUser.id);
         setUser(freshUser);
     }, []);
 

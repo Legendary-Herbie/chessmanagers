@@ -253,3 +253,10 @@
 .pairing-score-buttons .btn[aria-disabled='true'] { opacity:.55; cursor:wait; }
 @media(max-width:700px) { .scoreboard-keyboard-help { display:none; } }
 .scoreboard-toolbar select.input { min-height:44px; padding:10px 12px; border:1px solid var(--border); border-radius:10px; background:var(--bg-muted); color:var(--text-strong); font:inherit; color-scheme:inherit; }
+
+.tournament-round-progress { display:grid; gap:.4rem; margin-top:1rem; color:var(--text-secondary); }
+.tournament-round-progress progress { width:100%; height:.4rem; accent-color:var(--primary, #6366f1); }
+
+@media print { .tournament-print-sheet td:first-child { font-size:20pt; font-weight:700; } .tournament-print-sheet td:nth-child(2), .tournament-print-sheet td:nth-child(4) { font-size:16pt; font-weight:600; } .print-result-boxes { white-space:nowrap; line-height:1.8; font:12pt Arial,sans-serif; } }
+
+.tiebreak-help { position:relative; cursor:help; border-bottom:1px dotted currentColor; }.tiebreak-help [role=tooltip] { display:none; position:absolute; bottom:100%; right:0; width:220px; padding:.75rem; white-space:normal; background:var(--bg-surface); color:var(--text); border:1px solid var(--border); border-radius:.5rem; box-shadow:var(--shadow); z-index:10; }.tiebreak-help:hover [role=tooltip], .tiebreak-help:focus [role=tooltip] { display:block; }.tiebreak-settings { padding:1rem; }.tiebreak-settings summary { cursor:pointer; }.tiebreak-settings fieldset { border:0; padding:0; }.tiebreak-settings label { display:block; margin:.75rem 0; }.tiebreak-settings li { margin:.5rem 0; }

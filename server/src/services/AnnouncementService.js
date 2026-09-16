@@ -1,30 +1,14 @@
+import createDOMPurify from 'dompurify';
+import { JSDOM } from 'jsdom';
+import { configureAnnouncementPurifier } from '../../shared/announcementHtml.js';
 import sanitizeHtmlLibrary from 'sanitize-html';
 import db from '../database/database.js';
 import { notifyClubMembers } from './NotificationService.js';
 
-const ALLOWED_TAGS = [
-    'p', 'br', 'strong', 'b', 'em', 'i', 'u', 's', 'ul', 'ol', 'li',
-    'blockquote', 'h2', 'h3', 'h4', 'a', 'code', 'pre',
-];
+const purifyAnnouncement = configureAnnouncementPurifier(createDOMPurify(new JSDOM('').window));
 
 export function sanitizeAnnouncementHtml(value) {
-    const contentHtml = sanitizeHtmlLibrary(value, {
-        allowedTags: ALLOWED_TAGS,
-        allowedAttributes: { a: ['href', 'target', 'rel'] },
-        allowedSchemes: ['http', 'https', 'mailto'],
-        allowProtocolRelative: false,
-        transformTags: {
-            a: (_tagName, attribs) => ({
-                tagName: 'a',
-                attribs: {
-                    ...attribs,
-                    ...(attribs.target === '_blank'
-                        ? { target: '_blank', rel: 'noopener noreferrer' }
-                        : {}),
-                },
-            }),
-        },
-    }).trim();
+    const contentHtml = purifyAnnouncement(value).trim();
     const contentText = sanitizeHtmlLibrary(contentHtml, {
         allowedTags: [],
         allowedAttributes: {},

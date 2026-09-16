@@ -1,3 +1,4 @@
+import { createClubSchema, ratingCategorySettingsSchema } from '../../server/shared/validation.js';
 import Disclosure from '../shared/common/Disclosure.jsx';
 import Icon from '../shared/common/Icon.jsx';
 import React, { useEffect, useState } from 'react';
@@ -46,26 +47,14 @@ export default function CreateClub() {
   }, [badgeFile]);
 
   function validateStep1() {
-    const errs = {};
-    if (!name.trim()) errs.name = 'Name is required.';
-    else if (name.trim().length > 150) errs.name = 'Use no more than 150 characters.';
-    if (!federation.trim()) errs.federation = 'Federation is required.';
-    else if (federation.trim().length > 5) errs.federation = 'Use a federation code of no more than 5 characters.';
-    return errs;
+    const result = createClubSchema.pick({ name: true, federation: true }).safeParse({ name, federation });
+    return result.success ? {} : Object.fromEntries(result.error.issues.map(issue => [issue.path[0], issue.message]));
   }
 
   function validateStep2() {
-    const errs = {};
-    for (const [field, value, min, max] of [
-      ['initialRating', initialRating, 100, 4000], ['ratingFloor', ratingFloor, 0, 4000],
-      ['kFactor', kFactor, 1, 100], ['provisionalKFactor', provisionalKFactor, 1, 100],
-      ['provisionalGames', provisionalGames, 1, 100],
-    ]) {
-      if (String(value).trim() === '' || !Number.isInteger(Number(value)) || Number(value) < min || Number(value) > max)
-        errs[field] = `Enter a whole number from ${min} to ${max}.`;
-    }
-    if (Number(ratingFloor) > Number(initialRating)) errs.ratingFloor = 'Rating floor must not exceed the initial rating.';
-    return errs;
+    const values = { initialRating, ratingFloor, establishedKFactor: kFactor, provisionalKFactor, provisionalGames };
+    const result = ratingCategorySettingsSchema.safeParse(Object.fromEntries(Object.entries(values).map(([key, value]) => [key, String(value).trim() === '' ? NaN : Number(value)])));
+    return result.success ? {} : Object.fromEntries(result.error.issues.map(issue => [issue.path[0] === 'establishedKFactor' ? 'kFactor' : issue.path[0], issue.message]));
   }
 
   async function handleSubmit(e) {

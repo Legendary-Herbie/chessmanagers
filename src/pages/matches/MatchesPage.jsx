@@ -1,3 +1,4 @@
+import { submitMatch } from '../../features/matches/offline/matchQueue.js';
 import MatchRating from '../../features/matches/components/MatchRating.jsx';
 import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import NotificationMatchPreview from '../../features/matches/components/NotificationMatchPreview.jsx';
@@ -127,6 +128,7 @@ export default function MatchesPage() {
     }, [loadMatches]);
 
     const refreshAll = () => loadMatches();
+    useEffect(() => { const refresh = event => { if (event.detail?.clubId === club?.id) void loadMatches(); }; window.addEventListener('offline-match-synced', refresh); return () => window.removeEventListener('offline-match-synced', refresh); }, [club?.id, loadMatches]);
 
     function openAddModal() {
         setEditingMatch(null);
@@ -189,16 +191,16 @@ export default function MatchesPage() {
             const requestPayload = payload(confirmDuplicate);
             const response = editingMatch
                 ? await matchApi.update(club.id, editingMatch.id, requestPayload)
-                : await matchApi.create(club.id, requestPayload);
+                : await submitMatch(club.id, requestPayload);
             setDuplicateConfirmation(null);
             if (addAnother && !editingMatch) {
                 setForm({ ...emptyForm(), ratingCategory: form.ratingCategory, isRated: form.isRated });
                 setEntryVersion(value => value + 1);
             } else setModalOpen(false);
-            setNotice(response.ratingStatus === 'recalculation_pending'
+            setNotice(response.queued ? 'Match saved on this device. It will sync when you reconnect.' : response.ratingStatus === 'recalculation_pending'
                 ? 'Match saved. Ratings are being recalculated.'
                 : 'Match saved.');
-            await refreshAll();
+            if (!response.queued) await refreshAll();
         } catch (requestError) {
             if (requestError.code === 'POSSIBLE_DUPLICATE_MATCH') {
                 setDuplicateConfirmation({ editing: Boolean(editingMatch), addAnother });
@@ -222,7 +224,7 @@ export default function MatchesPage() {
                 ? await matchApi.void(club.id, lifecycleAction.match.id, lifecycleAction.reason.trim())
                 : await matchApi.delete(club.id, lifecycleAction.match.id, lifecycleAction.reason.trim() || null);
             setLifecycleAction(null);
-            setNotice(response.ratingStatus === 'recalculation_pending'
+            setNotice(response.queued ? 'Match saved on this device. It will sync when you reconnect.' : response.ratingStatus === 'recalculation_pending'
                 ? `Match ${lifecycleAction.kind === 'void' ? 'voided' : 'deleted'}. Ratings are being recalculated.`
                 : `Match ${lifecycleAction.kind === 'void' ? 'voided' : 'deleted'}.`);
             await refreshAll();

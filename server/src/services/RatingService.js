@@ -289,9 +289,44 @@ export function scheduleRatingRecalculation(clubId, category) {
     });
 }
 
+// Normal worker crashes roll back the entire replay transaction. This also repairs
+// stale committed claims left by older workers without stealing a live scope lock.
+export async function recoverStaleRatingJobs() {
+    const candidates = await db.query(
+        `SELECT id, club_id, category FROM rating_recalculation_jobs
+         WHERE status = 'running' AND COALESCE(started_at, updated_at) < NOW() - INTERVAL '5 minutes'`
+    ).then(result => result.rows);
+    let recovered = 0;
+    for (const candidate of candidates) {
+        recovered += await db.transaction(async trx => {
+            const lock = await trx.query(
+                'SELECT pg_try_advisory_xact_lock(hashtext($1), hashtext($2)) AS acquired',
+                [candidate.club_id, candidate.category]
+            ).then(result => result.first.acquired);
+            if (!lock) return 0;
+            const job = await trx.query(
+                `SELECT * FROM rating_recalculation_jobs WHERE id = $1 AND status = 'running'
+                   AND COALESCE(started_at, updated_at) < NOW() - INTERVAL '5 minutes'
+                 FOR UPDATE SKIP LOCKED`,
+                [candidate.id]
+            ).then(result => result.first);
+            if (!job) return 0;
+            // Remove the abandoned queue entry and coalesce its earliest affected
+            // time with any newer pending work atomically. Failed recovery rolls back both.
+            await trx.query('DELETE FROM rating_recalculation_jobs WHERE id = $1', [job.id]);
+            await enqueueRatingRecalculation({
+                clubId: job.club_id, category: job.category, affectedFrom: job.affected_from,
+            }, trx);
+            return 1;
+        });
+    }
+    return recovered;
+}
+
 function runBackgroundDrain() {
     if (backgroundDrain) return backgroundDrain;
-    backgroundDrain = drainRatingRecalculationJobs()
+    backgroundDrain = recoverStaleRatingJobs()
+        .then(() => drainRatingRecalculationJobs())
         .catch(error => {
             console.error('[RATING] Background recalculation failed', error);
         })

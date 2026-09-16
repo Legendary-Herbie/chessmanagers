@@ -4,7 +4,7 @@ import Dialog from '../../../shared/common/Dialog.jsx';
 import { parseBulkPlayers, readStartRatings } from './bulkPlayerEntry.js';
 import '../../../styles/playerForms.css';
 
-const categories = ['blitz', 'rapid', 'classical'];
+import { RATING_CATEGORIES as categories } from '../../../../server/shared/validation.js';
 const title = value => value[0].toUpperCase() + value.slice(1);
 
 export default function AddPlayerForm({ isOpen = false, isInline = false, onClose, clubId, ratingSettings = {}, onPlayerAdded }) {

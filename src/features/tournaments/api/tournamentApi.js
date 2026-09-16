@@ -1,3 +1,5 @@
+import { createTournamentSchema, updateTournamentSchema } from '../../../../server/shared/validation.js';
+import { parseInput } from '../../../shared/validation/parseInput.js';
 import { api, endpoints } from '../../../config/api.js';
 
 export const tournamentApi = {
@@ -8,10 +10,10 @@ export const tournamentApi = {
         return api.get(`${endpoints.tournaments.list(clubId)}?${params}`);
     },
     get: (clubId, tournamentId) => api.get(endpoints.tournaments.byId(clubId, tournamentId)),
-    create: (clubId, payload) => api.post(endpoints.tournaments.list(clubId), payload),
+    create: (clubId, payload) => api.post(endpoints.tournaments.list(clubId), parseInput(createTournamentSchema, payload)),
     setup: (clubId, tournamentId, payload) => api.post(`${endpoints.tournaments.byId(clubId, tournamentId)}/setup`, payload),
     update: (clubId, tournamentId, payload) => api.patch(
-        endpoints.tournaments.byId(clubId, tournamentId), payload
+        endpoints.tournaments.byId(clubId, tournamentId), parseInput(updateTournamentSchema, payload)
     ),
     setStatus: (clubId, tournamentId, status) => api.patch(
         endpoints.tournaments.status(clubId, tournamentId), { status }

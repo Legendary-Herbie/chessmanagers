@@ -81,6 +81,15 @@ describe('deterministic tournament pairing engines', () => {
         expect(new Set(completed.filter(pairing => !pairing.isBye).map(opponentKey)).size).toBe(6);
     });
 
+    it('changes tied-player ordering when head-to-head is moved before Buchholz', () => {
+        const participants = ['a','b','c','d','e'].map(id => ({ id, name:id }));
+        const completed = [['b','a'],['a','c'],['d','b'],['c','d'],['c','e']].map(([whitePlayerId,blackPlayerId]) => ({ whitePlayerId, blackPlayerId, status:'completed', result:'white', isBye:false }));
+        const standard = calculateStandings(participants, completed).map(row => row.playerId);
+        const directFirst = calculateStandings(participants, completed, ['directHeadToHead','buchholz']).map(row => row.playerId);
+        expect(standard.indexOf('a')).toBeLessThan(standard.indexOf('b'));
+        expect(directFirst.indexOf('b')).toBeLessThan(directFirst.indexOf('a'));
+    });
+
     it('orders standings by match points, Buchholz, Sonneborn-Berger, then direct result', () => {
         const participants = players(3);
         const completed = [

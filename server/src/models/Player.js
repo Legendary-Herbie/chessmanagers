@@ -152,13 +152,15 @@ export const PlayerModel = {
             playerId: player.id,
             ratings: player.resolvedRatings,
         })));
-        for (const player of created) {
-            await recordLifecycleEvent(trx, {
-                clubId, playerId: player.id, actorUserId, eventType: 'player.created', toStatus: 'active',
-                payload: { source: 'bulk_roster_entry' },
-            });
-        }
-        return created;
+        await trx.query(
+            `INSERT INTO player_lifecycle_events (
+                club_id, player_id, actor_user_id, event_type, to_status, payload_json
+             ) SELECT $1, player_id, $2, 'player.created', 'active', $3::JSONB
+               FROM UNNEST($4::TEXT[]) AS roster(player_id)`,
+            [clubId, actorUserId, JSON.stringify({ source: 'bulk_roster_entry' }), resolvedPlayers.map(player => player.id)]
+        );
+        const byId = new Map(created.map(player => [player.id, player]));
+        return resolvedPlayers.map(player => byId.get(player.id));
     }),
 
     // Internal read used by match/rating services. Never send this row directly to clients.

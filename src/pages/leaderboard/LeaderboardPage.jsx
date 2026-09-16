@@ -1,3 +1,4 @@
+import { useClubQuery } from '../../shared/query/useClubQuery.js';
 import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
 import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import Icon from '../../shared/common/Icon.jsx';
@@ -51,10 +52,13 @@ export default function LeaderboardPage() {
     const selectedCategory = CATEGORIES.includes(requestedCategory) ? requestedCategory : 'rapid';
     const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1);
     const search = searchParams.get('q') || '';
-    const [leaderboard, setLeaderboard] = useState({ entries: [], total: 0 });
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [refreshKey, setRefreshKey] = useState(0);
+    const { data: leaderboard = { entries: [], total: 0 }, isLoading: loading, error: queryError, refetch } = useClubQuery(
+        club?.id, ['leaderboard', selectedCategory, page, search],
+        () => leaderboardApi.fetchLeaderboard(club.id, {
+            category: selectedCategory, q: search, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE,
+        }),
+    );
+    const error = queryError?.message || '';
     const [selectedPlayer, setSelectedPlayer] = useState(null);
     const [ratingHistory, setRatingHistory] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
@@ -80,26 +84,6 @@ export default function LeaderboardPage() {
         Object.entries(changes).forEach(([key, value]) => value ? next.set(key, String(value)) : next.delete(key));
         setSearchParams(next, { replace: true });
     }, [searchParams, setSearchParams]);
-
-    useEffect(() => {
-        if (!club?.id) return;
-        let active = true;
-        setLoading(true);
-        setError('');
-        leaderboardApi.fetchLeaderboard(club.id, {
-            category: selectedCategory,
-            q: search,
-            limit: PAGE_SIZE,
-            offset: (page - 1) * PAGE_SIZE,
-        }).then(data => {
-            if (active) setLeaderboard(data || { entries: [], total: 0 });
-        }).catch(fetchError => {
-            if (active) setError(fetchError.message || 'Unable to load the leaderboard.');
-        }).finally(() => {
-            if (active) setLoading(false);
-        });
-        return () => { active = false; };
-    }, [club?.id, selectedCategory, page, search, refreshKey]);
 
     function selectCategory(category) {
         updateQuery({ category, page: null });
@@ -135,7 +119,7 @@ export default function LeaderboardPage() {
                 </div>
             </div>
 
-            {error && <div className="error-banner" role="alert"><p>Couldn’t load leaderboard. Try again. {error}</p><Button variant="secondary" disabled={loading} onClick={() => setRefreshKey(current => current + 1)}>Retry</Button></div>}
+            {error && <div className="error-banner" role="alert"><p>Couldn’t load leaderboard. Try again. {error}</p><Button variant="secondary" disabled={loading} onClick={() => refetch()}>Retry</Button></div>}
             <div className="leaderboard-list" aria-busy={loading}>
                 {loading ? <div className="muted">Loading...</div> : (
                     <>

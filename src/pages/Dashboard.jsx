@@ -1,4 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import MyChessSummary from '../features/players/profile/MyChessSummary.jsx';
+import React from 'react';
+import { useClubQuery } from '../shared/query/useClubQuery.js';
 import { Link, useLocation, useSearchParams } from 'react-router-dom';
 import { useClub } from '../app/contextHooks.js';
 import PendingLinksList from '../features/players/admin/PendingLinksList.jsx';
@@ -15,26 +17,10 @@ export default function Dashboard() {
     const [searchParams, setSearchParams] = useSearchParams();
     const requestedCategory = searchParams.get('category');
     const category = CATEGORIES.includes(requestedCategory) ? requestedCategory : 'rapid';
-    const [dashboard, setDashboard] = useState(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState('');
-    const [refreshKey, setRefreshKey] = useState(0);
-
-    useEffect(() => {
-        if (!club?.id) {
-            setDashboard(null);
-            setLoading(false);
-            return;
-        }
-        let active = true;
-        setLoading(true);
-        setError('');
-        leaderboardApi.fetchDashboard(club.id, category)
-            .then(data => active && setDashboard(data))
-            .catch(fetchError => active && setError(fetchError.message || 'Unable to load the dashboard.'))
-            .finally(() => active && setLoading(false));
-        return () => { active = false; };
-    }, [club?.id, category, refreshKey]);
+    const { data: dashboard, isLoading: loading, error: queryError, refetch } = useClubQuery(
+        club?.id, ['dashboard', category], () => leaderboardApi.fetchDashboard(club.id, category),
+    );
+    const error = queryError?.message || '';
 
     function changeCategory(nextCategory) {
         const next = new URLSearchParams(searchParams);
@@ -51,21 +37,22 @@ export default function Dashboard() {
     return <div className="page-container page-stack">
         {location.state?.joinMessage && <div className="success-banner" role="status">{location.state.joinMessage}</div>}
         <div><h1>Dashboard</h1><p className="muted">{club?.name || 'Your club'}</p></div>
+        {!loading && !error && <MyChessSummary summary={dashboard?.myChessSummary} />}
         <nav className="dashboard-shortcuts" aria-label="Club shortcuts">
             {capabilities.canManageMatches && <Link className="btn-primary" to="/matches?action=add">Record match</Link>}
             {capabilities.canManagePlayers && <Link className="btn-secondary" to="/players?action=add">Add players</Link>}
             {capabilities.canManageAnnouncements && <Link className="btn-secondary" to="/announcements?action=create">Post update</Link>}
         </nav>
         {capabilities.canManageMemberships && club?.id && (
-            <JoinRequestsPanel key={club.id} compact clubId={club.id} onQueueChanged={() => setRefreshKey(current => current + 1)} />
+            <JoinRequestsPanel key={club.id} compact clubId={club.id} onQueueChanged={() => refetch({ cancelRefetch: false })} />
         )}
         {loading && <div className="muted">Loading dashboard...</div>}
-        {error && <div className="error-banner" role="alert"><p>Couldn’t load dashboard. Try again. {error}</p><button type="button" className="btn-secondary" disabled={loading} onClick={() => setRefreshKey(current => current + 1)}>Retry</button></div>}
+        {error && <div className="error-banner" role="alert"><p>Couldn’t load dashboard. Try again. {error}</p><button type="button" className="btn-secondary" disabled={loading} onClick={() => refetch({ cancelRefetch: false })}>Retry</button></div>}
         {!loading && dashboard && <ClubDashboard data={dashboard} onCategoryChange={changeCategory} canManageMemberships={Boolean(capabilities.canManageMemberships)} />}
         {capabilities.canManagePlayers && club?.id && (
             <PendingLinksList
                 clubId={club.id}
-                onActionComplete={() => setRefreshKey(current => current + 1)}
+                onActionComplete={() => refetch({ cancelRefetch: false })}
             />
         )}
     </div>;

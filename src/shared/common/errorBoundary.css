@@ -1,0 +1,3 @@
+.render-error-card { padding: 1.5rem; margin-block: 1rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--bg-surface); color: var(--text-strong); }
+.render-error-card h2 { font-size: 1.1rem; margin: 0 0 .5rem; }
+.render-error-card p { margin: 0 0 1rem; }

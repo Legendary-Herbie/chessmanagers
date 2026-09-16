@@ -1,3 +1,4 @@
+import PublicBreadcrumbs from '../../features/public/components/PublicBreadcrumbs.jsx';
 import React, { useEffect, useState } from 'react';
 import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import { Link, useParams } from 'react-router-dom';
@@ -25,6 +26,7 @@ export default function PublicPlayerPage() {
         <h1>Loading player…</h1><p>Retrieving this player’s public profile.</p>
     </section>;
     return <div className="public-page">
+        <PublicBreadcrumbs clubId={clubId} name={player.name} />
         <article className="public-card public-section public-profile">
             {player.photoUrl && <img className="public-profile__photo" src={resolveAssetUrl(player.photoUrl)} alt={`${player.name} profile`} />}
             <div><h1>{player.name}</h1>{player.bio && <p>{player.bio}</p>}</div>

@@ -1,3 +1,4 @@
+import ErrorBoundary from '../shared/common/ErrorBoundary.jsx';
 import React, { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from './contextHooks.js';
@@ -40,10 +41,13 @@ const AnnouncementsPage = lazy(() => import('../pages/announcements/Announcement
 const AnnouncementPage = lazy(() => import('../pages/announcements/AnnouncementPage.jsx'));
 
 function LazyPage({ component }) {
+    const location = useLocation();
     return (
-        <Suspense fallback={<div className="page-loading" role="status">Loading page…</div>}>
-            {React.createElement(component)}
-        </Suspense>
+        <ErrorBoundary resetKey={location.pathname + location.search} message="This page could not be displayed.">
+            <Suspense fallback={<div className="page-loading" role="status">Loading page…</div>}>
+                {React.createElement(component)}
+            </Suspense>
+        </ErrorBoundary>
     );
 }
 

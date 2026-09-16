@@ -63,7 +63,7 @@ describe('tournament domain lifecycle', () => {
         const list = await request(app).get(`${base}?q=Autumn&limit=1&offset=0`)
             .set('Authorization', token).expect(200);
         expect(list.body).toMatchObject({ total: 1, limit: 1, offset: 0 });
-        expect(list.body.tournaments[0].name).toBe('Autumn Swiss');
+        expect(list.body.tournaments[0]).toMatchObject({ name: 'Autumn Swiss', participant_count: 0, completed_rounds: 0 });
     });
 
     it('runs Swiss rounds atomically with edits, withdrawals, and late registration', async () => {
@@ -109,6 +109,8 @@ describe('tournament domain lifecycle', () => {
             'SELECT status FROM tournament_rounds WHERE id = $1', [first.body.round.id]
         );
         expect(persistedRound.first.status).toBe('completed');
+        const overview = await request(app).get(`/api/v1/clubs/${club.id}/tournaments`).set('Authorization', token).expect(200);
+        expect(overview.body.tournaments.find(item => item.id === tournament.id)).toMatchObject({ participant_count: 4, current_round: 1, completed_rounds: 1 });
         expect((await db.query(
             `SELECT COUNT(*)::INTEGER AS count FROM matches
              WHERE tournament_id = $1 AND status = 'active'`, [tournament.id]

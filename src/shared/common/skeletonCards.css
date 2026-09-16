@@ -1,0 +1,7 @@
+.skeleton-cards { display:grid; gap:1rem; width:100%; }
+.skeleton-cards--roster { grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr)); }
+.skeleton-card { border:1px solid var(--border); border-radius:1rem; padding:1.25rem; min-height:170px; }
+.skeleton-line, .skeleton-image { background:var(--bg-tertiary, #94a3b830); border-radius:.5rem; animation:skeleton-pulse 1.5s ease-in-out infinite alternate; }
+.skeleton-line { height:1rem; margin-bottom:1rem; }.skeleton-heading { width:45%; height:1.5rem; }.skeleton-short { width:65%; }.skeleton-image { height:180px; margin-bottom:1rem; }
+@keyframes skeleton-pulse { to { opacity:.35; } }
+@media (prefers-reduced-motion:reduce) { .skeleton-line, .skeleton-image { animation:none; } }

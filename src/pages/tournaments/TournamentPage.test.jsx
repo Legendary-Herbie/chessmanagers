@@ -67,6 +67,19 @@ describe('TournamentPage duplicate result protection', () => {
         print.mockRestore();
     });
 
+    it('prints standings separately and includes write-in score boxes for unplayed pairings', async () => {
+        const print = vi.spyOn(window, 'print').mockImplementation(() => {});
+        tournamentApi.get.mockResolvedValue({ ...detail, standings:[{ playerId:'player_1', playerName:'Alpha', rank:1, matchPoints:1, wins:1, draws:0, losses:0, buchholz:0, sonnebornBerger:0, directHeadToHead:0 }] });
+        renderPage(false);
+        fireEvent.click(await screen.findByRole('button',{ name:'Print pairings' }));
+        expect(document.querySelector('.tournament-print-sheet').textContent).toContain('□ 1–0');
+        fireEvent.click(screen.getByRole('button',{ name:'Print standings' }));
+        const sheet = document.querySelector('.tournament-print-sheet');
+        expect(sheet.textContent).toContain('Standings'); expect(sheet.textContent).toContain('Alpha');
+        expect(sheet.textContent).not.toContain('□ 1–0');
+        print.mockRestore();
+    });
+
     it('shows a recorded score in the pairing and print sheet after refreshing', async () => {
         const updated = { ...detail, rounds: [{ ...detail.rounds[0], pairings: [{
             ...detail.rounds[0].pairings[0], result: 'white', status: 'completed',

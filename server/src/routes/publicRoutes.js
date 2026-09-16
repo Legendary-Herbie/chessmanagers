@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { publicReadLimiter } from '../middleware/publicRateLimit.js';
 import {
     getPublicLeaderboard,
     getPublicClub,
@@ -14,6 +15,7 @@ import {
 } from '../middleware/validate.js';
 
 const router = Router();
+router.use(publicReadLimiter);
 
 router.get('/clubs/:clubId', validateRequest({ params: clubParamsSchema }), getPublicClub);
 

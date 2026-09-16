@@ -1,16 +1,40 @@
+import { createPlayerSchema, createPlayersBulkSchema, updatePlayerAdminSchema, updatePlayerSelfSchema } from '../../../../server/shared/validation.js';
+import { parseInput } from '../../../shared/validation/parseInput.js';
 import { api, endpoints } from '../../../config/api.js';
 
+let offlineOwner = null;
+const offlineRoster = new Map();
+export function setOfflineRosterOwner(owner) { if (owner !== offlineOwner) { offlineRoster.clear(); offlineOwner = owner; } }
+export function cachedPlayerName(clubId, playerId) { return offlineRoster.get(clubId)?.get(playerId)?.name; }
 export const playerApi = {
     fetchRegistrations: async (clubId, options = {}) => (await api.get(endpoints.players.registrations(clubId), options)).registrations,
     registerSelf: async (clubId, values) => (await api.post(endpoints.players.registrations(clubId), values)).registration,
     reviewRegistration: async (clubId, requestId, values) => (await api.patch(endpoints.players.registration(clubId, requestId), values)).registration,
     searchPlayers: async (clubId, { q = '', limit = 20, offset = 0, signal, status, sortBy, category } = {}) => {
+        if (navigator.onLine === false) {
+            const cached = [...(offlineRoster.get(clubId)?.values() || [])];
+            if (!offlineOwner || !cached.length) throw new Error('No players are cached for offline entry. Load the roster while online first.');
+            const filtered = cached.filter(player => {
+                const matchesText = `${player.name} ${player.bio || ''}`.toLowerCase().includes(q.toLowerCase());
+                const matchesStatus = !status || status === 'all' || (status === 'claimed' && player.link_status === 'approved')
+                    || (status === 'pending' && player.link_status === 'pending') || (status === 'unlinked' && !['approved', 'pending'].includes(player.link_status));
+                return matchesText && matchesStatus;
+            });
+            return { players: filtered.slice(offset, offset + limit), total: filtered.length };
+        }
+        const requestOwner = offlineOwner;
         const params = new URLSearchParams({ limit: String(limit), offset: String(offset) });
         if (status) params.set('status', status);
         if (sortBy) params.set('sortBy', sortBy);
         if (category) params.set('category', category);
         if (q) params.set('q', q);
-        return await api.get(`${endpoints.players.list(clubId)}?${params}`, { signal });
+        const result = await api.get(`${endpoints.players.list(clubId)}?${params}`, { signal });
+        if (requestOwner && requestOwner === offlineOwner) {
+            const cached = offlineRoster.get(clubId) || new Map();
+            for (const player of result.players) cached.set(player.id, player);
+            offlineRoster.set(clubId, cached);
+        }
+        return result;
     },
 
     fetchPlayers: async (clubId, { q = '', limit = 50, offset = 0, signal } = {}) => {
@@ -36,22 +60,22 @@ export const playerApi = {
     },
 
     createPlayer: async (clubId, player) => {
-        const data = await api.post(endpoints.players.list(clubId), player);
+        const data = await api.post(endpoints.players.list(clubId), parseInput(createPlayerSchema, player));
         return data.player;
     },
 
     createPlayersBulk: async (clubId, players) => {
-        const data = await api.post(endpoints.players.bulk(clubId), { players });
+        const data = await api.post(endpoints.players.bulk(clubId), parseInput(createPlayersBulkSchema, { players }));
         return data.players;
     },
 
     updatePlayer: async (clubId, playerId, changes) => {
-        const data = await api.patch(endpoints.players.byId(clubId, playerId), changes);
+        const data = await api.patch(endpoints.players.byId(clubId, playerId), parseInput(updatePlayerAdminSchema, changes));
         return data.player;
     },
 
     updateOwnProfile: async (clubId, playerId, changes) => {
-        const data = await api.patch(endpoints.players.profile(clubId, playerId), changes);
+        const data = await api.patch(endpoints.players.profile(clubId, playerId), parseInput(updatePlayerSelfSchema, changes));
         return data.player;
     },
 
@@ -113,6 +137,17 @@ export const playerApi = {
         return data.history;
     },
 
+    fetchRatingTimeline: async (clubId, playerId, { category, since, signal, limit }) => {
+        const rows = [];
+        for (let offset = 0; !signal?.aborted; offset += 100) {
+            const query = new URLSearchParams({ category, limit: String(limit || 100), offset: String(offset) });
+            if (since) query.set('since', since);
+            const data = await api.get(`${endpoints.players.ratingHistory(clubId, playerId)}?${query}`, { signal });
+            rows.push(...data.history);
+            if (limit || data.history.length < 100) break;
+        }
+        return rows.sort((a, b) => new Date(a.playedAt) - new Date(b.playedAt) || a.matchId.localeCompare(b.matchId));
+    },
     fetchStatistics: async (clubId, playerId, options = {}) => {
         const data = await api.get(endpoints.players.statistics(clubId, playerId), options);
         return data.statistics;

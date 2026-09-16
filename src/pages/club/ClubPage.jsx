@@ -665,6 +665,7 @@ export default function ClubPage() {
                     <section className="invite-section invite-share-hub">
                         <h2>Invite & share</h2>
                         <p className="muted">Share a code or invite link to bring people into your club.</p>
+                        {club.visibility === 'public' && <div className="public-club-share"><h3>Public club page</h3><p>Visitors can view the club and sign in to join.</p><ShareControls value={`${window.location.origin}/clubs/${club.id}`} label="Club page" /></div>}
                         <div className="discovery-switch" role="group" aria-label="Share club using">
                             <Button variant={shareMode === 'code' ? 'primary' : 'secondary'} aria-pressed={shareMode === 'code'} onClick={() => setShareMode('code')}>Join code</Button>
                             <Button variant={shareMode === 'link' ? 'primary' : 'secondary'} aria-pressed={shareMode === 'link'} onClick={() => setShareMode('link')}>Invite link</Button>

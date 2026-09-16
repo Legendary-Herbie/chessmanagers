@@ -1,3 +1,4 @@
+import ErrorBoundary from '../../shared/common/ErrorBoundary.jsx';
 import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
 import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import MatchRating from '../../features/matches/components/MatchRating.jsx';
@@ -326,11 +327,11 @@ export default function PlayerPage() {
 
             {/* Tab 1: Overview & Rating Chart */}
             {activeTab === 'overview' && (
-                <PlayerRatingChart
+                <ErrorBoundary resetKey={`${club.id}:${playerId}`} message="Unable to display rating history."><PlayerRatingChart clubId={club.id} playerId={playerId}
                     history={ratingHistory}
                     startRating={start_rating}
                     category={ratingCategory}
-                />
+                /></ErrorBoundary>
             )}
 
             {/* Tab 2: Match History Table */}

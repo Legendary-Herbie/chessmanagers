@@ -1,9 +1,11 @@
+import { sanitizeAnnouncementHtml } from '../sanitizeHtml.js';
+import ErrorBoundary from '../../../shared/common/ErrorBoundary.jsx';
 import React, { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { announcementApi } from '../api/announcementApi.js';
 import AttachmentList, { ImageAttachment } from './AttachmentList.jsx';
 
-export default function AnnouncementPost({ announcement, club }) {
+function AnnouncementPostContent({ announcement, club }) {
     const ref = useRef(null);
     const [views, setViews] = useState(announcement.viewCount ?? 0);
     useEffect(() => {
@@ -33,7 +35,7 @@ export default function AnnouncementPost({ announcement, club }) {
         {!!files.filter(file => file.kind === 'image').length && <div className="announcement-post-images">
             {files.filter(file => file.kind === 'image').map(file => <ImageAttachment key={file.id} clubId={club.id} announcementId={announcement.id} attachment={file} />)}
         </div>}
-        {announcement.contentHtml ? <div className="announcement-content" dangerouslySetInnerHTML={{ __html: announcement.contentHtml }} />
+        {announcement.contentHtml ? <div className="announcement-content" dangerouslySetInnerHTML={{ __html: sanitizeAnnouncementHtml(announcement.contentHtml) }} />
             : <p className="announcement-post-text">{announcement.contentText}</p>}
         <AttachmentList clubId={club.id} announcementId={announcement.id} attachments={files.filter(file => file.kind !== 'image')} canManage={false} />
         <footer className="announcement-post-footer">
@@ -41,4 +43,10 @@ export default function AnnouncementPost({ announcement, club }) {
             <Link className="text-link" to={`/announcements/${announcement.id}`}>Open announcement <span aria-hidden="true">→</span></Link>
         </footer>
     </article>;
+}
+
+export default function AnnouncementPost(props) {
+    return <ErrorBoundary resetKey={props.announcement?.id} message="Unable to display this announcement.">
+        <AnnouncementPostContent {...props} />
+    </ErrorBoundary>;
 }

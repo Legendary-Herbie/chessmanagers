@@ -127,20 +127,25 @@ export async function generateNextRound({ clubId, tournamentId, trx: existingTra
              VALUES ($1, $2, $3) RETURNING *`,
             [clubId, tournamentId, roundNumber]
         ).then(result => result.first);
-        const pairings = [];
-        for (const [index, pairing] of generated.entries()) {
-            const created = await trx.query(
-                `INSERT INTO tournament_pairings (
-                    club_id, tournament_id, round_id, round_number, board,
-                    white_player_id, black_player_id, result, is_bye, status
-                 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-                 RETURNING *`,
-                [clubId, tournamentId, round.id, roundNumber, index + 1,
-                    pairing.whitePlayerId, pairing.blackPlayerId,
-                    pairing.isBye ? 'bye' : null, pairing.isBye,
-                    pairing.isBye ? 'completed' : 'scheduled']
-            ).then(result => result.first);
-            pairings.push(toPairing(created));
+        const createdPairings = await trx.query(
+            `INSERT INTO tournament_pairings (
+                club_id, tournament_id, round_id, round_number, board,
+                white_player_id, black_player_id, result, is_bye, status
+             ) SELECT $1, $2, $3, $4, entry.board::INTEGER,
+                      entry.white_id, entry.black_id,
+                      CASE WHEN entry.is_bye THEN 'bye' ELSE NULL END,
+                      entry.is_bye, CASE WHEN entry.is_bye THEN 'completed' ELSE 'scheduled' END
+               FROM UNNEST($5::TEXT[], $6::TEXT[], $7::BOOLEAN[]) WITH ORDINALITY
+                    AS entry(white_id, black_id, is_bye, board)
+             RETURNING *`,
+            [clubId, tournamentId, round.id, roundNumber,
+                generated.map(pairing => pairing.whitePlayerId),
+                generated.map(pairing => pairing.blackPlayerId ?? null),
+                generated.map(pairing => Boolean(pairing.isBye))]
+        ).then(result => result.rows.sort((a, b) => a.board - b.board));
+        const pairings = createdPairings.map(toPairing);
+        for (const created of createdPairings) {
+            const pairing = toPairing(created);
             await notifyLinkedPlayers({
                 trx,
                 clubId,
@@ -238,7 +243,7 @@ export async function getTournamentDetail(clubId, tournamentId) {
         tournament,
         participants,
         rounds,
-        standings: calculateStandings(participants, pairings),
+        standings: calculateStandings(participants, pairings, tournament.tiebreaks),
     };
 }
 

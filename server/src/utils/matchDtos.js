@@ -4,6 +4,9 @@ export function toMatchDto(match) {
     if (!match) return null;
     const { white_rating_before, white_rating_after, black_rating_before, black_rating_after,
         ratings_pending, ...record } = match;
+    delete record.client_request_id;
+    delete record.client_user_id;
+    delete record.client_payload_hash;
     const hasSnapshots = [white_rating_before, white_rating_after, black_rating_before, black_rating_after]
         .every(value => typeof value === 'number' && Number.isFinite(value));
     const status = !match.is_rated ? 'unrated' : match.status !== 'active' ? 'excluded'

@@ -1,19 +1,8 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useClubQuery } from '../../../shared/query/useClubQuery.js';
 import { playerApi } from '../api/playerApi.js';
-import { isCancelledError } from '../../../config/api.js';
 
 export function usePlayers(clubId, { includeInactive = false } = {}) {
-    const [players, setPlayers] = useState([]);
-    const [inactivePlayers, setInactivePlayers] = useState([]);
-    const [rosterSummary, setRosterSummary] = useState({
-        totalPlayers: 0,
-        activePlayers: 0,
-        averageRatings: { blitz: null, rapid: null, classical: null },
-    });
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
-    const [metadataError, setMetadataError] = useState(null);
-
     // Toolbar filtering & sorting state
     const [searchTerm, setSearchTerm] = useState('');
     const [ratingCategory, setRatingCategory] = useState('rapid');
@@ -22,70 +11,41 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     const [viewMode, setViewMode] = useState('grid');       // 'grid' | 'table'
 
     const [page, setPage] = useState(0);
-    const [total, setTotal] = useState(0);
     const [query, setQuery] = useState('');
-    const [revision, setRevision] = useState(0);
     useEffect(() => { setPage(0); }, [clubId]);
     useEffect(() => {
         const timer = setTimeout(() => { setQuery(searchTerm.trim()); setPage(0); }, 250);
         return () => clearTimeout(timer);
     }, [searchTerm]);
+    const roster = useClubQuery(clubId, ['players', query, page, statusFilter, sortBy, ratingCategory], ({ signal }) => (
+        playerApi.searchPlayers(clubId, { q: query, limit: 24, offset: page * 24, status: statusFilter, sortBy, category: ratingCategory, signal })
+    ));
+    const metadata = useClubQuery(clubId, ['roster-summary', includeInactive], async ({ signal }) => {
+        const [inactive, summary] = await Promise.all([
+            includeInactive ? playerApi.fetchInactivePlayers(clubId, { signal }) : [],
+            playerApi.fetchRosterSummary(clubId, { signal }),
+        ]);
+        return { inactive, summary };
+    });
+    const players = roster.data?.players ?? [];
+    const total = roster.data?.total ?? 0;
+    const inactivePlayers = metadata.data?.inactive ?? [];
+    const rosterSummary = metadata.data?.summary ?? {
+        totalPlayers: 0, activePlayers: 0,
+        averageRatings: { blitz: null, rapid: null, classical: null },
+    };
+    const loading = roster.isLoading;
+    const error = roster.error?.message || metadata.error?.message || null;
     useEffect(() => {
-        const controller = new AbortController();
-        if (!clubId) return;
-        setMetadataError(null);
-        Promise.all([
-            includeInactive ? playerApi.fetchInactivePlayers(clubId, { signal: controller.signal }) : [],
-            playerApi.fetchRosterSummary(clubId, { signal: controller.signal }),
-        ]).then(([inactive, summary]) => {
-            if (!controller.signal.aborted) { setInactivePlayers(inactive); setRosterSummary(summary); }
-        }).catch(err => { if (!controller.signal.aborted && !isCancelledError(err)) setMetadataError(err.message); });
-        return () => controller.abort();
-    }, [clubId, includeInactive, revision]);
-    const requestId = useRef(0);
-    const fetchPlayers = useCallback(async (signal) => {
-        const currentRequest = ++requestId.current;
-        if (!clubId) {
-            setPlayers([]);
-            setInactivePlayers([]);
-            setRosterSummary({
-                totalPlayers: 0,
-                activePlayers: 0,
-                averageRatings: { blitz: null, rapid: null, classical: null },
-            });
-            setLoading(false);
-            return;
-        }
-        setLoading(true);
-        try {
-            const data = await playerApi.searchPlayers(clubId, {
-                q: query, limit: 24, offset: page * 24, status: statusFilter, sortBy, category: ratingCategory, signal,
-            });
-            if (signal?.aborted || currentRequest !== requestId.current) return;
-            if (!data.players.length && page > 0) { setPage(value => value - 1); return; }
-            setPlayers(data.players);
-            setTotal(data.total);
-            setError(null);
-        } catch (err) {
-            if (signal?.aborted || currentRequest !== requestId.current || isCancelledError(err)) return;
-            console.error('Failed to fetch players:', err);
-            setError(err.message || 'Unable to load players roster.');
-        } finally {
-            if (!signal?.aborted && currentRequest === requestId.current) setLoading(false);
-        }
-    }, [clubId, query, page, statusFilter, sortBy, ratingCategory]);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        fetchPlayers(controller.signal);
-        return () => { controller.abort(); requestId.current += 1; };
-    }, [clubId, fetchPlayers]);
+        if (roster.data && !roster.data.players.length && page > 0) setPage(value => value - 1);
+    }, [roster.data, page]);
+    const fetchPlayers = async () => { await Promise.all([roster.refetch({ cancelRefetch: false }), metadata.refetch({ cancelRefetch: false })]); };
 
     // Single Add Player
     const addPlayer = async ({ name, startRatings, bio }) => {
         if (!clubId) return;
         const newPlayer = await playerApi.createPlayer(clubId, { name, startRatings, bio });
-        setPlayers((prev) => [newPlayer, ...prev]);
+        await fetchPlayers();
         return newPlayer;
     };
 
@@ -93,7 +53,7 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     const addPlayersBulk = async (playersList) => {
         if (!clubId) return;
         const created = await playerApi.createPlayersBulk(clubId, playersList);
-        setPlayers((prev) => [...created, ...prev]);
+        await fetchPlayers();
         return created;
     };
 
@@ -101,23 +61,19 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     const updatePlayer = async (playerId, { name, bio }) => {
         if (!clubId) return;
         const updated = await playerApi.updatePlayer(clubId, playerId, { name, bio });
-        setPlayers((prev) =>
-            prev.map((p) => (p.id === playerId ? { ...p, ...updated } : p))
-        );
+        await fetchPlayers();
         return updated;
     };
 
     const archivePlayer = async (playerId) => {
         if (!clubId) return;
         await playerApi.archivePlayer(clubId, playerId);
-        setRevision(value => value + 1);
         await fetchPlayers();
     };
 
     const restorePlayer = async (playerId) => {
         if (!clubId) return;
         await playerApi.restorePlayer(clubId, playerId);
-        setRevision(value => value + 1);
         await fetchPlayers();
     };
 
@@ -125,7 +81,6 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     const claimPlayer = async (playerId) => {
         if (!clubId) return;
         const link = await playerApi.claimPlayer(clubId, playerId);
-        setRevision(value => value + 1);
         await fetchPlayers(); // Refresh link status
         return link;
     };
@@ -134,7 +89,6 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     const unlinkPlayer = async (playerId) => {
         if (!clubId) return;
         await playerApi.unlinkPlayer(clubId, playerId);
-        setRevision(value => value + 1);
         await fetchPlayers();
     };
 
@@ -145,7 +99,7 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
         page, setPage, total, pageSize: 24,
         stats: rosterSummary,
         loading,
-        error: error || metadataError,
+        error,
         searchTerm,
         setSearchTerm,
         ratingCategory,
@@ -156,7 +110,7 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
         setSortBy: value => { setSortBy(value); setPage(0); },
         viewMode,
         setViewMode,
-        refetch: async () => { setRevision(value => value + 1); await fetchPlayers(); },
+        refetch: fetchPlayers,
         addPlayer,
         addPlayersBulk,
         updatePlayer,

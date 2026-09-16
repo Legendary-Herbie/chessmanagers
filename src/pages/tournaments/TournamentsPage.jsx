@@ -105,7 +105,8 @@ export default function TournamentsPage() {
                             <span>{tournament.is_rated ? 'Rated' : 'Unrated'}</span>
                         </div>
                         <p>Starts {new Date(tournament.start_date).toLocaleString()}</p>
-                        <p className="muted">Round {tournament.current_round || 0}</p>
+                        <div className="tournament-meta"><span>{tournament.participant_count ?? 0} participants</span><span>{tournament.current_round ? `Round ${tournament.current_round}` : 'Not started'}</span></div>
+                        {tournament.current_round > 0 && <div className="tournament-round-progress"><progress aria-label="Generated rounds completed" value={tournament.completed_rounds ?? 0} max={tournament.current_round} /><small>{tournament.completed_rounds ?? 0} of {tournament.current_round} generated rounds completed</small></div>}
                     </Link>
                 ))}
                 {!loading && !tournaments.length && <div className="empty-tournaments"><h2>No tournaments found</h2><p className="muted">Create an event or adjust the filters.</p></div>}

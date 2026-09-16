@@ -1,3 +1,4 @@
+import { getMyChessSummary } from '../services/MyChessSummary.js';
 import { LeaderboardModel } from '../models/Leaderboard.js';
 import { PlayerModel } from '../models/Player.js';
 
@@ -33,10 +34,10 @@ export async function getLeaderboard(req, res, next) {
 export async function getRatingHistory(req, res, next) {
     try {
         const { clubId, playerId } = req.params;
-        const { category = 'rapid', limit = 30 } = req.validatedQuery;
+        const { category = 'rapid', limit = 30, offset = 0, since } = req.validatedQuery;
         const player = await PlayerModel.findByClubAndId(clubId, playerId, req.user.id);
         if (!player) return res.status(404).json({ error: 'Player not found.' });
-        const history = await LeaderboardModel.getRatingHistory(clubId, playerId, { category, limit });
+        const history = await LeaderboardModel.getRatingHistory(clubId, playerId, { category, limit, offset, since });
         res.json({ history });
     } catch (error) {
         next(error);
@@ -86,6 +87,7 @@ export async function getClubDashboard(req, res, next) {
             category,
             includeAdmin: req.clubContext.capabilities.canManageMemberships,
         });
+        dashboard.myChessSummary = req.clubContext.linkedPlayer ? await getMyChessSummary(req.params.clubId, req.clubContext.linkedPlayer) : null;
         res.json({ dashboard });
     } catch (error) {
         next(error);

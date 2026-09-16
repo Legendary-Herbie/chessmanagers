@@ -1,3 +1,4 @@
+import Toast from '../shared/common/Toast.jsx';
 import { useState, useCallback } from 'react';
 
 // Lightweight in-app toast system.
@@ -17,17 +18,15 @@ export function NotificationsProvider({ children }) {
         setNotifications(prev => prev.filter(n => n.id !== id));
     }, []);
 
-    const notify = useCallback((message, type = 'info', duration = 4000) => {
+    const notify = useCallback((message, type = 'info', duration = 3000) => {
         const id = ++_id;
-        setNotifications(prev => [...prev, { id, message, type }]);
-        if (duration > 0) {
-            setTimeout(() => dismiss(id), duration);
-        }
-    }, [dismiss]);
+        setNotifications(prev => [...prev, { id, message, type, duration }]);
+    }, []);
 
     return (
         <NotificationsContext.Provider value={{ notifications, notify, dismiss }}>
             {children}
+            <div className="app-toast-stack" aria-label="Notifications">{notifications.map(notification => <Toast key={notification.id} notification={notification} dismiss={dismiss} />)}</div>
         </NotificationsContext.Provider>
     );
 }

@@ -1,3 +1,4 @@
+import { sanitizeAnnouncementHtml } from '../sanitizeHtml.js';
 import React, { useEffect, useRef, useState } from 'react';
 
 const commands = [
@@ -77,8 +78,8 @@ export default function RichTextEditor({ value, onChange, disabled = false, onFi
     }, []);
 
     useEffect(() => {
-        if (editorRef.current && editorRef.current.innerHTML !== value) {
-            editorRef.current.innerHTML = value;
+        if (editorRef.current && editorRef.current.innerHTML !== sanitizeAnnouncementHtml(value)) {
+            editorRef.current.innerHTML = sanitizeAnnouncementHtml(value);
         }
     }, [value]);
 

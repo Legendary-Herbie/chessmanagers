@@ -1,7 +1,9 @@
+import { createClubSchema, updateClubSchema, updateClubPresentationSchema } from '../../../../server/shared/validation.js';
+import { parseInput } from '../../../shared/validation/parseInput.js';
 import { api, endpoints } from '../../../config/api.js';
 
 export const clubApi = {
-    create: (values) => api.post(endpoints.clubs.create(), values),
+    create: (values) => api.post(endpoints.clubs.create(), parseInput(createClubSchema, values)),
     fetchPresentation: async (clubId, options = {}) => {
         const data = await api.get(endpoints.clubs.byId(clubId), options);
         return data.club;
@@ -36,8 +38,8 @@ export const clubApi = {
     rejectJoinRequest: (clubId, requestId, reason) => api.patch(
         endpoints.clubs.joinRequest(clubId, requestId, 'reject'), reason ? { reason } : {}
     ),
-    update: (clubId, changes) => api.patch(endpoints.clubs.byId(clubId), changes),
-    updatePresentation: (clubId, changes) => api.patch(endpoints.clubs.presentation(clubId), changes),
+    update: (clubId, changes) => api.patch(endpoints.clubs.byId(clubId), parseInput(updateClubSchema, changes)),
+    updatePresentation: (clubId, changes) => api.patch(endpoints.clubs.presentation(clubId), parseInput(updateClubPresentationSchema, changes)),
     uploadBadge: (clubId, file) => {
         const formData = new FormData();
         formData.append('image', file);

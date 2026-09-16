@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import rateLimit from 'express-rate-limit';
+import { publicReadLimiter } from '../middleware/publicRateLimit.js';
 import {
     getMyClub,
     getClubContext,
@@ -66,18 +67,17 @@ import {
 
 const router = Router();
 const joinCodeLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
+    windowMs: 60 * 1000,
     max: 10,
     standardHeaders: true,
     legacyHeaders: false,
-    keyGenerator: req => req.user.id,
     message: { error: 'Too many join-code attempts. Please try again later.' },
 });
 
 // Public listing: GET /api/v1/clubs
 // optionalAuth is retained for response personalization; private clubs are
 // never exposed through this collection endpoint.
-router.get('/', optionalAuth, validateRequest({ query: publicClubListQuerySchema }), listClubs);
+router.get('/', publicReadLimiter, optionalAuth, validateRequest({ query: publicClubListQuerySchema }), listClubs);
 
 // GET /api/v1/clubs/mine
 // Must be declared before /:clubId to avoid 'mine' being treated as an ID
@@ -93,7 +93,7 @@ router.get(
 );
 
 // Public club detail. optionalAuth lets the handler include membership context.
-router.get('/:clubId', optionalAuth, validateRequest({ params: clubParamsSchema }), getClub);
+router.get('/:clubId', publicReadLimiter, optionalAuth, validateRequest({ params: clubParamsSchema }), getClub);
 
 router.use(requireAuth);
 

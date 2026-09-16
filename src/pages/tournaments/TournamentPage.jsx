@@ -1,3 +1,7 @@
+import ErrorBoundary from '../../shared/common/ErrorBoundary.jsx';
+import { TIEBREAKS, DEFAULT_TIEBREAKS } from '../../features/tournaments/tiebreaks.js';
+import TiebreakSettings, { TiebreakHelp } from '../../features/tournaments/components/TiebreakSettings.jsx';
+import { flushSync } from 'react-dom';
 import PairingsPrintSheet from '../../features/tournaments/components/PairingsPrintSheet.jsx';
 import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import Disclosure from '../../shared/common/Disclosure.jsx';
@@ -39,6 +43,8 @@ export default function TournamentPage() {
     const [participantsOpen, setParticipantsOpen] = useState(false);
     const [participantQuery, setParticipantQuery] = useState('');
     const [playerSearchVersion, setPlayerSearchVersion] = useState(0);
+    const [printMode, setPrintMode] = useState('pairings');
+    function printTournament(mode) { flushSync(() => setPrintMode(mode)); window.print(); }
     const [tableView, setTableView] = useState('standings');
     const [selectedPlayerId, setSelectedPlayerId] = useState('');
     const [loading, setLoading] = useState(false);
@@ -239,16 +245,17 @@ export default function TournamentPage() {
             {error && <div className="error" role="alert">{error}</div>}
             {notice && <div className="match-notice" role="status">{notice}</div>}
             <section className="tournament-section">
-                <div className="section-heading"><div><h2>{tableView === 'standings' ? 'Standings' : 'Crosstable'}</h2><p className="muted">Match points, Buchholz, Sonneborn-Berger, then head-to-head.</p></div>
-                    <div className="tournament-actions" role="group" aria-label="Tournament table view">{['standings', 'crosstable'].map(view => <Button key={view} variant={tableView === view ? 'primary' : 'secondary'} aria-pressed={tableView === view} onClick={() => setTableView(view)}>{title(view)}</Button>)}</div>
+                <div className="section-heading"><div><h2>{tableView === 'standings' ? 'Standings' : 'Crosstable'}</h2><p className="muted">Match points{(tournament.tiebreaks || DEFAULT_TIEBREAKS).map(key => ` → ${TIEBREAKS[key].label}`).join('')}.</p></div>
+                    <div className="tournament-actions" role="group" aria-label="Tournament table view"><Button variant="secondary" disabled={!standings.length} onClick={() => printTournament('standings')}>Print standings</Button>{['standings', 'crosstable'].map(view => <Button key={view} variant={tableView === view ? 'primary' : 'secondary'} aria-pressed={tableView === view} onClick={() => setTableView(view)}>{title(view)}</Button>)}</div>
                 </div>
-                {tableView === 'crosstable' ? <TournamentCrosstable participants={participants} rounds={rounds} standings={standings} /> : <><div className="tournament-table-wrap table-scroll" tabIndex={0} role="region" aria-label="Tournament standings"><table className="tournament-table tournament-standings">
-                    <thead><tr><th>#</th><th>Player</th><th>Pts</th><th>W</th><th>D</th><th>L</th><th>Buchholz</th><th>SB</th><th>H2H</th></tr></thead>
-                    <tbody>{standings.map(row => <tr key={row.playerId}><td>{row.rank}</td><td>{row.playerName}</td><td><strong>{row.matchPoints}</strong></td><td>{row.wins}</td><td>{row.draws}</td><td>{row.losses}</td><td>{row.buchholz}</td><td>{row.sonnebornBerger}</td><td>{row.directHeadToHead}</td></tr>)}
-                        {!standings.length && <tr><td colSpan={9} className="muted">No participants yet.</td></tr>}
+                {tableView === 'crosstable' ? <ErrorBoundary resetKey={`${club.id}:${tournament.id}`} message="Unable to display the crosstable."><TournamentCrosstable participants={participants} rounds={rounds} standings={standings} /></ErrorBoundary> : <><div className="tournament-table-wrap table-scroll" tabIndex={0} role="region" aria-label="Tournament standings"><table className="tournament-table tournament-standings">
+                    <thead><tr><th>#</th><th>Player</th><th>Pts</th><th>W</th><th>D</th><th>L</th>{(tournament.tiebreaks || DEFAULT_TIEBREAKS).map(key => <th key={key}><TiebreakHelp name={key} /></th>)}</tr></thead>
+                    <tbody>{standings.map(row => <tr key={row.playerId}><td>{row.rank}</td><td>{row.playerName}</td><td><strong>{row.matchPoints}</strong></td><td>{row.wins}</td><td>{row.draws}</td><td>{row.losses}</td>{(tournament.tiebreaks || DEFAULT_TIEBREAKS).map(key => <td key={key}>{row[key]}</td>)}</tr>)}
+                        {!standings.length && <tr><td colSpan={6 + (tournament.tiebreaks || DEFAULT_TIEBREAKS).length} className="muted">No participants yet.</td></tr>}
                     </tbody>
                 </table></div><p className="muted standings-legend">Pts: match points · W/D/L: wins/draws/losses · SB: Sonneborn-Berger · H2H: head-to-head. Standings are calculated by the server.</p></>}
             </section>
+            {isAdmin && <TiebreakSettings key={`${tournament.id}:${(tournament.tiebreaks || DEFAULT_TIEBREAKS).join(',')}`} clubId={club.id} tournament={tournament} onSaved={load} />}
             {isAdmin && tournament.status === 'upcoming' && <TournamentSetup key={`${club.id}-${tournamentId}`} clubId={club.id} tournamentId={tournamentId} participants={participants}
                 onComplete={load} onSaveLater={() => navigate('/tournaments')} />}
 
@@ -260,17 +267,17 @@ export default function TournamentPage() {
 
             <section className="tournament-section tournament-pairings" aria-label="Pairings">
                 <div className="section-heading"><div><h2>Pairings</h2></div>
-                    <Button variant="secondary" disabled={!rounds.length} onClick={() => window.print()}>Print pairings</Button>
+                    <Button variant="secondary" disabled={!rounds.length} onClick={() => printTournament('pairings')}>Print pairings</Button>
                     {isAdmin && tournament.status === 'active' && <Button disabled={!canGenerate || saving || resultPending.size > 0} loading={saving} onClick={() => runAction(() => tournamentApi.generateRound(club.id, tournamentId), 'Next round paired.')}>Generate next round</Button>}
                 </div>
                 <div className="scoreboard-toolbar">
-                    <label>Round<select className="input" aria-label="Select round" value={selectedRound || ''} onChange={event => setSelectedRound(Number(event.target.value))}>
+                    <label>Round<select className="input" aria-label="Select round" value={selectedRound || tournament.current_round || ''} onChange={event => setSelectedRound(Number(event.target.value))}>
                         {[...rounds].reverse().map(round => <option key={round.id} value={round.roundNumber}>Round {round.roundNumber}{isAdmin ? ` · ${title(round.status)}` : ''}</option>)}
                     </select></label>
                     {isAdmin && <p className="muted">New results use the current time. Adjust time or notes only when needed.<span className="scoreboard-keyboard-help"> Arrow keys move between scores and boards; 1 / 2 / 0 records a win / draw / loss for White.</span></p>}
                 </div>
                 <div className="round-list">
-                    {rounds.filter(round => round.roundNumber === selectedRound).map(round => <div className="round-card" key={round.id}>
+                    {rounds.filter(round => round.roundNumber === (selectedRound || tournament.current_round)).map(round => <div className="round-card" key={round.id}>
                         <div className="round-card__header"><strong>Round {round.roundNumber}</strong><span hidden={!isAdmin} className={`tournament-status ${round.status}`}>{title(round.status)}</span><span hidden={!isAdmin}>{round.pairings.filter(pairing => !pairing.isBye && !['white', 'black', 'draw'].includes(pairing.result)).length} missing results · {round.pairings.filter(pairing => pairing.isBye).length} byes</span></div>
                         <div className="pairing-list" ref={scoreboard} onKeyDown={scoreboardKeyDown}>{round.pairings.map(pairing => <div className="pairing-item" data-board={pairing.board} key={pairing.id}><div className={`pairing-row${isAdmin ? '' : ' pairing-row--read-only'}`}>
                             <span className="board-number">{pairing.board}</span>
@@ -337,7 +344,7 @@ export default function TournamentPage() {
                 </div>
             </Dialog>}
 
-            <PairingsPrintSheet tournament={tournament} participants={participants} round={rounds.find(round => round.roundNumber === selectedRound)} />
+            <PairingsPrintSheet mode={printMode} standings={standings} tournament={tournament} participants={participants} round={rounds.find(round => round.roundNumber === (selectedRound || tournament.current_round))} />
 
             <ConfirmDialog isOpen={archiveConfirmation} title="Archive tournament?"
                 message="Its rounds and results will be preserved."

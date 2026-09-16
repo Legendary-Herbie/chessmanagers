@@ -1,3 +1,4 @@
+import { sanitizeAnnouncementHtml } from '../../features/announcements/sanitizeHtml.js';
 import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useClub } from '../../app/contextHooks.js';
@@ -128,7 +129,7 @@ export default function AnnouncementPage() {
             {editing ? (
                 <RichTextEditor value={contentHtml} onChange={setContentHtml} disabled={working} />
             ) : (
-                <div className="announcement-rich-content" dangerouslySetInnerHTML={{ __html: announcement.contentHtml }} />
+                <div className="announcement-rich-content" dangerouslySetInnerHTML={{ __html: sanitizeAnnouncementHtml(announcement.contentHtml) }} />
             )}
 
             {canManage && (

@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import db from '../database/database.js';
 import { MatchModel } from '../models/Match.js';
 import {
@@ -191,6 +192,17 @@ function scheduleScopes(clubId, categories) {
 export async function createMatch(input) {
     const result = await db.transaction(async trx => {
         const values = { ...input, tournamentId: input.tournamentId ?? null, notes: input.notes ?? null };
+        if (input.clientRequestId) {
+            values.clientPayloadHash = createHash('sha256').update(JSON.stringify([
+                values.whitePlayerId, values.blackPlayerId, values.result, values.ratingCategory,
+                values.isRated, new Date(values.playedAt).toISOString(), values.notes, values.tournamentId,
+            ])).digest('hex');
+            await trx.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [values.clubId, `${values.actorUserId}:${input.clientRequestId}`]);
+            const previous = await trx.query('SELECT * FROM matches WHERE club_id = $1 AND client_user_id = $2 AND client_request_id = $3', [values.clubId, values.actorUserId, input.clientRequestId]).then(result => result.first);
+            if (previous) return previous.client_payload_hash === values.clientPayloadHash
+                ? { ok: true, match: previous, ratingStatus: 'already_saved', categories: [] }
+                : failure('REQUEST_ID_CONFLICT');
+        }
         const resourceCheck = await validateResources(trx, values);
         if (!resourceCheck.ok) return resourceCheck;
         const pairingCheck = await lockTournamentPairing(trx, values);

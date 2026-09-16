@@ -19,15 +19,15 @@ const ratingJoins = `LEFT JOIN rating_history white_history
 
 export const MatchModel = {
     create: async ({ clubId, whitePlayerId, blackPlayerId, result, ratingCategory,
-        isRated, tournamentId = null, notes = null, playedAt }, trx) => qry(trx)(
+        isRated, tournamentId = null, notes = null, playedAt, clientRequestId = null, actorUserId = null, clientPayloadHash = null }, trx) => qry(trx)(
         `INSERT INTO matches (
             club_id, white_player_id, black_player_id, result,
             rating_category, is_rated, tournament_id, notes, played_at,
-            status
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active')
+            status, client_request_id, client_user_id, client_payload_hash
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11, $12)
          RETURNING *`,
         [clubId, whitePlayerId, blackPlayerId, result, ratingCategory,
-            isRated, tournamentId, notes, playedAt]
+            isRated, tournamentId, notes, playedAt, clientRequestId, actorUserId, clientPayloadHash]
     ).then(result => result.first),
 
     findById: async (id, clubId, { includeDeleted = false, forUpdate = false, trx = null } = {}) => qry(trx)(

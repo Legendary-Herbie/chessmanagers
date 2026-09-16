@@ -1,3 +1,4 @@
+import SkeletonCards from '../../shared/common/SkeletonCards.jsx';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useClub } from '../../app/contextHooks.js';
 import { announcementApi } from '../../features/announcements/api/announcementApi.js';
@@ -93,7 +94,7 @@ export default function AnnouncementsPage() {
             {canManage && !query && !status && <Button onClick={() => setShowComposer(true)}>Create the first announcement</Button>}
         </section>}
         <div className="announcement-grid">{visible.map(announcement => <AnnouncementPost key={`${club.id}-${announcement.id}`} announcement={announcement} club={club} />)}</div>
-        {loading && <p role="status">Loading announcements…</p>}
+        {loading && <SkeletonCards label="Loading announcements" kind="feed" count={2} />}
         <div ref={sentinel}>{hasMore && !loading && <Button variant="secondary" onClick={() => load()}>Load more announcements</Button>}</div>
     </div>;
 }

@@ -1,3 +1,6 @@
+import CommandPalette from '../common/CommandPalette.jsx';
+import OfflineMatches from '../../features/matches/offline/OfflineMatches.jsx';
+import { useSearchShortcut } from '../hooks/useSearchShortcut.js';
 import ActionMenu from '../common/ActionMenu.jsx';
 import Icon from '../common/Icon.jsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -32,6 +35,7 @@ function storedSidebarPreference() {
 }
 
 export default function AppLayout() {
+    useSearchShortcut(false);
     const { user, logout } = useAuth();
     const {
         club,
@@ -353,7 +357,7 @@ export default function AppLayout() {
             </header>
 
             <main className="app-main">
-                <div className="app-main__inner">
+                <div className="app-main__inner"><OfflineMatches /><CommandPalette />
                     <div role="status" aria-live="polite" aria-atomic="true">
                         {workspaceLoading && <div className="club-workspace-state">
                             <h1>{loadingMessage}</h1>

@@ -32,7 +32,9 @@ export const TournamentModel = {
         }
         params.push(limit, offset);
         return db.query(
-            `SELECT *, COUNT(*) OVER ()::INTEGER AS total_count
+            `SELECT *, COUNT(*) OVER ()::INTEGER AS total_count,
+                (SELECT COUNT(*)::INTEGER FROM tournament_players tp WHERE tp.tournament_id = tournaments.id) AS participant_count,
+                (SELECT COUNT(*)::INTEGER FROM tournament_rounds tr WHERE tr.tournament_id = tournaments.id AND tr.club_id = tournaments.club_id AND tr.status = 'completed') AS completed_rounds
              FROM tournaments
              WHERE ${conditions.join(' AND ')}
              ORDER BY start_date DESC, id DESC
@@ -167,14 +169,15 @@ export const TournamentModel = {
         return entry ? { ok: true, entry } : { ok: false, code: 'PLAYER_NOT_ACTIVE' };
     }),
 
-    update: async (id, clubId, { name, startDate, endDate }) => db.query(
+    update: async (id, clubId, { name, startDate, endDate, tiebreaks }) => db.query(
         `UPDATE tournaments
          SET name = COALESCE($1, name), start_date = COALESCE($2, start_date),
              end_date = CASE WHEN $3::BOOLEAN THEN $4::TIMESTAMPTZ ELSE end_date END,
+             tiebreaks = COALESCE($7::TEXT[], tiebreaks),
              updated_at = NOW()
          WHERE id = $5 AND club_id = $6 AND deleted_at IS NULL
          RETURNING *`,
-        [name, startDate, endDate !== undefined, endDate ?? null, id, clubId]
+        [name, startDate, endDate !== undefined, endDate ?? null, id, clubId, tiebreaks ?? null]
     ).then(result => result.first),
 
     setStatus: async (id, clubId, status, options = {}) => (options.trx ? async fn => fn(options.trx) : db.transaction)(async trx => {

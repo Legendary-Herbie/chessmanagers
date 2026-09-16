@@ -1,3 +1,4 @@
+import { useSearchShortcut } from '../hooks/useSearchShortcut.js';
 import React from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../app/contextHooks.js';
@@ -5,6 +6,7 @@ import BrandLogo from '../common/BrandLogo.jsx';
 import '../../styles/public.css';
 
 export default function PublicLayout() {
+    useSearchShortcut();
     const { user, loading } = useAuth();
 
     return (
