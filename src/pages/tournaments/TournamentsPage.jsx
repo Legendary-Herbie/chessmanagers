@@ -102,10 +102,10 @@ export default function TournamentsPage() {
                         <div className="tournament-meta">
                             <span>{title(tournament.type)}</span>
                             <span><RatingCategoryIcon category={tournament.rating_category} />{title(tournament.rating_category)}</span>
-                            <span>{tournament.is_rated ? 'Rated' : 'Unrated'}</span>
+
                         </div>
-                        <p>Starts {new Date(tournament.start_date).toLocaleString()}</p>
-                        <div className="tournament-meta"><span>{tournament.participant_count ?? 0} participants</span><span>{tournament.current_round ? `Round ${tournament.current_round}` : 'Not started'}</span></div>
+                        {tournament.status === 'completed' && tournament.end_date && Number.isFinite(Date.parse(tournament.end_date)) && <p className="tournament-card__date">Ended <time dateTime={tournament.end_date}>{new Date(tournament.end_date).toLocaleDateString()}</time></p>}
+                        <div className="tournament-card__metrics"><div><strong>{tournament.participant_count ?? 0}</strong><span>Participants</span></div><div><strong>{tournament.current_round || 0}</strong><span>Rounds paired</span></div></div>
                         {tournament.current_round > 0 && <div className="tournament-round-progress"><progress aria-label="Generated rounds completed" value={tournament.completed_rounds ?? 0} max={tournament.current_round} /><small>{tournament.completed_rounds ?? 0} of {tournament.current_round} generated rounds completed</small></div>}
                     </Link>
                 ))}

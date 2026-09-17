@@ -174,6 +174,7 @@ export default function NotificationTray() {
             <button
                 type="button"
                 className="notification-tray__trigger"
+                title="Notifications"
                 aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
                 aria-haspopup="dialog"
                 aria-expanded={open}

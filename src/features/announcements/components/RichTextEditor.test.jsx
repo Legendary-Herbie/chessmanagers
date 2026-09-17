@@ -14,6 +14,28 @@ function selectContents(element) {
 describe('RichTextEditor', () => {
     afterEach(cleanup);
 
+    it('retains shortcut formatting and the caret when controlled content updates while typing', () => {
+        function Editor() {
+            const [value, setValue] = React.useState('');
+            return <RichTextEditor value={value} onChange={setValue} />;
+        }
+        render(<Editor />);
+        const editor = screen.getByRole('textbox');
+        selectContents(editor);
+        fireEvent.keyDown(editor, { key: 'b', ctrlKey: true });
+        fireEvent.keyDown(editor, { key: 'i', ctrlKey: true });
+        const range = window.getSelection().getRangeAt(0);
+        const text = range.startContainer;
+        expect(text.parentElement.tagName).toBe('EM');
+        text.insertData(range.startOffset, 'Hello');
+        range.setStart(text, text.length);
+        range.collapse(true);
+        fireEvent.input(editor);
+        expect(editor.querySelector('strong em').textContent).toContain('Hello');
+        expect(window.getSelection().anchorNode).toBe(text);
+        expect(screen.getByRole('button', { name: 'Bold' }).getAttribute('aria-pressed')).toBe('true');
+    });
+
     it('formats with keyboard shortcuts and exposes active toolbar state', () => {
         const onChange = vi.fn();
         render(<RichTextEditor value="Hello" onChange={onChange} />);

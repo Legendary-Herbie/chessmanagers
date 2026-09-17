@@ -185,6 +185,14 @@ export default function PlayersPage() {
                 )}
             </div>
 
+            <Disclosure className="roster-summary" title="Roster statistics" defaultOpen>
+                <div className="roster-stat-cards">
+                    <div><span>Total players</span><strong>{stats.totalPlayers}</strong></div>
+                    <div><span>Players with games</span><strong>{stats.activePlayers}</strong></div>
+                    {['blitz', 'rapid', 'classical'].map(category => <div key={category}><span>{category[0].toUpperCase() + category.slice(1)} average</span><strong>{stats.averageRatings[category] ?? '�'}</strong><small>Elo rating</small></div>)}
+                </div>
+            </Disclosure>
+
             {/* Admin Pending Requests Banner */}
             <SelfRegistrationPanel key={club.id} clubId={club.id} userId={user?.id} linkedPlayer={linkedPlayer} isAdmin={isAdmin} onChanged={async () => { await refetch(); await refreshClub(); }} />
             {isAdmin && <PendingLinksList clubId={club.id} onActionComplete={refetch} />}
@@ -320,9 +328,7 @@ export default function PlayersPage() {
                 <button type="button" className="btn-secondary" disabled={(page + 1) * pageSize >= total} onClick={() => setPage(value => value + 1)}>Next</button>
             </nav>}
 
-            <Disclosure className="roster-summary" title="Roster statistics">
-                <p>{stats.activePlayers} players with games played. Average Elo ratings: Blitz {stats.averageRatings.blitz ?? '—'} · Rapid {stats.averageRatings.rapid ?? '—'} · Classical {stats.averageRatings.classical ?? '—'}</p>
-            </Disclosure>
+
 
 
             {/* Edit Player Modal */}

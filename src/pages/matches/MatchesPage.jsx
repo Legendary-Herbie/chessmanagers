@@ -241,8 +241,14 @@ export default function MatchesPage() {
     const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
     const firstResult = total === 0 ? 0 : page * PAGE_SIZE + 1;
     const lastResult = Math.min((page + 1) * PAGE_SIZE, total);
-    const activeFilterCount = [debouncedSearch, categoryFilter !== 'all', ratedFilter !== 'all',
+    const activeFilterCount = [search, categoryFilter !== 'all', ratedFilter !== 'all',
         statusFilter !== 'all', playerFilter, dateFrom, dateTo, sortOrder !== 'playedAt-desc'].filter(Boolean).length;
+
+    function clearFilters() {
+        setSearch(''); setDebouncedSearch(''); setCategoryFilter('all'); setRatedFilter('all');
+        setStatusFilter('all'); setPlayerFilter(''); setDateFrom(''); setDateTo('');
+        setSortOrder('playedAt-desc'); setPage(0);
+    }
 
     if (!club) return <NoClubState title="Keep every result in one reliable history"
         feature="Record opponents, result, rating category, and when the game was played. Ratings and player statistics update from that shared record."
@@ -254,6 +260,7 @@ export default function MatchesPage() {
                 <h1>Matches</h1>
                 <div className="matches-header-actions">
                     {isAdmin && <Button onClick={openAddModal}>Add Match</Button>}
+                    {activeFilterCount > 0 && <Button variant="secondary" onClick={clearFilters}>Clear filters</Button>}
                     <Button variant="secondary" aria-expanded={filtersOpen} aria-controls="match-filters"
                         onClick={() => setFiltersOpen(open => !open)}>
                         {filtersOpen ? 'Hide filters' : `Show filters${activeFilterCount ? ` (${activeFilterCount})` : ''}`}

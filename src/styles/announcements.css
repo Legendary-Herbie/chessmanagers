@@ -1,9 +1,9 @@
 @import './variables.css';
 
-.app-dialog.announcement-composer-dialog { width: min(100%, 680px); display: flex; flex-direction: column; overflow: hidden; }
+.app-dialog.announcement-composer-dialog { width: min(100%, 680px); overflow-y: auto; }
 .announcement-composer-dialog > .modal-header { flex-shrink: 0; }
-.announcement-composer-dialog > form { display: flex; flex-direction: column; min-height: 0; max-height: calc(100dvh - 120px); overflow: hidden; }
-.announcement-composer-dialog .announcement-composer { overflow-y: auto; min-height: 0; flex: 1; }
+.announcement-composer-dialog > form { display: block; min-width: 0; }
+.announcement-composer-dialog .announcement-composer { min-width: 0; overflow: visible; }
 .announcement-composer-dialog .modal-footer { flex-shrink: 0; }
 fieldset.announcement-composer { border: 0; margin: 0; min-width: 0; }
 .composer-label { display: block; margin-bottom: 8px; font-weight: 600; }

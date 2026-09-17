@@ -36,11 +36,24 @@ describe('TournamentsPage', () => {
     });
     afterEach(cleanup);
 
-    it('shows format, category, rating state, and admin creation controls', async () => {
+    it('shows an end date only for completed tournaments', async () => {
+        tournamentApi.list.mockResolvedValue({ tournaments: ['active', 'completed'].map(status => ({
+            id: status, name: `${status} event`, type: 'swiss', status, rating_category: 'rapid',
+            start_date: '2026-09-01T18:00:00.000Z', end_date: '2026-09-02T18:00:00.000Z',
+        })) });
+        renderPage();
+        const completed = await screen.findByRole('link', { name: /completed event/ });
+        expect(completed.querySelector('time').dateTime).toBe('2026-09-02T18:00:00.000Z');
+        expect(screen.getByRole('link', { name: /active event/ }).querySelector('time')).toBeNull();
+        expect(screen.queryByText(/Starts /)).toBeNull();
+    });
+
+    it('shows format and category without rating state or dates on active cards', async () => {
         renderPage();
         expect(await screen.findByText('Club Swiss')).toBeTruthy();
         expect(screen.getByText('Rapid')).toBeTruthy();
-        expect(screen.getByText('Rated')).toBeTruthy();
+        expect(screen.queryByText('Rated')).toBeNull();
+        expect(screen.getByRole('link', { name: /Club Swiss/ }).querySelector('time')).toBeNull();
         fireEvent.click(screen.getByRole('button', { name: 'New tournament' }));
         expect(screen.getByLabelText('Format')).toBeTruthy();
         expect(screen.getByRole('option', { name: 'Swiss' })).toBeTruthy();

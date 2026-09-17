@@ -8,7 +8,7 @@ export function usePlayers(clubId, { includeInactive = false } = {}) {
     const [ratingCategory, setRatingCategory] = useState('rapid');
     const [statusFilter, setStatusFilter] = useState('all'); // 'all' | 'claimed' | 'pending' | 'unlinked'
     const [sortBy, setSortBy] = useState('rating_desc');     // 'rating_desc' | 'rating_asc' | 'name_asc' | 'games_desc' | 'winrate_desc'
-    const [viewMode, setViewMode] = useState('grid');       // 'grid' | 'table'
+    const [viewMode, setViewMode] = useState('table');       // 'grid' | 'table'
 
     const [page, setPage] = useState(0);
     const [query, setQuery] = useState('');

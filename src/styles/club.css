@@ -109,7 +109,7 @@
     background: var(--bg);
 }
 .club-page > .tabs { display:flex; flex-wrap:wrap; }
-.club-page > .tabs button { flex:1 1 130px; min-height:44px; }
+.club-page > .tabs button { flex:0 0 auto; min-height:36px; }
 .club-page .profile-panel h2 { margin-top:0; }
 .settings-tabs { display:flex; flex-wrap:wrap; gap:6px; padding:6px; border:1px solid var(--border); border-radius:12px; background:var(--bg-muted); margin-bottom:24px; }
 .settings-tabs button { display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:10px 14px; border:0; border-radius:8px; color:var(--text); background:transparent; cursor:pointer; }
@@ -126,3 +126,24 @@
 .unsaved-settings-bar { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); z-index:800; display:flex; align-items:center; gap:12px; padding:16px 20px; width:max-content; max-width:calc(100% - 32px); border:1px solid var(--border); border-radius:16px; background:var(--bg-surface); box-shadow:var(--shadow-lg); }
 .profile-panel:has(.unsaved-settings-bar) { padding-bottom:120px; }
 @media(max-width:760px) { .rating-settings-grid { grid-template-columns:1fr; } .unsaved-settings-bar { width:calc(100% - 24px); bottom:12px; flex-wrap:wrap; } .unsaved-settings-bar span { flex-basis:100%; } .unsaved-settings-bar button { flex:1; } }
+.club-page { display:grid; grid-template-columns:190px minmax(0,1fr); gap:20px; align-items:start; }
+.club-page > .page-header, .club-page > .error { grid-column:1/-1; }
+.club-page > .settings-tabs { grid-column:1; display:flex; flex-direction:column; align-items:stretch; position:sticky; top:20px; margin:0; }
+.club-page > .settings-tabs button { text-align:left; justify-content:flex-start; }
+.club-page > .tab-panel { grid-column:2; min-width:0; }
+.club-profile-fields { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; }
+.club-profile-fields > .form-row { min-width:0; }
+.club-profile-fields input, .club-profile-fields textarea, .club-profile-fields select { width:100%; min-width:0; }
+.club-profile-fields > .form-actions { grid-column:1/-1; }
+.club-profile-fields .logo-preview { margin:8px 0 0; }
+.club-profile-fields .logo-preview img { max-width:160px; max-height:140px; object-fit:contain; }
+@media(max-width:900px) { .club-page { grid-template-columns:150px minmax(0,1fr); gap:12px; } .club-profile-fields { grid-template-columns:1fr; } .club-page > .settings-tabs { top:80px; } }
+@media(max-width:560px) { .club-page { grid-template-columns:110px minmax(0,1fr); padding:12px; gap:8px; } .club-page > .settings-tabs { padding:4px; } .club-page > .settings-tabs button { padding:8px 4px; font-size:12px; gap:4px; overflow-wrap:anywhere; } .club-page > .tab-panel { padding:12px; } .club-page .form-actions { flex-wrap:wrap; } }
+
+/* Secondary navigation is a compact list, not a stack of tab cards. */
+.club-page > .settings-tabs { padding:0; gap:2px; background:transparent; border:0; border-radius:0; flex-wrap:nowrap; }
+.club-page > .settings-tabs button { flex:0 0 auto; min-height:36px; padding:8px 10px; gap:8px; border:0; border-radius:6px; font-size:13px; line-height:1.3; font-weight:500; box-shadow:none; }
+.club-page > .settings-tabs button.active { background:color-mix(in srgb,var(--primary) 9%,transparent); color:var(--primary); box-shadow:inset 2px 0 var(--primary); }
+.club-page > .settings-tabs button:hover { background:var(--bg-muted); }
+@media(min-width:901px) { .club-page { grid-template-columns:168px minmax(0,1fr); gap:16px; } }
+@media(max-width:560px) { .club-page > .settings-tabs button { padding:8px 4px; font-size:12px; gap:4px; } }

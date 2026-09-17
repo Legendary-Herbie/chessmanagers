@@ -47,9 +47,9 @@ export default function ActionMenu({ children, label = 'More actions', icon = 'm
     }
     return <div className="action-menu" ref={root} onKeyDown={onKeyDown}
         onBlur={onBlur}>
-        <button ref={trigger} type="button" className="btn btn-secondary action-menu__trigger" aria-label={label}
+        <button ref={trigger} type="button" className="btn btn-secondary action-menu__trigger" aria-label={label} title={label}
             disabled={disabled} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen(value => !value)}><Icon name={icon} size="lg" /></button>
-        {open && createPortal(<div ref={panel} id={id} role="menu" aria-label={label} className={`action-menu__panel ${panelClassName}`} style={position}>
+        {open && createPortal(<div ref={panel} id={id} role="menu" aria-label={label} title={label} className={`action-menu__panel ${panelClassName}`} style={position}>
             {heading && <div className="action-menu__heading" role="presentation">{heading}</div>}
             {Children.map(children, child => child && cloneElement(child, { role: 'menuitem', onClick: event => {
                 trigger.current?.focus(); setOpen(false); child.props.onClick?.(event);

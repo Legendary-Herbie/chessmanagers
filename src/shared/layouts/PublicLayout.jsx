@@ -1,3 +1,4 @@
+import SiteFooter from '../common/SiteFooter.jsx';
 import { useSearchShortcut } from '../hooks/useSearchShortcut.js';
 import React from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
@@ -31,6 +32,7 @@ export default function PublicLayout() {
             <main id="public-main" className="public-main" tabIndex="-1">
                 <Outlet />
             </main>
+            <SiteFooter />
         </div>
     );
 }

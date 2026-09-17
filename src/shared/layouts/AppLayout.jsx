@@ -1,3 +1,4 @@
+import SiteFooter from '../common/SiteFooter.jsx';
 import CommandPalette from '../common/CommandPalette.jsx';
 import OfflineMatches from '../../features/matches/offline/OfflineMatches.jsx';
 import { useSearchShortcut } from '../hooks/useSearchShortcut.js';
@@ -17,9 +18,9 @@ const navItems = [
     { to: '/leaderboard', label: 'Leaderboard', icon: 'leaderboard' },
     { to: '/players', label: 'Players', icon: 'players' },
     { to: '/matches', label: 'Matches', icon: 'matches' },
-    { to: '/clubs', label: 'Clubs', icon: 'clubs' },
     { to: '/tournaments', label: 'Tournaments', icon: 'tournaments' },
     { to: '/announcements', label: 'Announcements', icon: 'announcements' },
+    { to: '/clubs', label: 'Clubs', icon: 'clubs' },
 ];
 
 function navLinkClass({ isActive }) {
@@ -125,11 +126,6 @@ export default function AppLayout() {
         navigate('/auth/login', { replace: true });
     };
 
-    const handleThemeToggle = () => {
-        toggleTheme();
-        setMenuOpen(false);
-    };
-
     const handleClubChange = async (event) => {
         if (!window.dispatchEvent(new Event('app:before-context-change', { cancelable: true }))) return;
         const nextClubId = event.target.value;
@@ -189,16 +185,12 @@ export default function AppLayout() {
             <header className={`app-nav${sidebarCollapsed ? ' app-nav--collapsed' : ''}`}>
                 <div className="app-nav__inner">
                     <div className="app-nav__top">
-                        <button
-                            type="button"
-                            className="app-nav__brand app-nav__brand-toggle"
-                            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                            aria-expanded={!sidebarCollapsed}
-                            onClick={() => setSidebarCollapsed(current => !current)}
-                        >
+                        {sidebarCollapsed ? <button type="button" className="app-nav__brand app-nav__brand-toggle" aria-label="Expand sidebar" title="Expand sidebar" aria-expanded={false} onClick={() => setSidebarCollapsed(false)}>
                             <BrandLogo className="app-nav__brand-logo" collapse="phone" />
-                            <span className="app-nav__brand-toggle-icon" aria-hidden="true"><Icon name={sidebarCollapsed ? 'chevronRight' : 'chevronLeft'} size="lg" /></span>
-                        </button>
+                            <span className="app-nav__brand-toggle-icon"><Icon name="sidebar" size="lg" /></span>
+                        </button> : <NavLink className="app-nav__brand" to="/dashboard" aria-label="1chessclub dashboard"><BrandLogo className="app-nav__brand-logo" collapse="phone" /></NavLink>}
+                        <div className="app-nav__header-actions"><CommandPalette />
+                        {!sidebarCollapsed && <button type="button" className="app-nav__desktop-toggle" title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded onClick={() => setSidebarCollapsed(true)}><Icon name="sidebar" size="lg" /></button>}</div>
                         <NavLink className="app-nav__mobile-brand" to="/dashboard" aria-label="1chessclub dashboard">
                             <BrandLogo className="app-nav__brand-logo" collapse="phone" />
                         </NavLink>
@@ -254,6 +246,7 @@ export default function AppLayout() {
                                 to={item.to}
                                 end={item.end}
                                 className={navLinkClass}
+                                title={sidebarCollapsed ? item.label : undefined}
                             >
                                 <Icon className="app-nav__icon" name={item.icon} size="xl" />
                                 <span className="app-nav__link-label">{item.label}</span>
@@ -263,6 +256,7 @@ export default function AppLayout() {
 
                     <div className="app-nav__utilities">
                         <NotificationTray />
+                        <button type="button" className="app-nav__theme-button" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Use light mode' : 'Use dark mode'} title={theme === 'dark' ? 'Use light mode' : 'Use dark mode'}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size="xl" /><span className="app-nav__link-label">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span></button>
                         <div className="app-nav__account" ref={dropdownRef}>
                         <button
                             type="button"
@@ -270,12 +264,13 @@ export default function AppLayout() {
                             aria-haspopup="menu"
                             aria-controls="account-menu"
                             aria-label={`${menuOpen ? 'Close' : 'Open'} account menu for ${displayName}`}
+                            title={sidebarCollapsed ? displayName : undefined}
                             aria-expanded={menuOpen}
                             onClick={() => setMenuOpen(open => !open)}
                         >
                             <span className="app-nav__avatar" aria-hidden="true">{initial}</span>
                             <span className="app-nav__account-copy">
-                                <span className="app-nav__account-name">{displayName}</span>
+                                <span className="app-nav__account-name" title={displayName}>{displayName.length > 28 ? `${displayName.slice(0, 25)}...` : displayName}</span>
                                 <span className="app-nav__account-club">{clubName}</span>
                             </span>
                             <span className="app-nav__chevron" aria-hidden="true" />
@@ -284,8 +279,8 @@ export default function AppLayout() {
                         {menuOpen && (
                             <div id="account-menu" className="app-nav__dropdown app-nav__dropdown--open" role="menu" aria-label="Account menu">
                                 <div className="app-nav__dropdown-header">
-                                    <strong>{displayName}</strong>
-                                    <span>{clubName}</span>
+                                    <strong title={displayName}>{displayName.length > 28 ? `${displayName.slice(0, 25)}...` : displayName}</strong>
+                                    <span title={clubName}>{clubName.length > 32 ? `${clubName.slice(0, 29)}...` : clubName}</span>
                                 </div>
 
                                 <NavLink className="app-nav__dropdown-item" role="menuitem" to="/create-club">
@@ -332,14 +327,7 @@ export default function AppLayout() {
                                     </button>
                                 )}
 
-                                <button
-                                    type="button"
-                                    className="app-nav__dropdown-item"
-                                    role="menuitem"
-                                    onClick={handleThemeToggle}
-                                >
-                                    {theme === 'dark' ? 'Use light mode' : 'Use dark mode'}
-                                </button>
+
 
                                 <button
                                     type="button"
@@ -357,7 +345,7 @@ export default function AppLayout() {
             </header>
 
             <main className="app-main">
-                <div className="app-main__inner"><OfflineMatches /><CommandPalette />
+                <div className="app-main__inner"><OfflineMatches />
                     <div role="status" aria-live="polite" aria-atomic="true">
                         {workspaceLoading && <div className="club-workspace-state">
                             <h1>{loadingMessage}</h1>
@@ -373,6 +361,7 @@ export default function AppLayout() {
                     </div>
                 </div>
             </main>
+            <SiteFooter />
 
             <ConfirmDialog
                 isOpen={leaveConfirmationOpen}

@@ -130,3 +130,12 @@
 
 .leaderboard-card strong { min-width:0; overflow-wrap:anywhere; }
 .leaderboard-list { min-width:0; }
+.leaderboard-table { table-layout:fixed; }
+.leaderboard-table th, .leaderboard-table td { text-align:center; vertical-align:middle; font-variant-numeric:tabular-nums; }
+.leaderboard-table th:first-child { width:10%; }
+.leaderboard-table th:nth-child(2) { width:30%; }
+.leaderboard-table .name-link { display:inline-flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:6px; max-width:100%; overflow-wrap:anywhere; text-align:center; }
+.leaderboard-table th .rating-category-icon { vertical-align:middle; margin-right:6px; }
+.leaderboard-card { grid-template-columns:1fr; justify-items:center; text-align:center; }
+.leaderboard-card__rank { grid-row:auto; }
+.leaderboard-card > span { display:inline-flex; align-items:center; justify-content:center; gap:6px; }

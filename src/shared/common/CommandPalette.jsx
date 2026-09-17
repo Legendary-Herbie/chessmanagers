@@ -5,6 +5,7 @@ import { playerApi } from '../../features/players/api/playerApi.js';
 import { tournamentApi } from '../../features/tournaments/api/tournamentApi.js';
 import { announcementApi } from '../../features/announcements/api/announcementApi.js';
 import Dialog from './Dialog.jsx';
+import Icon from './Icon.jsx';
 import './commandPalette.css';
 export default function CommandPalette() {
     const { club, capabilities } = useClub(); const { toggleTheme } = useTheme(); const navigate = useNavigate();
@@ -47,7 +48,7 @@ export default function CommandPalette() {
     const choices = [...actions, ...results];
     useEffect(() => { if (open) document.getElementById(`command-${active}`)?.scrollIntoView?.({ block: 'nearest' }); }, [open, active]);
     const choose = item => { setOpen(false); if (item.action) item.action(); else navigate(item.to); };
-    return <><button className="command-trigger" type="button" onClick={() => setOpen(true)}>Quick search <kbd>Ctrl / ⌘ K</kbd></button>{open && <Dialog title="Quick search" onClose={() => setOpen(false)}>
+    return <><button className="command-trigger" type="button" aria-label="Quick search" title="Search (Ctrl / Cmd K)" onClick={() => setOpen(true)}><Icon name="search" size="lg" /></button>{open && <Dialog title="Quick search" onClose={() => setOpen(false)}>
         <div className="command-content"><input ref={input} className="input" role="combobox" aria-label="Search players, tournaments, announcements and actions" aria-expanded="true" aria-controls="command-results" aria-activedescendant={choices[active] ? `command-${active}` : undefined} maxLength={100} value={query} onChange={event => setQuery(event.target.value)} onKeyDown={event => {
             if (event.key === 'ArrowDown' || event.key === 'ArrowUp') { event.preventDefault(); setActive(value => Math.max(0, Math.min(choices.length - 1, value + (event.key === 'ArrowDown' ? 1 : -1)))); }
             if (event.key === 'Enter' && choices[active]) { event.preventDefault(); choose(choices[active]); }

@@ -79,6 +79,12 @@ export default function ClubPage() {
     const [profile, setProfile] = useState(null);
     const [savedProfile, setSavedProfile] = useState(null);
     const [badgeFile, setBadgeFile] = useState(null);
+    const [badgePreview, setBadgePreview] = useState(null);
+    useEffect(() => {
+        if (!badgeFile) { setBadgePreview(null); return; }
+        const url = URL.createObjectURL(badgeFile); setBadgePreview(url);
+        return () => URL.revokeObjectURL(url);
+    }, [badgeFile]);
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [creatingInvite, setCreatingInvite] = useState(false);
@@ -440,7 +446,7 @@ export default function ClubPage() {
             {(activeTab === 'profile' || isOwner && ['notifications', 'ratings', 'ownership'].includes(activeTab)) && (
                 <div className="tab-panel profile-panel">
                     {activeTab !== 'ownership' && <form noValidate onSubmit={saveProfile}>
-                    <fieldset disabled={savingSettings} className="form-fieldset">
+                    <fieldset disabled={savingSettings} className={`form-fieldset${activeTab === 'profile' ? ' club-profile-fields' : ''}`}>
                     {activeTab === 'profile' && <>
                     <label className="form-row">
                         <div className="label">Name</div>
@@ -465,6 +471,7 @@ export default function ClubPage() {
                         <input {...validationProps('badgeFile')} className="input" type="file" accept="image/jpeg,image/png,image/webp" disabled={!isClubAdmin} onChange={e => { clearProfileError('badgeFile'); setBadgeFile(e.target.files?.[0] || null); }} />
                         <div className="form-helper">JPEG, PNG, or WebP; maximum 5 MB.</div>
                         <ProfileFieldError field="badgeFile" errors={profileErrors} />
+                        {(badgePreview || profile?.logo) && <div className="logo-preview"><img src={badgePreview || resolveAssetUrl(profile.logo)} alt="Club badge preview" /></div>}
                     </label>
 
                     <label className="form-row">
@@ -516,11 +523,7 @@ export default function ClubPage() {
                         <ProfileFieldError field="affiliation" errors={profileErrors} />
                     </label>
 
-                    <label className="form-row">
-                        <div className="label">Presentation color</div>
-                        <input {...validationProps('primaryColor')} type="color" disabled={!isClubAdmin} value={profile?.settings_json?.presentation?.primaryColor || '#2563eb'} onChange={e => updateStructuredSetting('presentation', 'primaryColor', e.target.value)} />
-                        <ProfileFieldError field="primaryColor" errors={profileErrors} />
-                    </label>
+
 
                     </>}
                     {activeTab === 'notifications' && <div className="notification-settings"><h2>Notifications</h2><p className="muted">Choose which club events members hear about.</p>{[
@@ -571,7 +574,7 @@ export default function ClubPage() {
                     })}
 
                     </div></>}
-                    {activeTab === 'profile' && profile?.logo && <div className="logo-preview"><img src={resolveAssetUrl(profile.logo)} alt="Club badge" /></div>}
+
 
                     <div className="form-actions">
                         {isClubAdmin ? (

@@ -61,6 +61,12 @@ function insertPlainText(editor, text) {
 
 export default function RichTextEditor({ value, onChange, disabled = false, onFiles }) {
     const editorRef = useRef(null);
+    const lastEmitted = useRef(null);
+    const emitChange = html => {
+        const clean = sanitizeAnnouncementHtml(html).replace(/\u200b/g, '');
+        lastEmitted.current = clean;
+        onChange(clean);
+    };
     const [active, setActive] = useState([]);
     useEffect(() => {
         const update = () => {
@@ -78,6 +84,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, onFi
     }, []);
 
     useEffect(() => {
+        if (value === lastEmitted.current) return;
         if (editorRef.current && editorRef.current.innerHTML !== sanitizeAnnouncementHtml(value)) {
             editorRef.current.innerHTML = sanitizeAnnouncementHtml(value);
         }
@@ -99,7 +106,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, onFi
                 ancestor.replaceWith(...children);
                 if (children.length) moveCaretAfter(children[children.length - 1]);
                 setActive(current => current.filter(tag => tag !== tagName));
-                onChange(editor.innerHTML);
+                emitChange(editor.innerHTML);
                 return;
             }
             ancestor = ancestor.parentElement;
@@ -112,13 +119,20 @@ export default function RichTextEditor({ value, onChange, disabled = false, onFi
             item.append(content.childNodes.length ? content : document.createElement('br'));
             wrapper.append(item);
         } else {
-            wrapper.append(content.childNodes.length ? content : document.createElement('br'));
+            wrapper.append(content.childNodes.length ? content : document.createTextNode('\u200b'));
         }
         range.insertNode(wrapper);
-        if (wasCollapsed) moveCaretInside(tagName === 'ul' || tagName === 'ol' ? wrapper.firstChild : wrapper);
+        if (wasCollapsed) {
+            const target = tagName === 'ul' || tagName === 'ol' ? wrapper.firstChild : wrapper;
+            moveCaretInside(target);
+            if (target.firstChild?.nodeType === Node.TEXT_NODE) {
+                const caret = window.getSelection().getRangeAt(0);
+                caret.setStart(target.firstChild, target.firstChild.length); caret.collapse(true);
+            }
+        }
         else moveCaretAfter(wrapper);
-        setActive([tagName]);
-        onChange(editor.innerHTML);
+        setActive(current => [...new Set([...current, tagName])]);
+        emitChange(editor.innerHTML);
     };
 
     return (
@@ -142,7 +156,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, onFi
                 role="textbox"
                 aria-label="Announcement content"
                 aria-multiline="true"
-                onInput={event => onChange(event.currentTarget.innerHTML)}
+                onInput={event => emitChange(event.currentTarget.innerHTML)}
                 onKeyDown={event => {
                     const command = { b: 'strong', i: 'em', u: 'u' }[event.key.toLowerCase()];
                     if ((event.ctrlKey || event.metaKey) && command) { event.preventDefault(); format(command); }
@@ -157,7 +171,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, onFi
                     if (disabled) return;
                     if (event.clipboardData.files?.length && onFiles) { onFiles([...event.clipboardData.files]); return; }
                     if (insertPlainText(event.currentTarget, event.clipboardData.getData('text/plain'))) {
-                        onChange(event.currentTarget.innerHTML);
+                        emitChange(event.currentTarget.innerHTML);
                     }
                 }}
                 suppressContentEditableWarning

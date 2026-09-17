@@ -39,6 +39,7 @@ function renderPage() {
     );
 }
 
+
 async function selectPlayer(label, name) {
     vi.useFakeTimers();
     try {
@@ -56,6 +57,21 @@ describe('MatchesPage canonical match flows', () => {
         matchApi.list.mockResolvedValue({ matches: [], total: 0, limit: 25, offset: 0 });
     });
     afterEach(cleanup);
+
+it('clears filters even while the filter panel is closed', async () => {
+    matchApi.list.mockResolvedValue({ matches: [], total: 0 });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.change(screen.getByLabelText('Filter by rating category'), { target: { value: 'rapid' } });
+    fireEvent.change(screen.getByLabelText('Search matches'), { target: { value: 'Ada' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Hide filters' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getByLabelText('Search matches').value).toBe('');
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    expect(screen.getByLabelText('Filter by rating category').value).toBe('all');
+});
+
 
     it('shows useful next steps instead of rendering a broken match workspace without a club', () => {
         render(<MemoryRouter><ClubContext.Provider value={{

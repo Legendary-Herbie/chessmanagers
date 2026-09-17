@@ -1,5 +1,8 @@
 import React from 'react';
 const paths = {
+    sun: 'M12 8a4 4 0 1 1 0 8 4 4 0 0 1 0-8M12 2v2M12 20v2M2 12h2M20 12h2M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2',
+    moon: 'M20 15A9 9 0 0 1 9 3a9 9 0 1 0 11 12z',
+    sidebar: 'M5 3h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2M9 3v18',
     warning: 'M12 3 2 21h20L12 3zM12 9v5M12 17h.01',
     info: 'M12 8h.01M12 11v6M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0',
     settings: 'M4 6h16M4 12h16M4 18h16M8 3v6M16 9v6M8 15v6',

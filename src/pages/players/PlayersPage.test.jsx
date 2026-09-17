@@ -56,6 +56,9 @@ it('shows all ratings without category selectors, filters the roster, and clears
     render(<MemoryRouter><AuthContext.Provider value={{ user: { id: 'u' } }}><ClubContext.Provider value={{ club: { id: 'c', name: 'Club' }, capabilities: {} }}><NotificationsContext.Provider value={{ notify: vi.fn() }}><PlayersPage /></NotificationsContext.Provider></ClubContext.Provider></AuthContext.Provider></MemoryRouter>);
     await screen.findByText('Ada');
     expect(screen.queryByRole('group', { name: 'Rating category' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'List' }).getAttribute('aria-pressed')).toBe('true');
+    expect(screen.getByRole('table')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Grid' }));
     expect(screen.getAllByText('Blitz: —')).toHaveLength(2);
     expect(screen.getAllByText('Rapid: —')).toHaveLength(2);
     expect(screen.getAllByText('Classical: —')).toHaveLength(2);

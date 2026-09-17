@@ -1,8 +1,9 @@
+import SiteFooter from '../shared/common/SiteFooter.jsx';
 import Button from '../shared/common/Button.jsx';
 import { Link } from 'react-router-dom';
 
 export default function NotFound() {
-    return (
+    return (<>
         <div className="">
             <h1 className="">404 - Page Not Found</h1>
             <p className="">Sorry, the page you're looking for doesn't exist.</p>
@@ -12,5 +13,6 @@ export default function NotFound() {
                 </Button>
             </Link>
         </div>
+        <SiteFooter /></>
     );
 }

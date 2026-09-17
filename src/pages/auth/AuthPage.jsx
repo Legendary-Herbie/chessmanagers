@@ -1,3 +1,4 @@
+import SiteFooter from '../../shared/common/SiteFooter.jsx';
 import React from 'react';
 import { Outlet } from 'react-router-dom';
 import '../../styles/auth.css';
@@ -10,7 +11,7 @@ function AuthBrand({ mobile = false }) {
 }
 
 export default function AuthPage() {
-    return (
+    return (<>
         <div className="auth-root">
             <div className="auth-layout">
                 <section className="auth-left">
@@ -33,5 +34,6 @@ export default function AuthPage() {
                 </section>
             </div>
         </div>
+        <SiteFooter /></>
     );
 }

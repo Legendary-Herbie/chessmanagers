@@ -1,3 +1,4 @@
+import SiteFooter from '../shared/common/SiteFooter.jsx';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import BrandLogo from '../shared/common/BrandLogo.jsx';
@@ -16,7 +17,7 @@ const playerOutcomes = [
 ];
 
 export default function Landing() {
-    return (
+    return (<>
         <main className="landing-page">
             <header className="landing-nav">
                 <Link className="landing-brand" to="/" aria-label="1chessclub home">
@@ -105,5 +106,6 @@ export default function Landing() {
                 </div>
             </section>
         </main>
+        <SiteFooter /></>
     );
 }
