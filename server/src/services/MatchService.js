@@ -10,6 +10,51 @@ import { notifyLinkedPlayers } from './NotificationService.js';
 
 const failure = (code, details = {}) => ({ ok: false, code, ...details });
 
+// Serialize results with registration, withdrawal, pairing and lifecycle changes.
+// Acquire rating locks first (as deletion does), then tournament and match locks.
+async function lockTournament(trx, clubId, tournamentId) {
+    if (!tournamentId) return;
+    await trx.query('SELECT id FROM tournaments WHERE id = $1 AND club_id = $2 FOR UPDATE', [tournamentId, clubId]);
+}
+
+async function lockMatchContext(trx, clubId, matchId, changes = {}) {
+    const snapshot = await trx.query('SELECT tournament_id, rating_category, is_rated FROM matches WHERE id = $1 AND club_id = $2', [matchId, clubId]).then(result => result.first);
+    if (!snapshot) return failure('MATCH_NOT_FOUND');
+    await lockRatingCategories(trx, clubId, [
+        ...(snapshot.is_rated ? [snapshot.rating_category] : []),
+        ...((changes.isRated ?? snapshot.is_rated) ? [changes.ratingCategory ?? snapshot.rating_category] : []),
+    ]);
+    for (const id of [...new Set([snapshot.tournament_id, changes.tournamentId].filter(Boolean))].sort()) {
+        await lockTournament(trx, clubId, id);
+    }
+    const match = await MatchModel.findById(matchId, clubId, { includeDeleted: true, forUpdate: true, trx });
+    if (!match) return failure('MATCH_NOT_FOUND');
+    // Another writer may have changed the lock scope while we waited. Retry safely.
+    if (match.tournament_id !== snapshot.tournament_id || match.rating_category !== snapshot.rating_category
+        || match.is_rated !== snapshot.is_rated) return failure('MATCH_CHANGED');
+    return { ok: true, match };
+}
+
+async function lockRatingCategories(trx, clubId, categories) {
+    for (const category of [...new Set(categories)].sort()) {
+        await trx.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [clubId, category]);
+    }
+}
+
+async function replayTournamentRatings(trx, clubId, category) {
+    const jobs = await trx.query(
+        `SELECT id FROM rating_recalculation_jobs
+         WHERE club_id = $1 AND category = $2 AND status IN ('pending', 'failed') FOR UPDATE`,
+        [clubId, category]
+    ).then(result => result.rows.map(job => job.id));
+    const result = await replayRatingCategory(trx, clubId, category);
+    await trx.query(
+        `UPDATE rating_recalculation_jobs SET status = 'completed', completed_at = NOW(),
+         last_error = NULL, updated_at = NOW() WHERE id = ANY($1::TEXT[])`, [jobs]
+    );
+    return result;
+}
+
 async function notifyMatchParticipants(trx, match, eventType, dedupeKey) {
     const players = await trx.query(
         `SELECT id, name FROM players
@@ -50,44 +95,75 @@ async function validateParticipants(trx, clubId, whitePlayerId, blackPlayerId) {
 async function validateTournament(trx, values) {
     if (!values.tournamentId) return { ok: true };
     const tournament = await trx.query(
-        `SELECT id, club_id, rating_category, is_rated
-         FROM tournaments WHERE id = $1 AND club_id = $2 FOR SHARE`,
+        `SELECT id, club_id, rating_category, is_rated, status, deleted_at
+         FROM tournaments WHERE id = $1 AND club_id = $2 FOR UPDATE`,
         [values.tournamentId, values.clubId]
     ).then(result => result.first);
-    if (!tournament) return failure('TOURNAMENT_NOT_FOUND');
+    if (!tournament || tournament.deleted_at) return failure('TOURNAMENT_NOT_FOUND');
     if (tournament.rating_category !== values.ratingCategory || tournament.is_rated !== values.isRated) {
         return failure('TOURNAMENT_RATING_MISMATCH');
     }
+    if (tournament.status !== 'active') return failure('TOURNAMENT_NOT_ACTIVE');
     const roster = await trx.query(
-        `SELECT player_id FROM tournament_players
+        `SELECT player_id, status FROM tournament_players
          WHERE tournament_id = $1 AND player_id IN ($2, $3)`,
         [values.tournamentId, values.whitePlayerId, values.blackPlayerId]
     ).then(result => result.rows);
-    return roster.length === 2 ? { ok: true } : failure('TOURNAMENT_ROSTER_MISMATCH');
+    if (roster.length !== 2) return failure('TOURNAMENT_ROSTER_MISMATCH');
+    return roster.every(player => player.status === 'active')
+        ? { ok: true } : failure('TOURNAMENT_PLAYER_INELIGIBLE');
 }
 
 async function lockTournamentPairing(trx, values, matchId = null) {
-    if (!values.tournamentPairingId && !matchId) return { ok: true, pairing: null };
+    if (!values.tournamentId && !values.tournamentPairingId && !matchId) return { ok: true, pairing: null };
     const pairing = await trx.query(
         `SELECT * FROM tournament_pairings
          WHERE club_id = $1
-           AND (($2::TEXT IS NOT NULL AND id = $2) OR ($3::TEXT IS NOT NULL AND match_id = $3))
+           AND (($2::TEXT IS NOT NULL AND id = $2) OR ($2::TEXT IS NULL AND $3::TEXT IS NOT NULL AND match_id = $3)
+             OR ($2::TEXT IS NULL AND $3::TEXT IS NULL AND tournament_id = $4
+                 AND white_player_id = $5 AND black_player_id = $6
+                 AND status = 'scheduled' AND match_id IS NULL))
+         ORDER BY round_number DESC LIMIT 1
          FOR UPDATE`,
-        [values.clubId, values.tournamentPairingId ?? null, matchId]
+        [values.clubId, values.tournamentPairingId ?? null, matchId,
+            values.tournamentId, values.whitePlayerId, values.blackPlayerId]
     ).then(result => result.first);
     if (!pairing) {
-        return values.tournamentPairingId
+        return values.tournamentPairingId || values.tournamentId
             ? failure('TOURNAMENT_PAIRING_NOT_FOUND')
             : { ok: true, pairing: null };
     }
     const matchesPairing = pairing.tournament_id === values.tournamentId
         && pairing.white_player_id === values.whitePlayerId
         && pairing.black_player_id === values.blackPlayerId
-        && !pairing.is_bye;
+        && !pairing.is_bye
+        && (!matchId || (pairing.match_id === matchId && pairing.status === 'completed'));
     if (!matchesPairing) return failure('TOURNAMENT_PAIRING_MISMATCH');
-    if (values.tournamentPairingId && (pairing.status !== 'scheduled' || pairing.match_id)) {
+    if (!matchId && (pairing.status !== 'scheduled' || pairing.match_id)) {
         return failure('TOURNAMENT_PAIRING_ALREADY_COMPLETED');
     }
+    const round = await trx.query(
+        `SELECT round.status, round.round_number, tournament.current_round
+         FROM tournament_rounds round
+         JOIN tournaments tournament ON tournament.id = round.tournament_id AND tournament.club_id = round.club_id
+         WHERE round.id = $1 AND round.tournament_id = $2 AND round.club_id = $3`,
+        [pairing.round_id, values.tournamentId, values.clubId]
+    ).then(result => result.first);
+    // A completed round accepts corrections to its existing games, never new results.
+    const correction = matchId && pairing.match_id === matchId && pairing.status === 'completed';
+    if (!round || round.round_number !== pairing.round_number
+        || (correction
+            ? !['paired', 'completed'].includes(round.status) || round.round_number > round.current_round
+            : round.status !== 'paired' || round.round_number !== round.current_round)) {
+        return failure('TOURNAMENT_ROUND_NOT_OPEN');
+    }
+    const eligible = await trx.query(
+        `SELECT player_id FROM tournament_players
+         WHERE tournament_id = $1 AND player_id IN ($2, $3)
+           AND status = 'active' AND registration_round <= $4`,
+        [values.tournamentId, values.whitePlayerId, values.blackPlayerId, round.round_number]
+    ).then(result => result.rows);
+    if (eligible.length !== 2) return failure('TOURNAMENT_PLAYER_INELIGIBLE');
     return { ok: true, pairing };
 }
 
@@ -203,6 +279,8 @@ export async function createMatch(input) {
                 ? { ok: true, match: previous, ratingStatus: 'already_saved', categories: [] }
                 : failure('REQUEST_ID_CONFLICT');
         }
+        if (values.isRated) await lockRatingCategories(trx, values.clubId, [values.ratingCategory]);
+        await lockTournament(trx, values.clubId, values.tournamentId);
         const resourceCheck = await validateResources(trx, values);
         if (!resourceCheck.ok) return resourceCheck;
         const pairingCheck = await lockTournamentPairing(trx, values);
@@ -212,12 +290,6 @@ export async function createMatch(input) {
             return failure('POSSIBLE_DUPLICATE_MATCH', { duplicate });
         }
 
-        if (values.isRated) {
-            await trx.query(
-                'SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))',
-                [values.clubId, values.ratingCategory]
-            );
-        }
         const isBackdated = values.isRated
             ? await MatchModel.hasLaterRatedMatch(
                 values.clubId, values.ratingCategory, values.playedAt, trx
@@ -235,26 +307,28 @@ export async function createMatch(input) {
         await notifyMatchParticipants(trx, match, 'match.recorded', `match-audit:${audit.id}`);
 
         if (!values.isRated) return { ok: true, match, ratingStatus: 'unrated', categories: [] };
-        if (isBackdated) {
+        if (isBackdated && !pairingCheck.pairing) {
             const categories = await enqueueAffectedRatings(trx, values.clubId, null, match);
             return { ok: true, match, ratingStatus: 'recalculation_pending', categories };
         }
-        const ratingResult = await replayRatingCategory(
-            trx, values.clubId, values.ratingCategory, match.played_at
-        );
+        const ratingResult = pairingCheck.pairing
+            ? await replayTournamentRatings(trx, values.clubId, values.ratingCategory)
+            : await replayRatingCategory(trx, values.clubId, values.ratingCategory, match.played_at);
         return { ok: true, match, ratingStatus: 'applied', ratingResult, categories: [] };
     });
     if (result.ok) scheduleScopes(input.clubId, result.categories);
     return result;
 }
 
-export async function updateMatch({ clubId, matchId, actorUserId, changes }) {
+export async function updateMatch({ clubId, matchId, actorUserId, changes, tournamentPairingId = null }) {
     const result = await db.transaction(async trx => {
-        const existing = await MatchModel.findById(matchId, clubId, { forUpdate: true, trx });
-        if (!existing) return failure('MATCH_NOT_FOUND');
+        const context = await lockMatchContext(trx, clubId, matchId, changes);
+        if (!context.ok) return context;
+        const existing = context.match;
         if (existing.status !== 'active') return failure('MATCH_NOT_ACTIVE');
         const values = {
             clubId,
+            tournamentPairingId,
             whitePlayerId: changes.whitePlayerId ?? existing.white_player_id,
             blackPlayerId: changes.blackPlayerId ?? existing.black_player_id,
             result: changes.result ?? existing.result,
@@ -282,7 +356,12 @@ export async function updateMatch({ clubId, matchId, actorUserId, changes }) {
         let categories = [];
         if (affectsRatings && (existing.is_rated || updated.is_rated)) {
             await MatchModel.deleteRatingHistory(matchId, clubId, trx);
-            categories = await enqueueAffectedRatings(trx, clubId, existing, updated);
+            if (pairingCheck.pairing) {
+                // Replay the whole category so earlier queued corrections are included too.
+                await replayTournamentRatings(trx, clubId, updated.rating_category);
+            } else {
+                categories = await enqueueAffectedRatings(trx, clubId, existing, updated);
+            }
         }
         const audit = await MatchModel.recordAudit({
             clubId, matchId, actorUserId,
@@ -296,7 +375,8 @@ export async function updateMatch({ clubId, matchId, actorUserId, changes }) {
         return {
             ok: true,
             match: updated,
-            ratingStatus: categories.length ? 'recalculation_pending' : 'unchanged',
+            ratingStatus: categories.length ? 'recalculation_pending'
+                : affectsRatings && updated.is_rated && pairingCheck.pairing ? 'applied' : 'unchanged',
             categories,
         };
     });
@@ -306,8 +386,9 @@ export async function updateMatch({ clubId, matchId, actorUserId, changes }) {
 
 export async function voidMatch({ clubId, matchId, actorUserId, reason }) {
     const result = await db.transaction(async trx => {
-        const existing = await MatchModel.findById(matchId, clubId, { forUpdate: true, trx });
-        if (!existing) return failure('MATCH_NOT_FOUND');
+        const context = await lockMatchContext(trx, clubId, matchId);
+        if (!context.ok) return context;
+        const existing = context.match;
         if (existing.status !== 'active') return failure('MATCH_NOT_ACTIVE');
         const match = await MatchModel.void(matchId, clubId, actorUserId, reason, trx);
         await reopenTournamentPairing(trx, matchId);
@@ -330,10 +411,9 @@ export async function voidMatch({ clubId, matchId, actorUserId, reason }) {
 
 export async function deleteMatch({ clubId, matchId, actorUserId, reason = null }) {
     const result = await db.transaction(async trx => {
-        const existing = await MatchModel.findById(matchId, clubId, {
-            includeDeleted: true, forUpdate: true, trx,
-        });
-        if (!existing) return failure('MATCH_NOT_FOUND');
+        const context = await lockMatchContext(trx, clubId, matchId);
+        if (!context.ok) return context;
+        const existing = context.match;
         if (existing.status === 'deleted') return failure('MATCH_NOT_ACTIVE');
         const match = await MatchModel.softDelete(matchId, clubId, actorUserId, reason, trx);
         await reopenTournamentPairing(trx, matchId);

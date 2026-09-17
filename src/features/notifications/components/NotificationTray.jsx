@@ -1,3 +1,4 @@
+import ActionMenu from '../../../shared/common/ActionMenu.jsx';
 import { useVisiblePolling } from '../../../shared/hooks/useVisiblePolling.js';
 import Icon from '../../../shared/common/Icon.jsx';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
@@ -46,7 +47,7 @@ function notificationDetail(notification) {
 
 export default function NotificationTray() {
     const navigate = useNavigate();
-    const { selectClub, activeClubs = [] } = useClub();
+    const { selectClub, activeClubs = [], club, capabilities = {} } = useClub();
     const trayRef = useRef(null);
     const [open, setOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
@@ -87,7 +88,7 @@ export default function NotificationTray() {
     useEffect(() => {
         if (!open) return undefined;
         const close = event => {
-            if (!trayRef.current?.contains(event.target)) setOpen(false);
+            if (!trayRef.current?.contains(event.target) && !event.target.closest?.('.notification-actions-menu')) setOpen(false);
         };
         const escape = event => {
             if (event.key === 'Escape') setOpen(false);
@@ -195,12 +196,11 @@ export default function NotificationTray() {
                             <strong>Notifications</strong>
                             <span>{unreadCount ? `${unreadCount} unread` : 'All caught up'}</span>
                         </div>
-                        <div className="notification-tray__actions">
-                        {unreadCount > 0 && (
-                            <button type="button" disabled={mutating} onClick={markAllRead}>Mark all read</button>
-                        )}
-                        {notifications.length > 0 && <button type="button" disabled={mutating} onClick={dismissAll}>Delete all</button>}
-                        </div>
+                        <ActionMenu label="Notification actions" panelClassName="notification-actions-menu">
+                            <button type="button" className="app-nav__dropdown-item" disabled={mutating || unreadCount === 0} onClick={markAllRead}>Mark all as read</button>
+                            <button type="button" className="app-nav__dropdown-item app-nav__dropdown-item--danger" disabled={mutating || notifications.length === 0} onClick={dismissAll}>Delete all</button>
+                            <button type="button" className="app-nav__dropdown-item" disabled={!club || !capabilities.canManageClubSettings} title={!capabilities.canManageClubSettings ? 'Club owners manage notification settings' : undefined} onClick={() => { setOpen(false); navigate('/club?tab=notifications'); }}>Notification settings</button>
+                        </ActionMenu>
                     </div>
 
                     {loading && notifications.length === 0 && (

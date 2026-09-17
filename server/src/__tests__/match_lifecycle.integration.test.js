@@ -231,7 +231,7 @@ describe('canonical match lifecycle', () => {
         const white = await createPlayer(club);
         const black = await createPlayer(club);
         const outsider = await createPlayer(club);
-        const tournament = await createTournament(club, { ratingCategory: 'rapid', isRated: false });
+        const tournament = await createTournament(club, { ratingCategory: 'rapid', isRated: false, status: 'active' });
         await db.query(
             `INSERT INTO tournament_players (tournament_id, player_id) VALUES ($1, $2), ($1, $3)`,
             [tournament.id, white.id, black.id]
@@ -245,8 +245,15 @@ describe('canonical match lifecycle', () => {
             .send(matchPayload(white, outsider, {
                 tournamentId: tournament.id, ratingCategory: 'rapid', isRated: false,
             })).expect(400);
-        const created = await request(app).post(base).set('Authorization', token)
+        await request(app).post(base).set('Authorization', token)
             .send(matchPayload(white, black, {
+                tournamentId: tournament.id, ratingCategory: 'rapid', isRated: false,
+            })).expect(404);
+        const round = await request(app).post(`/api/v1/clubs/${club.id}/tournaments/${tournament.id}/rounds`)
+            .set('Authorization', token).send({}).expect(201);
+        const pairing = round.body.pairings[0];
+        const created = await request(app).post(base).set('Authorization', token)
+            .send(matchPayload({ id: pairing.whitePlayerId }, { id: pairing.blackPlayerId }, {
                 tournamentId: tournament.id, ratingCategory: 'rapid', isRated: false,
             })).expect(201);
         expect(created.body.match).toMatchObject({

@@ -10,7 +10,9 @@ import { toMatchDto } from '../utils/matchDtos.js';
 
 const FAILURES = {
     TOURNAMENT_NOT_FOUND: [404, 'Tournament not found.'],
-    TOURNAMENT_NOT_ACTIVE: [409, 'The tournament must be active before generating a round.'],
+    TOURNAMENT_NOT_ACTIVE: [409, 'Resume or start the tournament before generating rounds or recording results.'],
+    TOURNAMENT_PLAYER_INELIGIBLE: [409, 'Both players must be active and registered for this round.'],
+    TOURNAMENT_ROUND_NOT_OPEN: [409, 'New results require the current open round; completed rounds only accept corrections.'],
     UNSUPPORTED_TOURNAMENT_FORMAT: [409, 'Only Swiss and Round-Robin tournaments are supported.'],
     TOURNAMENT_COMPLETED: [409, 'The tournament is already completed.'],
     TOURNAMENT_ALREADY_STARTED: [409, 'Remove players only before play starts; withdraw them after play starts.'],
@@ -31,6 +33,7 @@ const FAILURES = {
     TOURNAMENT_PAIRING_MISMATCH: [409, 'The match does not match this tournament pairing.'],
     TOURNAMENT_PAIRING_ALREADY_COMPLETED: [409, 'This tournament pairing already has a result.'],
     MATCH_NOT_FOUND: [404, 'Tournament match not found.'],
+    MATCH_CHANGED: [409, 'The match settings changed during this request. Refresh and try again.'],
     MATCH_NOT_ACTIVE: [409, 'Only an active tournament match can be edited.'],
 };
 

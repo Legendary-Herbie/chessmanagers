@@ -266,7 +266,8 @@ export async function recordPairingResult({
             clubId,
             matchId: pairing.match_id,
             actorUserId,
-            changes: { result, playedAt, notes, confirmDuplicate },
+            tournamentPairingId: pairingId,
+            changes: { result, playedAt, notes, confirmDuplicate, tournamentId },
         });
         return { ...updated, created: false };
     }

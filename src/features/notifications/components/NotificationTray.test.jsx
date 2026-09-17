@@ -31,8 +31,8 @@ function LocationProbe() {
     return <output data-testid="notification-location">{useLocation().pathname}{useLocation().search}</output>;
 }
 
-function renderTray({ activeClubs = [], selectClub = vi.fn() } = {}) {
-    return render(<MemoryRouter><ClubContext.Provider value={{ activeClubs, selectClub }}>
+function renderTray({ activeClubs = [], selectClub = vi.fn(), canManageClubSettings = false } = {}) {
+    return render(<MemoryRouter><ClubContext.Provider value={{ activeClubs, selectClub, club: { id: 'club_1' }, capabilities: { canManageClubSettings } }}>
         <NotificationTray /><LocationProbe />
     </ClubContext.Provider></MemoryRouter>);
 }
@@ -48,6 +48,27 @@ describe('NotificationTray', () => {
         notificationApi.dismissAll.mockResolvedValue({ deleted: 1 });
     });
     afterEach(cleanup);
+    it.each([true, false])('opens settings only with club settings permission %s', async canManageClubSettings => {
+        renderTray({ canManageClubSettings });
+        fireEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
+        const trigger = screen.getByRole('button', { name: 'Notification actions' });
+        fireEvent.click(trigger);
+        const settings = screen.getByRole('menuitem', { name: 'Notification settings' });
+        expect(settings.disabled).toBe(!canManageClubSettings);
+        fireEvent.mouseDown(settings);
+        expect(screen.getByRole('dialog', { name: 'Notifications' })).toBeTruthy();
+        if (canManageClubSettings) {
+            fireEvent.click(settings);
+            expect(screen.getByTestId('notification-location').textContent).toBe('/club?tab=notifications');
+            expect(screen.queryByRole('dialog', { name: 'Notifications' })).toBeNull();
+        } else {
+            fireEvent.keyDown(screen.getByRole('menu'), { key: 'Escape' });
+            expect(screen.queryByRole('menu')).toBeNull();
+            expect(document.activeElement).toBe(trigger);
+            expect(screen.getByRole('dialog', { name: 'Notifications' })).toBeTruthy();
+        }
+    });
+
     it('shows self-registration rejection and its review reason in the tray', async () => {
         notificationApi.list.mockResolvedValue({ notifications: [{ ...notification, eventType: 'player_registration.rejected', payload: { requestId: 'r1', playerName: 'Ada', reason: 'Use your full name.' } }], total: 1 });
         renderTray();
@@ -59,7 +80,8 @@ describe('NotificationTray', () => {
     it('deletes all notifications and clears the unread badge', async () => {
         renderTray();
         fireEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
-        fireEvent.click(await screen.findByRole('button', { name: 'Delete all' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Notification actions' }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete all' }));
         expect(await screen.findByText('No notifications yet.')).toBeTruthy();
         expect(notificationApi.dismissAll).toHaveBeenCalledOnce();
         expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
@@ -70,11 +92,13 @@ describe('NotificationTray', () => {
         notificationApi.dismissAll.mockRejectedValueOnce(new Error('Delete failed'));
         renderTray();
         fireEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
-        fireEvent.click(await screen.findByRole('button', { name: 'Delete all' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Notification actions' }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete all' }));
         expect((await screen.findByRole('alert')).textContent).toBe('Delete failed');
         expect(screen.getByText('Ada vs Grace')).toBeTruthy();
         expect(screen.getByRole('button', { name: 'Notifications, 1 unread' })).toBeTruthy();
-        fireEvent.click(screen.getByRole('button', { name: 'Delete all' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Notification actions' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Delete all' }));
         expect(await screen.findByText('No notifications yet.')).toBeTruthy();
     });
 
@@ -83,8 +107,9 @@ describe('NotificationTray', () => {
         notificationApi.markAllRead.mockRejectedValue(new Error('Read failed'));
         renderTray();
         fireEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
-        fireEvent.click(await screen.findByRole('button', {
-            name: scope === 'all' ? 'Mark all read' : /^A match involving your player/,
+        if (scope === 'all') fireEvent.click(screen.getByRole('button', { name: 'Notification actions' }));
+        fireEvent.click(await screen.findByRole(scope === 'all' ? 'menuitem' : 'button', {
+            name: scope === 'all' ? 'Mark all as read' : /^A match involving your player/,
         }));
         expect((await screen.findByRole('alert')).textContent).toBe('Read failed');
         expect(screen.getByRole('button', { name: 'Notifications, 1 unread' })).toBeTruthy();
@@ -122,7 +147,8 @@ describe('NotificationTray', () => {
     it('marks all records read through the persistent API', async () => {
         renderTray();
         fireEvent.click(await screen.findByRole('button', { name: 'Notifications, 1 unread' }));
-        fireEvent.click(await screen.findByRole('button', { name: 'Mark all read' }));
+        fireEvent.click(screen.getByRole('button', { name: 'Notification actions' }));
+        fireEvent.click(await screen.findByRole('menuitem', { name: 'Mark all as read' }));
         await waitFor(() => expect(notificationApi.markAllRead).toHaveBeenCalledTimes(1));
         expect(screen.getByRole('button', { name: 'Notifications' })).toBeTruthy();
     });

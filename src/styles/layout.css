@@ -922,3 +922,5 @@
     .app-nav--collapsed .app-nav__utilities { display:flex; flex-direction:column; }
     .app-nav--collapsed .app-nav__utilities > .app-nav__account { width:44px; }
 }
+.notification-actions-menu { width:min(280px,calc(100vw - 24px)); padding:8px; gap:0; border-radius:var(--radius-lg); background:var(--bg-surface); color:var(--text); box-shadow:var(--shadow-lg); }
+.notification-actions-menu .app-nav__dropdown-item:disabled { opacity:.5; cursor:not-allowed; background:transparent; }

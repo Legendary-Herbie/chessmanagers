@@ -122,7 +122,7 @@ describe('tournament domain lifecycle', () => {
             .set('Authorization', token)
             .send({ result: 'black', playedAt: '2026-09-01T10:00:00.000Z' })
             .expect(200);
-        expect(edited.body.ratingStatus).toBe('recalculation_pending');
+        expect(edited.body.ratingStatus).toBe('applied');
         expect((await db.query(
             'SELECT result, match_id, status FROM tournament_pairings WHERE id = $1',
             [editedPairing.id]
