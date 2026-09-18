@@ -1,3 +1,4 @@
+import PlayerSearchSelect from '../components/PlayerSearchSelect.jsx';
 import React, { useState, useEffect, useCallback } from 'react';
 import { playerApi } from '../api/playerApi.js';
 import { matchResultLabel } from '../../matches/matchPresentation.js';
@@ -10,7 +11,7 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
 
-    const opponentOptions = allPlayers.filter(p => p.id !== playerA?.id);
+    const [opponent, setOpponent] = useState(null);
 
     const fetchHeadToHead = useCallback(async (signal) => {
         if (!clubId || !playerA?.id || !selectedPlayerBId) {
@@ -45,99 +46,56 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
         return () => controller.abort();
     }, [fetchHeadToHead]);
 
-    const playerB = allPlayers.find(p => p.id === selectedPlayerBId);
+    const playerB = opponent || allPlayers.find(p => p.id === selectedPlayerBId);
     const selectedSummary = category === 'overall' ? summary?.overall : summary?.categories?.[category];
 
     return (
         <div className="chart-card">
-            <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px' }}>
+            <div className="rivalry-heading">
                 <div>
-                    <h3 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-strong)' }}>
+                    <h3 className="rivalry-title">
                         Head-to-Head Comparison
                     </h3>
-                    <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    <span className="muted">
                         Compare match records between {playerA?.name} and another player.
                     </span>
                 </div>
 
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <label htmlFor="h2h-select" style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text)' }}>
-                        Select Opponent:
-                    </label>
-                    <select
-                        id="h2h-select"
-                        className="players-filter-select"
-                        value={selectedPlayerBId}
-                        onChange={(e) => setSelectedPlayerBId(e.target.value)}
-                    >
-                        <option value="">-- Select Player --</option>
-                        {opponentOptions.map(p => (
-                            <option key={p.id} value={p.id}>
-                                {p.name}
-                            </option>
-                        ))}
-                    </select>
+                <div className="rivalry-search">
+                    <PlayerSearchSelect clubId={clubId} label="Select opponent" value={selectedPlayerBId}
+                        excludePlayerId={playerA?.id} allowClear
+                        onChange={setSelectedPlayerBId} onSelect={setOpponent} />
                 </div>
             </div>
 
             {!selectedPlayerBId && (
-                <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '0.875rem' }}>
+                <div className="page-empty">
                     Choose an opponent above to view their head-to-head rivalry history.
                 </div>
             )}
 
             {loading && (
-                <div style={{ padding: '24px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                <div className="page-empty">
                     Fetching head-to-head record...
                 </div>
             )}
 
-            {error && <div className="error-box">{error}</div>}
+            {error && <div className="error-box" role="alert">{error}</div>}
 
             {!loading && selectedPlayerBId && summary && (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '12px' }}>
+                <div className="rivalry-content">
                     <div className="category-switcher" role="group" aria-label="Head-to-head category">
                         {['overall', 'blitz', 'rapid', 'classical'].map(value => (
                             <button type="button" key={value} className={category === value ? 'active' : ''}
                                 onClick={() => setCategory(value)}>{value[0].toUpperCase() + value.slice(1)}</button>
                         ))}
                     </div>
-                    {/* Scoreboard */}
-                    <div
-                        style={{
-                            display: 'grid',
-                            gridTemplateColumns: '1fr auto 1fr',
-                            gap: '12px',
-                            alignItems: 'center',
-                            backgroundColor: 'var(--bg-muted)',
-                            padding: '16px 20px',
-                            borderRadius: '12px',
-                            textAlign: 'center',
-                        }}
-                    >
-                        <div>
-                            <strong style={{ display: 'block', fontSize: '1.1rem', color: 'var(--text-strong)' }}>{playerA?.name}</strong>
-                            <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--primary)' }}>
-                                {selectedSummary.playerAWins}
-                            </span>
+                    <div className="rivalry-summary">
+                        <p>{selectedSummary.games} rated games</p>
+                        <div className="rivalry-bar" role="img" aria-label={`${playerA?.name}: ${selectedSummary.playerAWins} wins; ${selectedSummary.draws} draws; ${playerB?.name}: ${selectedSummary.playerBWins} wins`}>
+                            {[[selectedSummary.playerAWins, playerA?.name, 'first'], [selectedSummary.draws, 'Draws', 'draw'], [selectedSummary.playerBWins, playerB?.name, 'second']].map(([count, name, tone]) => count > 0 && <span key={tone} className={`rivalry-bar__${tone}`} style={{ flexGrow: count }} title={`${name}: ${count} (${Math.round(count / selectedSummary.games * 100)}%)`} />)}
                         </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            <span style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase' }}>
-                                Total Played
-                            </span>
-                            <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-strong)' }}>
-                                {selectedSummary.games}
-                            </span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--warning)' }}>
-                                {selectedSummary.draws} Draw(s)
-                            </span>
-                        </div>
-                        <div>
-                            <strong style={{ display: 'block', fontSize: '1.1rem', color: 'var(--text-strong)' }}>{playerB?.name}</strong>
-                            <span style={{ fontSize: '1.5rem', fontWeight: 800, color: 'var(--accent)' }}>
-                                {selectedSummary.playerBWins}
-                            </span>
-                        </div>
+                        <div className="rivalry-legend"><span>{playerA?.name}: {selectedSummary.playerAWins} wins</span><span>{selectedSummary.draws} draws</span><span>{playerB?.name}: {selectedSummary.playerBWins} wins</span></div>
                     </div>
 
                     {/* Match List */}
@@ -158,26 +116,18 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                                         <tr key={m.id}>
                                             <td>{new Date(m.playedAt).toLocaleDateString()}</td>
                                             <td>
-                                                <strong style={{ color: m.whitePlayerId === playerA?.id ? 'var(--primary)' : 'var(--text)' }}>
+                                                <strong className={m.whitePlayerId === playerA?.id ? 'rivalry-player-highlight' : 'entity-name'}>
                                                     {m.whitePlayerName}
                                                 </strong>
                                             </td>
                                             <td>
-                                                <strong style={{ color: m.blackPlayerId === playerA?.id ? 'var(--primary)' : 'var(--text)' }}>
+                                                <strong className={m.blackPlayerId === playerA?.id ? 'rivalry-player-highlight' : 'entity-name'}>
                                                     {m.blackPlayerName}
                                                 </strong>
                                             </td>
                                             <td>
                                                 <span
-                                                    style={{
-                                                        fontWeight: 700,
-                                                        color: m.result === 'draw' ? 'var(--warning)' : (
-                                                            (m.result === 'white' && m.whitePlayerId === playerA?.id) ||
-                                                            (m.result === 'black' && m.blackPlayerId === playerA?.id)
-                                                                ? 'var(--accent)'
-                                                                : 'var(--danger)'
-                                                        )
-                                                    }}
+                                                    className={`rivalry-score rivalry-score--${m.result === 'draw' ? 'draw' : (m.result === 'white' && m.whitePlayerId === playerA?.id) || (m.result === 'black' && m.blackPlayerId === playerA?.id) ? 'win' : 'loss'}`}
                                                 >
                                                     {matchResultLabel(m.result)}
                                                 </span>
@@ -189,7 +139,7 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
                             </table>
                         </div>
                     ) : (
-                        <div style={{ color: 'var(--text-muted)', fontSize: '0.85rem', textAlign: 'center', padding: '12px' }}>
+                        <div className="page-empty">
                             No matches registered between these two players yet.
                         </div>
                     )}

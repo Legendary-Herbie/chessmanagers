@@ -1,3 +1,7 @@
+import ShareControls from '../../features/clubs/components/ShareControls.jsx';
+import ToggleSwitch from '../../shared/common/ToggleSwitch.jsx';
+import Icon from '../../shared/common/Icon.jsx';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import React, { useState, useEffect, useCallback } from 'react';
 import { Navigate, useSearchParams } from 'react-router-dom';
 import '../../styles/club.css';
@@ -8,10 +12,13 @@ import { clubApi } from '../../features/clubs/api/clubApi.js';
 import {
     mapClubProfileApiErrors,
     validateClubProfile,
+    validateClubRatingSettings,
 } from '../../features/clubs/clubProfileValidation.js';
 import DataExportPanel from '../../features/exports/components/DataExportPanel.jsx';
 import { canRemoveClubMember } from '../../features/clubs/membership/memberActionPermissions.js';
 import ConfirmDialog from '../../components/ConfirmDialog.jsx';
+import UnsavedChangesWarning from '../../shared/common/UnsavedChangesWarning.jsx';
+import CopyPublicLink from '../../shared/common/CopyPublicLink.jsx';
 
 const profileFieldId = field => `club-profile-${field.replaceAll('.', '-')}`;
 const PROFILE_FIELD_LABELS = {
@@ -50,7 +57,16 @@ function ProfileFieldError({ field, errors }) {
     return <div className="profile-field-error" id={`${profileFieldId(field)}-error`}>{message}</div>;
 }
 
+const RATING_PRESETS = {
+    club: { initialRating:1500, ratingFloor:500, establishedKFactor:32, provisionalKFactor:40, provisionalGames:10 },
+    fide: { initialRating:1500, ratingFloor:1400, establishedKFactor:20, provisionalKFactor:40, provisionalGames:30 },
+};
+function ratingPreset(settings) {
+    return Object.entries(RATING_PRESETS).find(([, values]) => Object.entries(values).every(([key, value]) => Number(settings?.[key] ?? RATING_PRESETS.club[key]) === value))?.[0] || 'custom';
+}
+
 export default function ClubPage() {
+    const [customRatingCategories, setCustomRatingCategories] = useState([]);
     const { club, capabilities, refreshClub } = useClub();
     const { user } = useAuth();
     const { notify } = useNotifications();
@@ -61,10 +77,18 @@ export default function ClubPage() {
     const setActiveTab = (tab) => setSearchParams({ tab }, { replace: true });
 
     const [profile, setProfile] = useState(null);
+    const [savedProfile, setSavedProfile] = useState(null);
     const [badgeFile, setBadgeFile] = useState(null);
+    const [badgePreview, setBadgePreview] = useState(null);
+    useEffect(() => {
+        if (!badgeFile) { setBadgePreview(null); return; }
+        const url = URL.createObjectURL(badgeFile); setBadgePreview(url);
+        return () => URL.revokeObjectURL(url);
+    }, [badgeFile]);
     const [members, setMembers] = useState([]);
     const [loading, setLoading] = useState(false);
     const [creatingInvite, setCreatingInvite] = useState(false);
+    const [shareMode, setShareMode] = useState('code');
     const [invites, setInvites] = useState([]);
     const [savingSettings, setSavingSettings] = useState(false);
     const [managementError, setManagementError] = useState(null);
@@ -99,6 +123,7 @@ export default function ClubPage() {
     useEffect(() => {
         if (!club) return;
         setProfile(club);
+        setSavedProfile(club);
         if (capabilities.canManageMemberships) loadMembers();
     }, [club, capabilities.canManageMemberships, loadMembers]);
 
@@ -161,7 +186,9 @@ export default function ClubPage() {
     async function saveProfile(event) {
         event?.preventDefault();
         if (!club || !isClubAdmin) return;
-        const validation = validateClubProfile(profile, { isOwner, badgeFile });
+        const validation = activeTab === 'ratings' ? validateClubRatingSettings(profile.rating_settings)
+            : activeTab === 'notifications' ? { success: true, data: {} }
+                : validateClubProfile(profile, { isOwner: false, badgeFile });
         if (!validation.success) {
             setProfileErrors(validation.errors);
             setManagementError('Please correct the highlighted club profile fields.');
@@ -174,40 +201,42 @@ export default function ClubPage() {
         setProfileErrors({});
         try {
             const values = validation.data;
-            const presentation = {
-                federation: values.federation,
-                description: values.description,
-                contactInfo: values.contactInfo,
-                settings: {
-                    contacts: values.contacts,
-                    affiliation: values.affiliation,
-                    presentation: {
-                        ...(profile.settings_json?.presentation || {}),
-                        primaryColor: values.primaryColor,
-                    },
-                },
-            };
-            if (isOwner) {
-                await clubApi.update(club.id, {
-                    name: values.name,
-                    ...presentation,
-                    visibility: profile.visibility,
-                    publicLeaderboard: Boolean(profile.public_leaderboard),
-                    settings: {
-                        ...presentation.settings,
-                        notifications: profile.settings_json?.notifications || {},
-                    },
-                    ratingSettings: values.ratingSettings,
-                });
+            if (activeTab === 'notifications') {
+                await clubApi.update(club.id, { settings: { notifications: profile.settings_json?.notifications || {} } });
+            } else if (activeTab === 'ratings') {
+                await clubApi.update(club.id, { ratingSettings: validation.data });
             } else {
-                await clubApi.updatePresentation(club.id, presentation);
+                const presentation = {
+                    federation: values.federation,
+                    description: values.description,
+                    contactInfo: values.contactInfo,
+                    settings: {
+                        contacts: values.contacts,
+                        affiliation: values.affiliation,
+                        presentation: {
+                            ...(profile.settings_json?.presentation || {}),
+                            primaryColor: values.primaryColor,
+                        },
+                    },
+                };
+                if (isOwner) {
+                    await clubApi.update(club.id, {
+                        name: values.name,
+                        ...presentation,
+                        visibility: profile.visibility,
+                        publicLeaderboard: Boolean(profile.public_leaderboard),
+                    });
+                } else {
+                    await clubApi.updatePresentation(club.id, presentation);
+                }
+                if (badgeFile) {
+                    await clubApi.uploadBadge(club.id, badgeFile);
+                    setBadgeFile(null);
+                }
             }
-            if (badgeFile) {
-                await clubApi.uploadBadge(club.id, badgeFile);
-                setBadgeFile(null);
-            }
+            setSavedProfile(profile);
             await refreshClub();
-            notify('Club profile saved.', 'success');
+            notify(`${activeTab === 'ratings' ? 'Rating rules' : activeTab === 'notifications' ? 'Notifications' : 'Club profile'} saved.`, 'success');
         } catch (err) {
             const fieldErrors = mapClubProfileApiErrors(err?.errors);
             if (Object.keys(fieldErrors).length > 0) {
@@ -273,6 +302,7 @@ export default function ClubPage() {
             setTransferTarget('');
         } catch (err) {
             setManagementError(err.message || 'Failed to transfer ownership');
+            throw err;
         }
     }
 
@@ -291,7 +321,7 @@ export default function ClubPage() {
     function deleteClub() {
         openDialog({
             kind: 'deleteClub', title: 'Delete club', confirmLabel: 'Delete club', variant: 'danger',
-            message: 'Delete this club? Historical chess records will be retained, but the club cannot be restored.',
+            message: 'Permanently delete this club and all its players, matches, ratings, tournaments, announcements, and uploaded files? User accounts and other clubs will remain. This cannot be undone.',
         });
     }
 
@@ -359,7 +389,9 @@ export default function ClubPage() {
         setDialogBusy(true);
         setManagementError(null);
         try {
-            if (action.kind === 'archiveClub') {
+            if (action.kind === 'transferOwnership') {
+                await transferOwnership();
+            } else if (action.kind === 'archiveClub') {
                 await clubApi.archive(club.id);
                 await refreshClub();
                 notify('Club archived', 'success');
@@ -404,20 +436,18 @@ export default function ClubPage() {
             {managementError && <div className="error" role="alert">{managementError}</div>}
 
             {/* Club profile and administration tabs. Operational work lives on the main dashboard. */}
-            <div className="tabs">
-                <button className={activeTab === 'profile' ? 'active' : ''} onClick={() => setActiveTab('profile')}>Profile</button>
-                {isClubAdmin && (
-                    <button className={activeTab === 'members' ? 'active' : ''} onClick={() => setActiveTab('members')}>Members &amp; access</button>
-                )}
-                {canExportData && (
-                    <button className={activeTab === 'exports' ? 'active' : ''} onClick={() => setActiveTab('exports')}>Data exports</button>
-                )}
-            </div>
+            <nav className="tabs settings-tabs" aria-label="Club settings">{[
+                ['profile', 'Club profile', 'settings', true], ['notifications', 'Notifications', 'bell', isOwner],
+                ['ratings', 'Rating rules', 'chart', isOwner], ['members', 'Members & access', 'players', isClubAdmin],
+                ['exports', 'Data exports', 'download', canExportData], ['ownership', 'Ownership', 'warning', isOwner],
+            ].filter(([, , , allowed]) => allowed).map(([key, label, icon]) => <button type="button" key={key} className={activeTab === key ? 'active' : ''} aria-current={activeTab === key ? 'page' : undefined} onClick={() => setActiveTab(key)}><Icon name={icon} />{label}</button>)}</nav>
 
             {/* Profile tab — club info editing (name, federation, description, logo) */}
-            {activeTab === 'profile' && (
+            {(activeTab === 'profile' || isOwner && ['notifications', 'ratings', 'ownership'].includes(activeTab)) && (
                 <div className="tab-panel profile-panel">
-                    <form noValidate onSubmit={saveProfile}>
+                    {activeTab !== 'ownership' && <form noValidate onSubmit={saveProfile}>
+                    <fieldset disabled={savingSettings} className={`form-fieldset${activeTab === 'profile' ? ' club-profile-fields' : ''}`}>
+                    {activeTab === 'profile' && <>
                     <label className="form-row">
                         <div className="label">Name</div>
                         <input {...validationProps('name')} className="input" maxLength={150} disabled={!isOwner} value={profile?.name || ''} onChange={e => { clearProfileError('name'); setProfile({ ...profile, name: e.target.value }); }} />
@@ -441,6 +471,7 @@ export default function ClubPage() {
                         <input {...validationProps('badgeFile')} className="input" type="file" accept="image/jpeg,image/png,image/webp" disabled={!isClubAdmin} onChange={e => { clearProfileError('badgeFile'); setBadgeFile(e.target.files?.[0] || null); }} />
                         <div className="form-helper">JPEG, PNG, or WebP; maximum 5 MB.</div>
                         <ProfileFieldError field="badgeFile" errors={profileErrors} />
+                        {(badgePreview || profile?.logo) && <div className="logo-preview"><img src={badgePreview || resolveAssetUrl(profile.logo)} alt="Club badge preview" /></div>}
                     </label>
 
                     <label className="form-row">
@@ -492,47 +523,32 @@ export default function ClubPage() {
                         <ProfileFieldError field="affiliation" errors={profileErrors} />
                     </label>
 
-                    <label className="form-row">
-                        <div className="label">Presentation color</div>
-                        <input {...validationProps('primaryColor')} type="color" disabled={!isClubAdmin} value={profile?.settings_json?.presentation?.primaryColor || '#2563eb'} onChange={e => updateStructuredSetting('presentation', 'primaryColor', e.target.value)} />
-                        <ProfileFieldError field="primaryColor" errors={profileErrors} />
-                    </label>
 
-                    <label className="form-row">
-                        <div className="label">Allow notification email delivery</div>
-                        <input type="checkbox" disabled={!isOwner} checked={Boolean(profile?.settings_json?.notifications?.emailEnabled)} onChange={e => updateStructuredSetting('notifications', 'emailEnabled', e.target.checked)} />
-                    </label>
 
-                    <label className="form-row">
-                        <div className="label">Membership decision notifications</div>
-                        <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.membershipEvents !== false} onChange={e => updateStructuredSetting('notifications', 'membershipEvents', e.target.checked)} />
-                    </label>
-
-                    <label className="form-row">
-                        <div className="label">Player claim notifications</div>
-                        <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.playerClaimEvents !== false} onChange={e => updateStructuredSetting('notifications', 'playerClaimEvents', e.target.checked)} />
-                    </label>
-
-                    <label className="form-row">
-                        <div className="label">Match notifications</div>
-                        <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.matchEvents !== false} onChange={e => updateStructuredSetting('notifications', 'matchEvents', e.target.checked)} />
-                    </label>
-
-                    <label className="form-row">
-                        <div className="label">Tournament notifications</div>
-                        <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.tournamentEvents !== false} onChange={e => updateStructuredSetting('notifications', 'tournamentEvents', e.target.checked)} />
-                    </label>
-
-                    <label className="form-row">
-                        <div className="label">Announcement notifications</div>
-                        <input type="checkbox" disabled={!isOwner} checked={profile?.settings_json?.notifications?.announcementEvents !== false} onChange={e => updateStructuredSetting('notifications', 'announcementEvents', e.target.checked)} />
-                    </label>
-
+                    </>}
+                    {activeTab === 'notifications' && <div className="notification-settings"><h2>Notifications</h2><p className="muted">Choose which club events members hear about.</p>{[
+                        ['emailEnabled', 'Allow notification email delivery', 'Allow email delivery for significant club events.'],
+                        ['membershipEvents', 'Membership decision notifications', 'Keep members informed about joining and membership decisions.'],
+                        ['playerClaimEvents', 'Player claim and self-registration notifications', 'Updates when members claim or register a player profile.'],
+                        ['matchEvents', 'Match notifications', 'Notify linked players when their matches are recorded or changed.'],
+                        ['tournamentEvents', 'Tournament notifications', 'Share tournament pairings and round updates.'],
+                        ['announcementEvents', 'Announcement notifications', 'Notify members when a club update is published.'],
+                    ].map(([key, label, description]) => <ToggleSwitch key={key} label={label} description={description} disabled={!isOwner || savingSettings} checked={key === 'emailEnabled' ? Boolean(profile?.settings_json?.notifications?.[key]) : profile?.settings_json?.notifications?.[key] !== false} onChange={value => updateStructuredSetting('notifications', key, value)} />)}</div>}
+                    {activeTab === 'ratings' && <>
+                    <h2>Rating rules</h2><p className="muted">Blitz, Rapid, and Classical use independent Elo ratings.</p>
+                    <div className="rating-settings-grid">
                     {['blitz', 'rapid', 'classical'].map(category => {
                         const field = key => `ratingSettings.${category}.${key}`;
                         return (
                             <fieldset key={category} className="form-row rating-settings" disabled={!isOwner}>
-                                <legend>{category[0].toUpperCase() + category.slice(1)} Elo settings</legend>
+                                <legend><RatingCategoryIcon category={category} />{category[0].toUpperCase() + category.slice(1)} Elo settings</legend>
+                                <label>Preset<select className="input" aria-label={`${category} rating preset`} value={customRatingCategories.includes(category) ? 'custom' : ratingPreset(profile?.rating_settings?.[category])} onChange={event => {
+                                    setCustomRatingCategories(current => event.target.value === 'custom' ? [...current, category] : current.filter(value => value !== category));
+                                    if (event.target.value === 'custom') return;
+                                    setProfile(current => ({ ...current, rating_settings: { ...current.rating_settings, [category]: { ...RATING_PRESETS[event.target.value] } } }));
+                                    setProfileErrors({});
+                                }}><option value="club">Club Default</option><option value="fide">FIDE-inspired</option><option value="custom">Custom</option></select></label>
+                                <p className="muted rating-preset-note">Edit any value to customize. FIDE-inspired uses K 40 for 30 games, then 20, with a 1400 floor and a club starting rating of 1500. It omits age, title and rating-period rules and does not produce official FIDE ratings.</p>
                                 <label>Initial rating
                                     <input {...validationProps(field('initialRating'))} type="number" min="100" max="4000" step="1" value={profile?.rating_settings?.[category]?.initialRating ?? 1500} onChange={e => updateRatingSetting(category, 'initialRating', e.target.value)} />
                                     <ProfileFieldError field={field('initialRating')} errors={profileErrors} />
@@ -557,22 +573,27 @@ export default function ClubPage() {
                         );
                     })}
 
-                    {profile?.logo && <div className="logo-preview"><img src={resolveAssetUrl(profile.logo)} alt="Club badge" /></div>}
+                    </div></>}
+
 
                     <div className="form-actions">
                         {isClubAdmin ? (
                             <>
-                                <Button type="submit" disabled={savingSettings} className="mr-2">{savingSettings ? 'Saving...' : 'Save'}</Button>
-                                <Button variant="secondary" onClick={() => { setProfile(club); setBadgeFile(null); setProfileErrors({}); setManagementError(null); }}>Reset</Button>
+                                <Button type="submit" disabled={savingSettings} className="mr-2">{savingSettings ? 'Saving...' : activeTab === 'ratings' ? 'Save rating rules' : activeTab === 'notifications' ? 'Save notifications' : 'Save'}</Button>
+                                <Button variant="secondary" disabled={savingSettings} onClick={() => { setProfile(savedProfile); setBadgeFile(null); setProfileErrors({}); setManagementError(null); }}>Reset</Button>
                             </>
                         ) : (
                             <div className="muted">Only club owners and admins can edit the public club presentation.</div>
                         )}
                     </div>
-                    </form>
+                    </fieldset>
+                    </form>}
+                    {activeTab === 'profile' && club.visibility === 'public' && <CopyPublicLink path={`/clubs/${club.id}`} />}
+                    <UnsavedChangesWarning dirty={Boolean(profile && savedProfile && (badgeFile || JSON.stringify(profile) !== JSON.stringify(savedProfile)))} saving={savingSettings}
+                        onSave={saveProfile} onDiscard={() => { setProfile(savedProfile); setBadgeFile(null); setProfileErrors({}); }} />
 
-                    {isOwner && (
-                        <div className="dashboard-settings-card">
+                    {isOwner && activeTab === 'ownership' && (
+                        <div className="dashboard-settings-card settings-danger-zone">
                             <h3>Ownership and lifecycle</h3>
                             <label className="form-row">
                                 <div className="label">New owner</div>
@@ -591,7 +612,7 @@ export default function ClubPage() {
                                 </select>
                             </label>
                             <div className="form-actions">
-                                <Button onClick={transferOwnership} disabled={!transferTarget}>Transfer ownership</Button>
+                                <Button onClick={() => openDialog({ kind: 'transferOwnership', title: 'Transfer ownership', confirmLabel: 'Transfer ownership', variant: 'warning', message: 'Give the selected member ownership of this club? Your permissions will change to the selected role.' })} disabled={!transferTarget}>Transfer ownership</Button>
                                 <Button variant="secondary" onClick={archiveClub}>Archive club</Button>
                                 <Button variant="danger" onClick={deleteClub}>Delete club</Button>
                             </div>
@@ -636,8 +657,15 @@ export default function ClubPage() {
                         </table>
                     )}
 
-                    <div className="invite-section" style={{ marginTop: 24 }}>
-                        <h2>Club access</h2>
+                    <section className="invite-section invite-share-hub">
+                        <h2>Invite & share</h2>
+                        <p className="muted">Share a code or invite link to bring people into your club.</p>
+                        {club.visibility === 'public' && <div className="public-club-share"><h3>Public club page</h3><p>Visitors can view the club and sign in to join.</p><ShareControls value={`${window.location.origin}/clubs/${club.id}`} label="Club page" /></div>}
+                        <div className="discovery-switch" role="group" aria-label="Share club using">
+                            <Button variant={shareMode === 'code' ? 'primary' : 'secondary'} aria-pressed={shareMode === 'code'} onClick={() => setShareMode('code')}>Join code</Button>
+                            <Button variant={shareMode === 'link' ? 'primary' : 'secondary'} aria-pressed={shareMode === 'link'} onClick={() => setShareMode('link')}>Invite link</Button>
+                        </div>
+                        <div hidden={shareMode !== 'code'} className="share-method">
                         <div className="invite-label">Six-digit join code</div>
                         <div className="muted">
                             {joinCodeStatus.active
@@ -645,22 +673,25 @@ export default function ClubPage() {
                                 : 'No active join code'}
                         </div>
                         {revealedJoinCode && (
-                            <div style={{ marginTop: 8 }}>
-                                <code style={{ fontSize: 20, letterSpacing: 4 }}>{revealedJoinCode}</code>
+                            <div className="share-code">
+                                <code>{revealedJoinCode}</code>
+                                <ShareControls value={revealedJoinCode} label="Code" qrValue={`${window.location.origin}/clubs?joinCode=${encodeURIComponent(revealedJoinCode)}`} />
                                 <div className="muted">Copy this code now. It is stored securely and cannot be shown again.</div>
                             </div>
                         )}
-                        <div className="invite-row" style={{ margin: '8px 0 20px' }}>
+                        <div className="invite-row share-actions">
                             <Button onClick={rotateJoinCode} disabled={joinCodeLoading}>
                                 {joinCodeLoading ? 'Updating…' : joinCodeStatus.active ? 'Rotate code' : 'Create code'}
                             </Button>
                             {joinCodeStatus.active && (
-                                <Button variant="danger" style={{ marginLeft: 8 }} onClick={revokeJoinCode} disabled={joinCodeLoading}>Disable code</Button>
+                                <Button variant="danger" onClick={revokeJoinCode} disabled={joinCodeLoading}>Disable code</Button>
                             )}
                         </div>
 
-                        <div className="invite-label">Invites</div>
-                        <div className="invite-row" style={{ marginBottom: 8 }}>
+                        </div>
+                        <div hidden={shareMode !== 'link'} className="share-method">
+                        <div className="invite-label">Invite links</div>
+                        <div className="invite-row share-actions">
                             <Button onClick={createInvite} disabled={creatingInvite}>{creatingInvite ? 'Creating…' : 'Create invite'}</Button>
                         </div>
 
@@ -670,16 +701,17 @@ export default function ClubPage() {
                             <ul className="invite-list">
                                 {invites.map(invite => (
                                     <li key={invite.id} className="invite-item">
-                                        <code style={{ fontSize: 12 }}>{invite.token}</code>
-                                        <div style={{ marginLeft: 'auto' }}>
-                                            <Button onClick={() => navigator.clipboard.writeText(`${window.location.origin}/clubs/join?token=${invite.token}`)}>Copy</Button>
-                                            <Button variant="danger" style={{ marginLeft: 8 }} onClick={() => revokeInvite(invite)}>Revoke</Button>
+                                        <span className="muted">Club invite</span>
+                                        <div className="share-invite-actions">
+                                            <ShareControls value={`${window.location.origin}/clubs/join?token=${encodeURIComponent(invite.token)}`} />
+                                            <Button variant="danger" onClick={() => revokeInvite(invite)}>Revoke</Button>
                                         </div>
                                     </li>
                                 ))}
                             </ul>
                         )}
-                    </div>
+                        </div>
+                    </section>
                 </div>
             ) : activeTab === 'members' ? (
                 <div className="tab-panel">
@@ -693,7 +725,7 @@ export default function ClubPage() {
                 </div>
             ) : activeTab === 'exports' ? (
                 <div className="tab-panel">
-                    <div style={{ padding: 'var(--gap-lg)', textAlign: 'center', color: 'var(--text-muted)' }}>
+                    <div className="page-empty">
                         Only club owners and admins can export club data.
                     </div>
                 </div>
@@ -701,7 +733,8 @@ export default function ClubPage() {
 
             <ConfirmDialog isOpen={Boolean(dialogAction)} title={dialogAction?.title}
                 message={dialogAction?.message} confirmLabel={dialogAction?.confirmLabel}
-                variant={dialogAction?.variant} loading={dialogBusy}
+                variant={dialogAction?.variant} loading={dialogBusy} error={managementError}
+                confirmationText={dialogAction?.kind === 'deleteClub' ? 'DELETE' : dialogAction?.kind === 'archiveClub' ? 'ARCHIVE' : dialogAction?.kind === 'transferOwnership' ? 'TRANSFER' : undefined}
                 onClose={() => {
                     if (!dialogBusy) {
                         setDialogAction(null);

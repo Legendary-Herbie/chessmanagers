@@ -1,19 +1,27 @@
 import { TournamentModel } from '../models/Tournament.js';
+import { permanentlyDeleteTournament } from '../services/DeletionService.js';
 import {
     generateNextRound,
+    saveTournamentSetup,
     getTournamentDetail,
     recordPairingResult,
 } from '../services/TournamentService.js';
 import { toMatchDto } from '../utils/matchDtos.js';
 
 const FAILURES = {
+    KNOCKOUT_BRACKET_LOCKED: [409, 'Later knockout pairings depend on this result. It cannot be changed after play advances.'],
+    ROUND_ROBIN_ROSTER_FROZEN: [409, 'Round Robin rosters are fixed after round one. Players cannot be added or withdrawn.'],
+    TOURNAMENT_ROSTER_FROZEN: [409, 'This tournament roster is fixed after the first round. Players cannot be added or withdrawn.'],
+    ROUND_ROBIN_ROSTER_CHANGED: [409, 'The original Round Robin roster is no longer eligible. Restore its players before generating another round.'],
     TOURNAMENT_NOT_FOUND: [404, 'Tournament not found.'],
-    TOURNAMENT_NOT_ACTIVE: [409, 'The tournament must be active before generating a round.'],
-    UNSUPPORTED_TOURNAMENT_FORMAT: [409, 'Only Swiss and Round-Robin tournaments are supported.'],
+    TOURNAMENT_NOT_ACTIVE: [409, 'Resume or start the tournament before generating rounds or recording results.'],
+    TOURNAMENT_PLAYER_INELIGIBLE: [409, 'Both players must be active and registered for this round.'],
+    TOURNAMENT_ROUND_NOT_OPEN: [409, 'New results require the current open round; completed rounds only accept corrections.'],
+    UNSUPPORTED_TOURNAMENT_FORMAT: [409, 'Only Swiss, Round-Robin, and Knockout tournaments are supported.'],
     TOURNAMENT_COMPLETED: [409, 'The tournament is already completed.'],
     TOURNAMENT_ALREADY_STARTED: [409, 'Remove players only before play starts; withdraw them after play starts.'],
     NOT_ENOUGH_PLAYERS: [409, 'At least two eligible active players are required.'],
-    TOURNAMENT_COMPLETE: [409, 'All available Round-Robin pairings have been completed.'],
+    TOURNAMENT_COMPLETE: [409, 'All available tournament pairings have been completed.'],
     PAIRING_FAILED: [409, 'A valid deterministic pairing could not be generated.'],
     PAIRING_NOT_FOUND: [404, 'Tournament pairing not found.'],
     BYE_HAS_NO_MATCH: [400, 'A bye is a tournament outcome and cannot have a match result.'],
@@ -29,6 +37,7 @@ const FAILURES = {
     TOURNAMENT_PAIRING_MISMATCH: [409, 'The match does not match this tournament pairing.'],
     TOURNAMENT_PAIRING_ALREADY_COMPLETED: [409, 'This tournament pairing already has a result.'],
     MATCH_NOT_FOUND: [404, 'Tournament match not found.'],
+    MATCH_CHANGED: [409, 'The match settings changed during this request. Refresh and try again.'],
     MATCH_NOT_ACTIVE: [409, 'Only an active tournament match can be edited.'],
 };
 
@@ -99,41 +108,41 @@ export async function updateTournament(req, res, next) {
 
 export async function setTournamentStatus(req, res, next) {
     try {
-        const existing = await TournamentModel.findById(req.params.tournamentId, req.params.clubId);
-        if (!existing) return res.status(404).json({ error: 'Tournament not found.' });
-        if (existing.status === req.validated.status) {
-            return res.json({ tournament: existing });
-        }
-        const allowed = existing.status === req.validated.status
-            || (existing.status === 'upcoming' && req.validated.status === 'active')
-            || (existing.status === 'active' && req.validated.status === 'completed')
-            || (existing.status === 'completed' && req.validated.status === 'active');
-        if (!allowed) {
-            return res.status(409).json({ error: `Cannot change a ${existing.status} tournament to ${req.validated.status}.` });
-        }
-        if (req.validated.status === 'completed' && existing.current_round > 0) {
-            const detail = await getTournamentDetail(req.params.clubId, req.params.tournamentId);
-            const current = detail.rounds.find(round => round.roundNumber === existing.current_round);
-            if (current?.status !== 'completed') {
-                return res.status(409).json({ error: 'Complete every pairing in the current round first.' });
-            }
-        }
         const tournament = await TournamentModel.setStatus(
             req.params.tournamentId, req.params.clubId, req.validated.status
         );
+        if (!tournament) return res.status(404).json({ error: 'Tournament not found.' });
         res.json({ tournament });
     } catch (error) {
         next(error);
     }
 }
 
-export async function deleteTournament(req, res, next) {
+export async function archiveTournament(req, res, next) {
     try {
-        const deleted = await TournamentModel.delete(
+        const deleted = await TournamentModel.archive(
             req.params.tournamentId, req.params.clubId, req.validated.reason ?? null
         );
         if (!deleted) return res.status(404).json({ error: 'Tournament not found.' });
         res.json({ message: 'Tournament archived.' });
+    } catch (error) {
+        next(error);
+    }
+}
+
+export async function setupTournament(req, res, next) {
+    try {
+        const result = await saveTournamentSetup({ clubId: req.params.clubId, tournamentId: req.params.tournamentId, ...req.validated });
+        if (!result.ok) return sendFailure(res, result);
+        res.json(result);
+    } catch (error) { next(error); }
+}
+
+export async function deleteTournament(req, res, next) {
+    try {
+        const deleted = await permanentlyDeleteTournament(req.params.clubId, req.params.tournamentId);
+        if (!deleted) return res.status(404).json({ error: 'Tournament not found.' });
+        res.json({ message: 'Tournament and related records deleted. Ratings recalculated.' });
     } catch (error) {
         next(error);
     }

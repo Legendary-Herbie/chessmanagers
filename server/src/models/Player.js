@@ -3,12 +3,14 @@ import db from '../database/database.js';
 
 const qry = (trx) => trx ? trx.query.bind(trx) : db.query.bind(db);
 const failure = (code) => ({ ok: false, code });
+const inTransaction = (trx, action) => trx ? action(trx) : db.transaction(action);
 
 const PLAYER_FIELDS = `
     p.id, p.club_id, p.name, p.rating, p.start_rating,
     p.blitz_rating, p.rapid_rating, p.classical_rating,
     p.games, p.wins, p.draws, p.losses, p.last_played,
     p.bio, p.photo_url, p.date_of_birth, p.federation_id,
+    p.name_locked, p.chesscom_username, p.lichess_username,
     p.status, p.archived_at, p.deleted_at, p.created_at, p.updated_at`;
 
 const PLAYER_RATINGS_JOIN = `
@@ -106,8 +108,8 @@ export const PlayerModel = {
         [clubId, publicPlayerId]
     ).then(result => result.first),
 
-    create: async ({ clubId, actorUserId, name, rating = null, startRatings = null, bio = null, photoUrl = null, dateOfBirth = null, federationId = null }) => (
-        db.transaction(async (trx) => {
+    create: async ({ clubId, actorUserId, name, rating = null, startRatings = null, bio = null, photoUrl = null, dateOfBirth = null, federationId = null }, transaction = null) => (
+        inTransaction(transaction, async (trx) => {
             const configured = await ratingConfiguration(trx, clubId);
             const resolvedRatings = resolveStartRatings({ rating, startRatings }, configured);
             const player = await trx.query(
@@ -150,13 +152,15 @@ export const PlayerModel = {
             playerId: player.id,
             ratings: player.resolvedRatings,
         })));
-        for (const player of created) {
-            await recordLifecycleEvent(trx, {
-                clubId, playerId: player.id, actorUserId, eventType: 'player.created', toStatus: 'active',
-                payload: { source: 'bulk_roster_entry' },
-            });
-        }
-        return created;
+        await trx.query(
+            `INSERT INTO player_lifecycle_events (
+                club_id, player_id, actor_user_id, event_type, to_status, payload_json
+             ) SELECT $1, player_id, $2, 'player.created', 'active', $3::JSONB
+               FROM UNNEST($4::TEXT[]) AS roster(player_id)`,
+            [clubId, actorUserId, JSON.stringify({ source: 'bulk_roster_entry' }), resolvedPlayers.map(player => player.id)]
+        );
+        const byId = new Map(created.map(player => [player.id, player]));
+        return resolvedPlayers.map(player => byId.get(player.id));
     }),
 
     // Internal read used by match/rating services. Never send this row directly to clients.
@@ -186,7 +190,7 @@ export const PlayerModel = {
         [clubId, playerId, viewerUserId]
     ).then(result => result.first),
 
-    findByClub: async (clubId, viewerUserId = null, { q = '', limit = 50, offset = 0 } = {}) => db.query(
+    findByClub: async (clubId, viewerUserId = null, { q = '', limit = 50, offset = 0, category = 'rapid', status = 'all', sortBy = 'rating_desc' } = {}) => db.query(
         `SELECT ${PLAYER_FIELDS}, COALESCE(rating_state.ratings, '{}'::JSONB) AS ratings,
                 link.status AS link_status,
                 COALESCE(link.user_id = $2, FALSE) AS is_self,
@@ -203,9 +207,16 @@ export const PlayerModel = {
          ) link ON TRUE
          WHERE p.club_id = $1 AND p.status = 'active' AND p.deleted_at IS NULL
            AND ($3 = '' OR p.name ILIKE '%' || $3 || '%' OR COALESCE(p.bio, '') ILIKE '%' || $3 || '%')
-         ORDER BY p.rating DESC, p.name ASC
+           AND ($6 = 'all' OR ($6 = 'claimed' AND link.status = 'approved')
+                OR ($6 = 'pending' AND link.status = 'pending') OR ($6 = 'unlinked' AND link.status IS NULL))
+         ORDER BY
+            CASE WHEN $8 = 'rating_desc' THEN (rating_state.ratings -> $7 ->> 'current_rating')::NUMERIC END DESC NULLS LAST,
+            CASE WHEN $8 = 'rating_asc' THEN (rating_state.ratings -> $7 ->> 'current_rating')::NUMERIC END ASC NULLS LAST,
+            CASE WHEN $8 = 'games_desc' THEN p.games END DESC NULLS LAST,
+            CASE WHEN $8 = 'winrate_desc' THEN COALESCE((p.wins + p.draws * 0.5) / NULLIF(p.games, 0), 0) END DESC,
+            p.name ASC, p.id ASC
          LIMIT $4 OFFSET $5`,
-        [clubId, viewerUserId, q, limit, offset]
+        [clubId, viewerUserId, q, limit, offset, status, category, sortBy]
     ).then(result => ({
         players: result.rows.map(row => {
             const player = { ...row };
@@ -266,8 +277,12 @@ export const PlayerModel = {
         ).then(result => result.first);
         if (!player) return failure('PLAYER_NOT_FOUND');
         if (player.status === 'deleted') return failure('PLAYER_DELETED');
+        const owner = await trx.query('SELECT owner_id FROM clubs WHERE id = $1 FOR SHARE', [clubId]).then(r => r.first);
+        if (Object.hasOwn(changes, 'nameLocked') && owner.owner_id !== actorUserId) return failure('OWNER_ONLY_NAME_LOCK');
+        if (player.name_locked && Object.hasOwn(changes, 'name') && changes.name !== player.name && owner.owner_id !== actorUserId) return failure('PLAYER_NAME_LOCKED');
         const { assignments, values } = updateAssignments(changes, {
             name: 'name', bio: 'bio', photoUrl: 'photo_url', dateOfBirth: 'date_of_birth', federationId: 'federation_id',
+            nameLocked: 'name_locked', chesscomUsername: 'chesscom_username', lichessUsername: 'lichess_username',
         });
         if (!assignments.length) return failure('NO_CHANGES');
         values.push(clubId, playerId);
@@ -296,7 +311,11 @@ export const PlayerModel = {
         ).then(result => result.first);
         if (!player) return failure('NOT_LINKED_PLAYER');
         if (player.status !== 'active' || player.deleted_at) return failure('PLAYER_NOT_ACTIVE');
-        const { assignments, values } = updateAssignments(changes, { bio: 'bio', photoUrl: 'photo_url' });
+        if (player.name_locked && Object.hasOwn(changes, 'name') && changes.name !== player.name) return failure('PLAYER_NAME_LOCKED');
+        const { assignments, values } = updateAssignments(changes, {
+            bio: 'bio', photoUrl: 'photo_url', name: 'name', federationId: 'federation_id',
+            chesscomUsername: 'chesscom_username', lichessUsername: 'lichess_username',
+        });
         if (!assignments.length) return failure('NO_CHANGES');
         values.push(clubId, playerId);
         const updated = await trx.query(

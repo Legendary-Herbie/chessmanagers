@@ -12,6 +12,40 @@ import {
 } from '../test/factories.js';
 
 describe('player lifecycle and account linking', () => {
+    it.each(['owner', 'admin'])('automatically approves an active %s claim while preserving uniqueness', async role => {
+        const owner = await createUser();
+        const club = await createClub(owner);
+        const actor = role === 'owner' ? owner : await createUser();
+        if (role === 'admin') await addClubMember(club, actor, 'admin');
+        const player = await createPlayer(club);
+        const other = await createPlayer(club);
+        const base = `/api/v1/clubs/${club.id}/players`;
+        const claim = await request(app).post(`${base}/${player.id}/claim`)
+            .set('Authorization', authorization(actor)).send({}).expect(201);
+        expect(claim.body.link.status).toBe('approved');
+        expect(claim.body.link.reviewed_by).toBe(actor.id);
+        expect(claim.body.link.reviewed_at).toBeTruthy();
+        const events = await db.query('SELECT event_type FROM player_link_events WHERE link_id = $1', [claim.body.link.id]);
+        expect(events.rows.map(row => row.event_type).sort()).toEqual(['player_claim.approved', 'player_claim.submitted']);
+        const pending = await request(app).get(`/api/v1/clubs/${club.id}/player-links/pending`)
+            .set('Authorization', authorization(owner)).expect(200);
+        expect(pending.body.links).toEqual([]);
+        await request(app).post(`${base}/${other.id}/claim`)
+            .set('Authorization', authorization(actor)).send({}).expect(409);
+    });
+
+    it('requires review when an owner of another club claims as an ordinary member', async () => {
+        const actor = await createUser();
+        await createClub(actor);
+        const club = await createClub(await createUser());
+        await addClubMember(club, actor, 'member');
+        const player = await createPlayer(club);
+        const claim = await request(app).post(`/api/v1/clubs/${club.id}/players/${player.id}/claim`)
+            .set('Authorization', authorization(actor)).send({}).expect(201);
+        expect(claim.body.link.status).toBe('pending');
+        expect(claim.body.link.reviewed_at).toBeNull();
+    });
+
     it('supports claim approval, constrained self editing, self unlink, and persistent events', async () => {
         const owner = await createUser();
         const member = await createUser();
@@ -58,8 +92,8 @@ describe('player lifecycle and account linking', () => {
         await request(app)
             .patch(`${base}/players/${player.id}/profile`)
             .set('Authorization', authorization(member))
-            .send({ name: 'Unauthorized identity change' })
-            .expect(400);
+            .send({ name: 'Member-updated name' })
+            .expect(200);
 
         await request(app)
             .delete(`${base}/players/${player.id}/unlink`)

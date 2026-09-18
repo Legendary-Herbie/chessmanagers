@@ -37,7 +37,7 @@ describe('tournament domain lifecycle', () => {
         )).first.status).toBe('active');
     });
 
-    it('accepts only Swiss and Round-Robin tournaments and provides searchable pagination', async () => {
+    it('rejects unsupported tournament formats and provides searchable pagination', async () => {
         const owner = await createUser();
         const club = await createClub(owner);
         const token = authorization(owner);
@@ -51,7 +51,7 @@ describe('tournament domain lifecycle', () => {
         };
 
         await request(app).post(base).set('Authorization', token)
-            .send({ ...payload, type: 'knockout' }).expect(400);
+            .send({ ...payload, type: 'unsupported' }).expect(400);
         const created = await request(app).post(base).set('Authorization', token)
             .send(payload).expect(201);
         expect(created.body.tournament).toMatchObject({
@@ -63,7 +63,7 @@ describe('tournament domain lifecycle', () => {
         const list = await request(app).get(`${base}?q=Autumn&limit=1&offset=0`)
             .set('Authorization', token).expect(200);
         expect(list.body).toMatchObject({ total: 1, limit: 1, offset: 0 });
-        expect(list.body.tournaments[0].name).toBe('Autumn Swiss');
+        expect(list.body.tournaments[0]).toMatchObject({ name: 'Autumn Swiss', participant_count: 0, completed_rounds: 0 });
     });
 
     it('runs Swiss rounds atomically with edits, withdrawals, and late registration', async () => {
@@ -109,6 +109,8 @@ describe('tournament domain lifecycle', () => {
             'SELECT status FROM tournament_rounds WHERE id = $1', [first.body.round.id]
         );
         expect(persistedRound.first.status).toBe('completed');
+        const overview = await request(app).get(`/api/v1/clubs/${club.id}/tournaments`).set('Authorization', token).expect(200);
+        expect(overview.body.tournaments.find(item => item.id === tournament.id)).toMatchObject({ participant_count: 4, current_round: 1, completed_rounds: 1 });
         expect((await db.query(
             `SELECT COUNT(*)::INTEGER AS count FROM matches
              WHERE tournament_id = $1 AND status = 'active'`, [tournament.id]
@@ -120,7 +122,7 @@ describe('tournament domain lifecycle', () => {
             .set('Authorization', token)
             .send({ result: 'black', playedAt: '2026-09-01T10:00:00.000Z' })
             .expect(200);
-        expect(edited.body.ratingStatus).toBe('recalculation_pending');
+        expect(edited.body.ratingStatus).toBe('applied');
         expect((await db.query(
             'SELECT result, match_id, status FROM tournament_pairings WHERE id = $1',
             [editedPairing.id]

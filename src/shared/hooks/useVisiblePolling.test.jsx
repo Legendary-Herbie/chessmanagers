@@ -1,0 +1,25 @@
+import { act, cleanup, renderHook } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import { useVisiblePolling } from './useVisiblePolling.js';
+afterEach(() => { cleanup(); vi.useRealTimers(); vi.restoreAllMocks(); });
+it('pauses while hidden, refreshes on return, backs off idle polling and cleans up', async () => {
+    vi.useFakeTimers();
+    let visibility = 'visible';
+    vi.spyOn(document, 'visibilityState', 'get').mockImplementation(() => visibility);
+    const load = vi.fn().mockResolvedValue();
+    const { unmount } = renderHook(() => useVisiblePolling(load, 1000));
+    await act(async () => {});
+    expect(load).toHaveBeenCalledTimes(1);
+    visibility = 'hidden';
+    act(() => document.dispatchEvent(new Event('visibilitychange')));
+    await act(async () => vi.advanceTimersByTimeAsync(10000));
+    expect(load).toHaveBeenCalledTimes(1);
+    visibility = 'visible';
+    await act(async () => document.dispatchEvent(new Event('visibilitychange')));
+    expect(load).toHaveBeenCalledTimes(2);
+    await act(async () => vi.advanceTimersByTimeAsync(4000));
+    expect(load).toHaveBeenCalledTimes(5);
+    unmount();
+    await vi.advanceTimersByTimeAsync(20000);
+    expect(load).toHaveBeenCalledTimes(5);
+});

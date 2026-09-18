@@ -14,6 +14,7 @@ export const announcementApi = {
         `${endpoints.announcements.list(clubId)}${queryString(options)}`
     ),
     get: (clubId, announcementId) => api.get(endpoints.announcements.byId(clubId, announcementId)),
+    view: (clubId, announcementId) => api.post(`${endpoints.announcements.byId(clubId, announcementId)}/views`, {}),
     create: (clubId, values) => api.post(endpoints.announcements.list(clubId), values),
     update: (clubId, announcementId, values) => api.patch(
         endpoints.announcements.byId(clubId, announcementId), values

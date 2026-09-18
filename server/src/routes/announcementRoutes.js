@@ -11,6 +11,7 @@ import {
     publishClubAnnouncement,
     updateClubAnnouncement,
     uploadAnnouncementAttachment,
+    viewClubAnnouncement,
 } from '../controllers/announcementController.js';
 import { requireAuth } from '../middleware/auth.js';
 import { uploadSingleAttachment } from '../middleware/attachmentUpload.js';
@@ -25,6 +26,7 @@ const attachmentParams = z.object({ clubId: id, announcementId: id, attachmentId
 const content = z.object({
     title: z.string().trim().min(1).max(200),
     contentHtml: z.string().min(1).max(100_000),
+    notificationEnabled: z.boolean().optional(),
 }).strict();
 const listQuery = z.object({
     status: z.enum(['draft', 'published', 'archived']).optional(),
@@ -38,6 +40,7 @@ router.use(requireAuth, validateRequest({ params: clubParams }), loadClubContext
 router.get('/', validateRequest({ query: listQuery }), listClubAnnouncements);
 router.post('/', requireClubAdmin, validate(content), createClubAnnouncement);
 router.get('/:announcementId', validateRequest({ params: announcementParams }), getClubAnnouncement);
+router.post('/:announcementId/views', validateRequest({ params: announcementParams }), validate(emptyBody), viewClubAnnouncement);
 router.patch('/:announcementId', validateRequest({ params: announcementParams }), requireClubAdmin, validate(content), updateClubAnnouncement);
 router.post('/:announcementId/publish', validateRequest({ params: announcementParams }), requireClubAdmin, validate(emptyBody), publishClubAnnouncement);
 router.post('/:announcementId/archive', validateRequest({ params: announcementParams }), requireClubAdmin, validate(emptyBody), archiveClubAnnouncement);

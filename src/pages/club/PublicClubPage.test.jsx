@@ -47,6 +47,18 @@ describe('PublicClubPage membership states', () => {
     });
     afterEach(cleanup);
 
+    it('expands and pages public rankings, resetting the page when category changes', async () => {
+        leaderboardApi.fetchPublicLeaderboard.mockResolvedValue({ entries: [{ publicPlayerId: 'p1', playerName: 'Ada', selectedRating: 1500 }], total: 30 });
+        renderClub({ id: 'club_1', name: 'Test Club', visibility: 'public', public_leaderboard: true }, null);
+        fireEvent.click(await screen.findByRole('button', { name: 'View all 30 ranked players' }));
+        await waitFor(() => expect(leaderboardApi.fetchPublicLeaderboard).toHaveBeenLastCalledWith('club_1', { category: 'rapid', limit: 25, offset: 0 }));
+        await waitFor(() => expect(screen.getByRole('button', { name: 'Next' }).disabled).toBe(false));
+        fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+        await waitFor(() => expect(leaderboardApi.fetchPublicLeaderboard).toHaveBeenLastCalledWith('club_1', { category: 'rapid', limit: 25, offset: 25 }));
+        fireEvent.click(screen.getByRole('button', { name: 'Blitz' }));
+        await waitFor(() => expect(leaderboardApi.fetchPublicLeaderboard).toHaveBeenLastCalledWith('club_1', { category: 'blitz', limit: 25, offset: 0 }));
+    });
+
     it('turns a protocol-less club website into an external HTTPS link', async () => {
         renderClub({ id: 'club_1', name: 'Test Club', contacts: { website: 'example.com/chess' } });
         expect((await screen.findByRole('link', { name: 'Visit club website' })).getAttribute('href'))
@@ -91,13 +103,13 @@ describe('PublicClubPage membership states', () => {
             .toBe('/auth/register?returnTo=%2Fclubs%2Fclub_1');
     });
 
-    it('keeps an unpopulated public club page intentionally minimal', async () => {
+    it('keeps empty club information minimal while allowing ranking category changes', async () => {
         renderClub({ id: 'club_1', name: 'New Club', visibility: 'public', public_leaderboard: true,
             metrics: { memberCount: 0, rosterPlayers: 0, totalGames: 0, averageRatings: {} }, contacts: {} });
         expect(await screen.findByRole('heading', { name: 'New Club' })).toBeTruthy();
         expect(screen.queryByText('Members')).toBeNull();
         expect(screen.queryByRole('heading', { name: 'About' })).toBeNull();
-        expect(screen.queryByRole('heading', { name: 'Top players' })).toBeNull();
+        expect(await screen.findByText('No ranked players in this category yet.')).toBeTruthy();
     });
 
     it('shows public contacts, club-wide metrics, and category-specific top players', async () => {
@@ -125,7 +137,7 @@ describe('PublicClubPage membership states', () => {
 
         fireEvent.click(screen.getByRole('button', { name: 'Rapid' }));
         await waitFor(() => expect(leaderboardApi.fetchPublicLeaderboard).toHaveBeenLastCalledWith(
-            'club_1', { category: 'rapid', limit: 5 }
+            'club_1', { category: 'rapid', limit: 5, offset: 0 }
         ));
     });
     it('selects the public club before opening the member dashboard', async () => {

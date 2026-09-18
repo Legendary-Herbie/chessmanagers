@@ -1,0 +1,5 @@
+
+.claimed-badge { display: inline-flex; vertical-align: -.15em; position: relative; width: 1em; height: 1em; min-width: 16px; min-height: 16px; margin-left: .2em; color: #3897f0; flex-shrink: 0; }
+.claimed-badge svg { width: 100%; height: 100%; }
+.claimed-badge__tooltip { position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); padding: 5px 9px; border-radius: 6px; background: var(--text-strong); color: var(--bg-surface); font-size: 12px; font-weight: 500; line-height: 1.4; white-space: nowrap; pointer-events: none; opacity: 0; z-index: 5; }
+.claimed-badge:hover .claimed-badge__tooltip, :is(a, button):focus-visible .claimed-badge__tooltip { opacity: 1; }

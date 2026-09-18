@@ -1,4 +1,5 @@
 import React from 'react';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import { Link } from 'react-router-dom';
 import '../../styles/club-dashboard.css';
 
@@ -16,7 +17,7 @@ function StatCard({ label, value, sub, to }) {
 
 export default function ClubDashboard({ data, onCategoryChange, canManageMemberships = false }) {
     if (!data) return <div className="dash-empty"><p className="muted">No stats available yet.</p></div>;
-    const { metrics, admin, topPlayers = [], recentMatches = [], selectedCategory = 'blitz' } = data;
+    const { metrics, admin, topPlayers = [], recentMatches = [], selectedCategory = 'rapid' } = data;
     const pendingTotal = (admin?.pendingJoinRequests || 0) + (admin?.pendingPlayerLinks || 0);
     const categoryCounts = metrics.gamesByCategory;
     const maxCategoryCount = Math.max(1, ...CATEGORIES.map(category => categoryCounts[category]));
@@ -40,7 +41,7 @@ export default function ClubDashboard({ data, onCategoryChange, canManageMembers
                 <div className="dash-category-bars">{CATEGORIES.map(category => {
                     const count = categoryCounts[category];
                     return <div key={category} className="dash-category-row">
-                        <span className="dash-category-label">{title(category)}</span>
+                        <span className="dash-category-label"><RatingCategoryIcon category={category} />{title(category)}</span>
                         <div className="dash-category-track"><div className="dash-category-fill" style={{ width: `${Math.round(count / maxCategoryCount * 100)}%` }} /></div>
                         <span className="dash-category-count">{count}</span>
                     </div>;
@@ -58,20 +59,20 @@ export default function ClubDashboard({ data, onCategoryChange, canManageMembers
                 {!topPlayers.length ? <p className="muted">No eligible players yet.</p> :
                     <ol className="dash-top-players">{topPlayers.map(player => <li key={player.playerId}>
                         <span className="dash-top-players__rank">{player.rank}</span>
-                        <Link to={`/players/${player.playerId}`} className="dash-top-players__name">{player.playerName}</Link>
+                        <Link to={`/players/${player.playerId}`} className="dash-top-players__name name-link">{player.playerName}</Link>
                         <span className="dash-top-players__rating">{player.selectedRating}</span>
                     </li>)}</ol>}
             </div>
         </div>
 
         <div className="dash-panel">
-            <div className="dash-panel__header"><h3 className="dash-panel__title">Recent matches</h3><Link to="/matches">View match history</Link></div>
+            <div className="dash-panel__header"><h3 className="dash-panel__title">Recent matches</h3><Link className="text-link" to="/matches">View match history</Link></div>
             {!recentMatches.length ? <p className="muted">No matches recorded yet.</p> : <div className="dash-matches-table-wrap" role="region" aria-label="Recent matches table" tabIndex="0"><table className="dash-matches-table">
                 <thead><tr><th>Date</th><th>White</th><th>Black</th><th>Result</th><th>Rating category</th></tr></thead>
                 <tbody>{recentMatches.map(match => <tr key={match.id}>
                     <td>{new Date(match.playedAt).toLocaleDateString()}</td>
-                    <td>{match.whitePlayerId ? <Link to={`/players/${match.whitePlayerId}`}>{match.whitePlayerName}</Link> : match.whitePlayerName}</td><td>{match.blackPlayerId ? <Link to={`/players/${match.blackPlayerId}`}>{match.blackPlayerName}</Link> : match.blackPlayerName}</td>
-                    <td>{RESULT_LABELS[match.result]}</td><td>{title(match.ratingCategory)}</td>
+                    <td>{match.whitePlayerId ? <Link className="name-link" to={`/players/${match.whitePlayerId}`}>{match.whitePlayerName}</Link> : match.whitePlayerName}</td><td>{match.blackPlayerId ? <Link className="name-link" to={`/players/${match.blackPlayerId}`}>{match.blackPlayerName}</Link> : match.blackPlayerName}</td>
+                    <td>{RESULT_LABELS[match.result]}</td><td><RatingCategoryIcon category={match.ratingCategory} />{title(match.ratingCategory)}</td>
                 </tr>)}</tbody>
             </table></div>}
         </div>

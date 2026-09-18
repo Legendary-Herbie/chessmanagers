@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import db from '../database/database.js';
+import { up as canonicalUp, down as canonicalDown } from '../database/migrations/1700000000018_canonical_match_fields.js';
 import { readBaselineSchema } from '../database/migrations/1700000000000_baseline.js';
 import { down as reconciliationDown } from '../database/migrations/1700000000002_reconcile_multitenant_model.js';
 import { down as clubManagementDown } from '../database/migrations/1700000000003_club_management.js';
@@ -101,11 +102,17 @@ describe('test database safety and migrations', () => {
     });
 
     it('reapplies the authoritative-ratings migration safely', async () => {
-        await expect(db.query(AUTHORITATIVE_RATINGS_SQL)).resolves.toBeDefined();
-        await expect(db.query(MATCH_LIFECYCLE_SQL)).resolves.toBeDefined();
-        await expect(db.query(PUBLIC_SEARCH_BOUNDARY_SQL)).resolves.toBeDefined();
-        await expect(db.query(TOURNAMENT_DOMAIN_SQL)).resolves.toBeDefined();
-        await expect(db.query(AUTHENTICATION_LIFECYCLE_SQL)).resolves.toBeDefined();
+        await db.transaction(async trx => {
+            // Historical migrations require the schema that preceded canonical cleanup.
+            const pgm = { sql: text => trx.query(text) };
+            await canonicalDown(pgm);
+            await expect(trx.query(AUTHORITATIVE_RATINGS_SQL)).resolves.toBeDefined();
+            await expect(trx.query(MATCH_LIFECYCLE_SQL)).resolves.toBeDefined();
+            await expect(trx.query(PUBLIC_SEARCH_BOUNDARY_SQL)).resolves.toBeDefined();
+            await expect(trx.query(TOURNAMENT_DOMAIN_SQL)).resolves.toBeDefined();
+            await expect(trx.query(AUTHENTICATION_LIFECYCLE_SQL)).resolves.toBeDefined();
+            await canonicalUp(pgm);
+        });
     });
 
     it('documents the reconciliation migration as irreversible', async () => {

@@ -1,0 +1,9 @@
+.match-history-player { display:grid; gap:6px; min-width:0; }
+.match-history-player:last-child { text-align:right; }
+.match-rating { display:inline-flex; flex-wrap:wrap; align-items:center; gap:6px; font-size:.8rem; font-weight:400; font-variant-numeric:tabular-nums; color:var(--text-muted); }
+.match-history-player:last-child .match-rating { justify-content:flex-end; }
+.match-rating__change { font-weight:700; border-radius:6px; padding:2px 5px; background:var(--bg-muted); }
+.match-rating__change.gain { color:var(--text-green); }
+.match-rating__change.loss { color:var(--text-red); }
+.match-history-result .match-history-player strong { text-align:inherit; }
+.player-match-rating { display:grid; gap:4px; margin-top:6px; }

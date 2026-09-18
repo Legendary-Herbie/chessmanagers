@@ -57,6 +57,23 @@ async function download(endpoint, fallbackFilename) {
 }
 
 export const exportApi = {
+    downloadPackage: async clubId => {
+        const { zipSync } = await import('fflate');
+        const responses = await Promise.all([
+            fetchCsv(withQuery(endpoints.exports.players(clubId), { includeInactive: true })),
+            fetchCsv(endpoints.exports.matches(clubId)),
+            fetchCsv(withQuery(endpoints.exports.ratings(clubId), { includeInactive: true })),
+        ]);
+        const names = ['players.csv', 'matches.csv', 'ratings.csv'];
+        const contents = await Promise.all(responses.map(response => response.arrayBuffer()));
+        const zipped = zipSync(Object.fromEntries(contents.map((buffer, index) => [names[index], new Uint8Array(buffer)])));
+        const url = URL.createObjectURL(new Blob([zipped], { type: 'application/zip' }));
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `club-records-${new Date().toISOString().slice(0, 10)}.zip`;
+        document.body.appendChild(link); link.click(); link.remove();
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
+    },
     downloadPlayers: (clubId, { includeInactive = false } = {}) => download(
         withQuery(endpoints.exports.players(clubId), { includeInactive }),
         'players.csv'

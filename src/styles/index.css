@@ -1,5 +1,7 @@
+@import './workflow-simplicity.css';
 @import './variables.css';
 @import './common.css';
+@import './links.css';
 
 * {
     box-sizing: border-box;
@@ -54,12 +56,12 @@ select {
 [data-theme='dark'] .brand-logo--auto .brand-logo__lockup--dark-theme { display: block; }
 
 @media (max-width: 760px) {
-    .brand-logo--collapse-mobile .brand-logo__lockup { display: none; }
+    .brand-logo.brand-logo--collapse-mobile .brand-logo__lockup { display: none; }
     .brand-logo--collapse-mobile .brand-logo__icon { display: block; }
 }
 
 @media (max-width: 480px) {
-    .brand-logo--collapse-phone .brand-logo__lockup { display: none; }
+    .brand-logo.brand-logo--collapse-phone .brand-logo__lockup { display: none; }
     .brand-logo--collapse-phone .brand-logo__icon { display: block; }
 }
 html[data-theme='dark'] { color-scheme: dark; }
@@ -86,3 +88,4 @@ html[data-theme='light'] { color-scheme: light; }
 @media (max-width: 480px) {
     .no-club-state__actions { flex-direction: column; }
 }
+

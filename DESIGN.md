@@ -1,6 +1,6 @@
 ---
 version: "alpha"
-name: "Chess Managers"
+name: "1chessclub"
 description: "A focused chess club management interface with quiet operational surfaces, indigo actions, green success accents, and compact form-driven workflows."
 colors:
   primary: "#6366F1"
@@ -257,7 +257,7 @@ components:
 
 ## Overview
 
-Chess Managers has a quiet, work-focused SaaS feel: compact, centered workflows; pale operational surfaces; and a single confident indigo for the action path. The product should feel precise and administrative rather than decorative. The chess theme appears through restrained language and a simple bar-like mark, not through ornamental boards or heavy game imagery.
+1chessclub has a quiet, work-focused SaaS feel: compact, centered workflows; pale operational surfaces; and a single confident indigo for the action path. The product should feel precise and administrative rather than decorative. The chess theme appears through restrained language and a simple bar-like mark, not through ornamental boards or heavy game imagery.
 
 The strongest expression of the system is the authentication flow: a centered panel, soft ambient background color, compact inputs, clear labels, and one full-width call to action. Dark mode is an important first-class identity, using deep navy surfaces with the same indigo CTA and subdued slate borders.
 

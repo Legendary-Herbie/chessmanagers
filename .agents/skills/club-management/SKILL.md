@@ -54,4 +54,4 @@ Rating configuration, notification preferences, visibility, metadata, contacts, 
 
 ## Data integrity
 
-Club deletion or archive must not destroy historical matches/rating records. Use soft deletion and prevent new operational activity for inactive/deleted clubs.
+Archiving preserves historical records and prevents new operational activity. Permanent club deletion removes all club-owned records, including memberships, players, matches, ratings, tournaments, announcements, notifications, and uploaded files. Preserve global user accounts and all other clubs. Delete database records atomically and clean up uploads only after commit, with durable retries for failed file removal.

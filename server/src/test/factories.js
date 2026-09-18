@@ -124,9 +124,9 @@ export async function createMatch(club, whitePlayer, blackPlayer, overrides = {}
     const id = overrides.id || nextValue('match_test');
     return db.query(
         `INSERT INTO matches
-              (id, club_id, white_player_id, black_player_id, result, type, time_control,
+              (id, club_id, white_player_id, black_player_id, result,
                rating_category, is_rated, status, played_at, notes)
-           VALUES ($1, $2, $3, $4, $5, $6, $7, $7, $10, 'active', $8, $9)
+           VALUES ($1, $2, $3, $4, $5, $6, $9, 'active', $7, $8)
            RETURNING *`,
         [
             id,
@@ -134,7 +134,6 @@ export async function createMatch(club, whitePlayer, blackPlayer, overrides = {}
             whitePlayer.id,
             blackPlayer.id,
             overrides.result || 'draw',
-            overrides.type || 'rated',
             overrides.timeControl || 'blitz',
             overrides.playedAt || new Date('2026-01-01T12:00:00.000Z'),
               overrides.notes || null,

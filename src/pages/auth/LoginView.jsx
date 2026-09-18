@@ -64,6 +64,7 @@ export default function LoginView() {
                 <p className="auth-form-subtitle">Sign in to your account</p>
             </div>
 
+            {sessionNotice === 'sessionsEnded' && <div className="success-banner" role="status">All sessions were ended. Sign in to start a new session.</div>}
             {sessionNotice === 'passwordChanged' && <div className="success-banner" role="status">Password changed successfully. All sessions were ended. Sign in with your new password.</div>}
 
             {error && (
@@ -132,11 +133,11 @@ export default function LoginView() {
                 </button>
             </form>
 
-            <p className="auth-switch"><Link to={`/auth/forgot-password${continuation}`} className="auth-link">Forgot your password?</Link></p>
+            <p className="auth-switch"><Link to={`/auth/forgot-password${continuation}`} className="auth-link text-link">Forgot your password?</Link></p>
 
             <p className="auth-switch">
                 Don't have an account?{' '}
-                <Link to={`/auth/register${continuation}`} className="auth-link">Create one</Link>
+                <Link to={`/auth/register${continuation}`} className="auth-link text-link">Create one</Link>
             </p>
         </div>
     );

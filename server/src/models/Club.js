@@ -357,7 +357,6 @@ export const ClubModel = {
             const transitions = {
                 archive: { from: ['active'], to: 'archived', event: 'club.archived' },
                 restore: { from: ['archived'], to: 'active', event: 'club.restored' },
-                delete: { from: ['active', 'archived'], to: 'deleted', event: 'club.deleted' },
             };
             const transition = transitions[action];
             if (!transition || !transition.from.includes(club.status)) return null;

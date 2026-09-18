@@ -1,4 +1,6 @@
-# Chess Managers
+# 1chessclub
+
+For a Linux VPS, see the [Docker Compose deployment and backup guide](docs/VPS_DEPLOYMENT.md).
 
 A full-stack web application for managing chess clubs, players, tournaments, and ratings. Built with React, Express.js, and PostgreSQL.
 

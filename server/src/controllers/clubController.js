@@ -1,4 +1,5 @@
 import { ClubModel } from '../models/Club.js';
+import { permanentlyDeleteClub } from '../services/DeletionService.js';
 import { scheduleRatingRecalculation } from '../services/RatingService.js';
 import { MembershipModel } from '../models/Membership.js';
 import { UserModel } from '../models/User.js';
@@ -331,7 +332,7 @@ export async function updateClubPresentation(req, res, next) {
 async function changeClubLifecycle(req, res, next, action) {
     try {
         const { reason = null } = req.validated ?? req.body;
-        const club = await ClubModel.setLifecycle({
+        const club = await (action === 'delete' ? permanentlyDeleteClub : ClubModel.setLifecycle)({
             clubId: req.params.clubId,
             ownerId: req.user.id,
             action,

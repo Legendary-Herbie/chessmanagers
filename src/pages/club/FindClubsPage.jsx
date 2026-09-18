@@ -7,14 +7,16 @@ import { clubApi } from '../../features/clubs/api/clubApi.js';
 const PAGE_SIZE = 20;
 
 export default function FindClubsPage() {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const initialCode = /^\d{6}$/.test(searchParams.get('joinCode') || '') ? searchParams.get('joinCode') : '';
+    const [discoveryMode, setDiscoveryMode] = useState(initialCode ? 'code' : 'search');
     const [clubs, setClubs] = useState([]);
     const [total, setTotal] = useState(0);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [joinCode, setJoinCode] = useState('');
+    const [joinCode, setJoinCode] = useState(initialCode);
     const [joiningByCode, setJoiningByCode] = useState(false);
     const [joinMessage, setJoinMessage] = useState(null);
-    const [searchParams, setSearchParams] = useSearchParams();
     const query = searchParams.get('q') || '';
     const [draftQuery, setDraftQuery] = useState(query);
     const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1);
@@ -100,8 +102,12 @@ export default function FindClubsPage() {
         {joinMessage && <section className={`public-panel public-join-message public-join-message--${joinMessage.type}`}
             role={joinMessage.type === 'error' ? 'alert' : 'status'}>{joinMessage.text}</section>}
 
-        <div className="public-discovery-tools">
-            <section className="public-panel" aria-labelledby="club-search-heading">
+        <div className="public-panel discovery-hub">
+            <div className="discovery-switch" role="group" aria-label="Find a club by">
+                <button type="button" className="public-button public-button--secondary" aria-pressed={discoveryMode === 'search'} onClick={() => setDiscoveryMode('search')}>Search public clubs</button>
+                <button type="button" className="public-button public-button--secondary" aria-pressed={discoveryMode === 'code'} onClick={() => setDiscoveryMode('code')}>Have a join code?</button>
+            </div>
+            <section hidden={discoveryMode !== 'search'} aria-labelledby="club-search-heading">
                 <label className="public-field">
                     <span id="club-search-heading">Search public clubs</span>
                     <input className="public-input" type="search" aria-label="Search public clubs"
@@ -109,7 +115,7 @@ export default function FindClubsPage() {
                         onChange={event => setDraftQuery(event.target.value)} />
                 </label>
             </section>
-            <form className="public-panel public-join-form" onSubmit={handleJoinCode}>
+            <form hidden={discoveryMode !== 'code'} className="public-join-form" onSubmit={handleJoinCode}>
                 <label className="public-field"><span>Join a private club</span>
                     <input className="public-input" aria-label="Six-digit join code" inputMode="numeric"
                         autoComplete="one-time-code" pattern="[0-9]{6}" maxLength={6} value={joinCode}
@@ -122,6 +128,7 @@ export default function FindClubsPage() {
             </form>
         </div>
 
+        {discoveryMode === 'search' && <>
         <div className="public-results-status" role="status" aria-live="polite">
             {loading ? (clubs.length ? 'Updating results…' : 'Loading clubs…') : null}
         </div>
@@ -149,5 +156,6 @@ export default function FindClubsPage() {
             <button className="public-button public-button--secondary" type="button" disabled={page >= totalPages || loading}
                 onClick={() => goToPage(page + 1)}>Next</button>
         </nav>}
+        </>}
     </div>;
 }

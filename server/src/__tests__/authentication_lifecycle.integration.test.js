@@ -335,7 +335,7 @@ describe('authentication lifecycle', () => {
     });
 
     it('rate-limits repeated login attempts independently from the global limiter', async () => {
-        for (let index = 0; index < 10; index += 1) {
+        for (let index = 0; index < 5; index += 1) {
             await request(app).post('/api/v1/auth/login').set('X-Forwarded-For', '198.51.100.99')
                 .send({ email: 'missing@example.test', password: 'WrongPassword!' }).expect(401);
         }

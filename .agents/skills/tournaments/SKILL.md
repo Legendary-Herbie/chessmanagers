@@ -5,6 +5,10 @@ description: Implement Chess Managers Swiss and Round-Robin tournaments, pairing
 
 # Tournaments
 
+## Deletion and archive
+
+Archive preserves tournament history. Permanent deletion removes the tournament, entries, rounds, pairings, linked matches, and related notifications and audit records. Recalculate affected club rating categories chronologically from surviving matches in the same transaction. Keep club players, the club itself, and unrelated records. Only club admins may perform these actions.
+
 ## Supported formats
 
 - Swiss using the defined Dutch-style pairing approach.

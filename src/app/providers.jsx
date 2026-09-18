@@ -1,3 +1,5 @@
+import { QueryClientProvider } from '@tanstack/react-query';
+import { queryClient } from '../shared/query/queryClient.js';
 // providers.jsx — root composer only.
 // Each provider lives in its own file; import from there directly
 // when you need the hook (e.g. import { useAuth } from './AuthProvider.jsx').
@@ -10,7 +12,7 @@ import { ClubProvider }          from './ClubProvider.jsx';
 // Re-export hooks so consumers can import from either location.
 export default function Providers({ children }) {
     return (
-        <ThemeProvider>
+        <QueryClientProvider client={queryClient}><ThemeProvider>
             <NotificationsProvider>
                 <AuthProvider>
                     <ClubProvider>
@@ -18,6 +20,6 @@ export default function Providers({ children }) {
                     </ClubProvider>
                 </AuthProvider>
             </NotificationsProvider>
-        </ThemeProvider>
+        </ThemeProvider></QueryClientProvider>
     );
 }

@@ -45,7 +45,7 @@ describe('LeaderboardPage URL state', () => {
         fireEvent.click(screen.getByRole('button', { name: 'View Beth rating history' }));
         await screen.findByText('No rating history yet.');
         await act(async () => resolveAda([{ ratingAfter: 900 }, { ratingAfter: 1900 }]));
-        expect(screen.getByRole('dialog', { name: 'Beth' }).querySelector('svg')).toBeNull();
+        expect(screen.getByRole('dialog', { name: 'Beth' }).querySelector('svg.chart-svg')).toBeNull();
         expect(screen.getByText('No rating history yet.')).toBeTruthy();
     });
 
@@ -83,4 +83,19 @@ describe('LeaderboardPage URL state', () => {
         expect(leaderboardApi.fetchLeaderboard).toHaveBeenLastCalledWith('club_1', expect.objectContaining({ category: 'rapid' }));
     });
 
+});
+
+it('shows claimed badges beside names in desktop and mobile leaderboard views', async () => {
+    leaderboardApi.fetchLeaderboard.mockResolvedValue({ entries: [
+        { playerId: 'a', playerName: 'Ada', rank: 1, isClaimed: true },
+        { playerId: 'b', playerName: 'Beth', rank: 2, isClaimed: false },
+    ], total: 2 });
+    const view = render(<ClubContext.Provider value={{ club: { id: 'club_1' } }}>
+        <MemoryRouter><LeaderboardPage /></MemoryRouter>
+    </ClubContext.Provider>);
+    try {
+        const badges = await screen.findAllByRole('img', { name: 'Claimed' });
+        expect(badges).toHaveLength(2);
+        for (const badge of badges) expect(badge.closest('button').textContent).toContain('Ada');
+    } finally { view.unmount(); }
 });

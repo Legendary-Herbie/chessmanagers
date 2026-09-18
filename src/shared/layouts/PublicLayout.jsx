@@ -1,3 +1,5 @@
+import SiteFooter from '../common/SiteFooter.jsx';
+import { useSearchShortcut } from '../hooks/useSearchShortcut.js';
 import React from 'react';
 import { Link, NavLink, Outlet } from 'react-router-dom';
 import { useAuth } from '../../app/contextHooks.js';
@@ -5,6 +7,7 @@ import BrandLogo from '../common/BrandLogo.jsx';
 import '../../styles/public.css';
 
 export default function PublicLayout() {
+    useSearchShortcut();
     const { user, loading } = useAuth();
 
     return (
@@ -12,7 +15,7 @@ export default function PublicLayout() {
             <a className="public-skip-link" href="#public-main">Skip to content</a>
             <header className="public-header">
                 <div className="public-header__inner">
-                    <Link className="public-brand" to="/" aria-label="Chess Managers home">
+                    <Link className="public-brand" to="/" aria-label="1chessclub home">
                         <BrandLogo className="public-brand__logo" collapse="mobile" />
                     </Link>
                     <nav className="public-nav" aria-label="Public navigation">
@@ -29,6 +32,7 @@ export default function PublicLayout() {
             <main id="public-main" className="public-main" tabIndex="-1">
                 <Outlet />
             </main>
+            <SiteFooter />
         </div>
     );
 }

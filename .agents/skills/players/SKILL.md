@@ -34,8 +34,7 @@ Linked player:
 
 ## Editing
 
-Linked users may edit avatar/photo and bio.
-Official identity fields (name, date of birth, federation ID) are admin-controlled.
+Linked users may edit their name, federation ID, avatar/photo, bio, and Chess.com/Lichess usernames. Date of birth remains admin-controlled. Only the club owner may lock or unlock a name; while locked, only the owner may change that name. Store external profile usernames as links, without importing their ratings.
 
 ## Deletion
 

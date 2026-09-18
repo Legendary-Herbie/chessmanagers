@@ -1,0 +1,33 @@
+import React from 'react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, expect, it, vi } from 'vitest';
+import Toast from './Toast.jsx';
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => { cleanup(); vi.useRealTimers(); });
+it('pauses on hover and keyboard focus, then resumes only the remaining duration', () => {
+    const dismiss = vi.fn();
+    render(<Toast notification={{ id: 1, message: 'Saved', type: 'success', duration: 4000 }} dismiss={dismiss} />);
+    act(() => vi.advanceTimersByTime(1000));
+    const toast = screen.getByRole('status').parentElement;
+    fireEvent.mouseEnter(toast);
+    act(() => vi.advanceTimersByTime(5000));
+    expect(dismiss).not.toHaveBeenCalled();
+    fireEvent.focus(screen.getByRole('button'));
+    fireEvent.mouseLeave(toast);
+    act(() => vi.advanceTimersByTime(5000));
+    expect(dismiss).not.toHaveBeenCalled();
+    fireEvent.blur(screen.getByRole('button'));
+    act(() => vi.advanceTimersByTime(2999));
+    expect(dismiss).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(1));
+    expect(dismiss).toHaveBeenCalledWith(1);
+});
+it('allows explicit dismissal of persistent errors', () => {
+    const dismiss = vi.fn();
+    render(<Toast notification={{ id: 2, message: 'Failed', type: 'error', duration: 0 }} dismiss={dismiss} />);
+    expect(screen.getByRole('alert').textContent).toBe('Failed');
+    act(() => vi.advanceTimersByTime(10000));
+    expect(dismiss).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Dismiss notification' }));
+    expect(dismiss).toHaveBeenCalledWith(2);
+});

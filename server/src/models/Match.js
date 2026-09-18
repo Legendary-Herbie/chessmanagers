@@ -2,30 +2,41 @@ import db from '../database/database.js';
 
 const qry = trx => trx ? trx.query.bind(trx) : db.query.bind(db);
 
-function legacyType(isRated, tournamentId) {
-    if (tournamentId) return 'tournament';
-    return isRated ? 'rated' : 'casual';
-}
+const ratingColumns = `white_history.rating_before AS white_rating_before,
+    white_history.rating_after AS white_rating_after,
+    black_history.rating_before AS black_rating_before,
+    black_history.rating_after AS black_rating_after,
+    EXISTS (SELECT 1 FROM rating_recalculation_jobs job
+        WHERE job.club_id = match.club_id AND job.category = match.rating_category
+          AND job.status IN ('pending', 'running', 'failed')
+          AND job.affected_from <= match.played_at) AS ratings_pending`;
+const ratingJoins = `LEFT JOIN rating_history white_history
+    ON white_history.match_id = match.id AND white_history.club_id = match.club_id
+    AND white_history.category = match.rating_category AND white_history.player_id = match.white_player_id
+    LEFT JOIN rating_history black_history
+    ON black_history.match_id = match.id AND black_history.club_id = match.club_id
+    AND black_history.category = match.rating_category AND black_history.player_id = match.black_player_id`;
 
 export const MatchModel = {
     create: async ({ clubId, whitePlayerId, blackPlayerId, result, ratingCategory,
-        isRated, tournamentId = null, notes = null, playedAt }, trx) => qry(trx)(
+        isRated, tournamentId = null, notes = null, playedAt, clientRequestId = null, actorUserId = null, clientPayloadHash = null }, trx) => qry(trx)(
         `INSERT INTO matches (
             club_id, white_player_id, black_player_id, result,
             rating_category, is_rated, tournament_id, notes, played_at,
-            type, time_control, status
-         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $5, 'active')
+            status, client_request_id, client_user_id, client_payload_hash
+         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'active', $10, $11, $12)
          RETURNING *`,
         [clubId, whitePlayerId, blackPlayerId, result, ratingCategory,
-            isRated, tournamentId, notes, playedAt, legacyType(isRated, tournamentId)]
+            isRated, tournamentId, notes, playedAt, clientRequestId, actorUserId, clientPayloadHash]
     ).then(result => result.first),
 
     findById: async (id, clubId, { includeDeleted = false, forUpdate = false, trx = null } = {}) => qry(trx)(
-        `SELECT match.*, white_player.name AS white_player_name,
+        `SELECT match.*, ${ratingColumns}, white_player.name AS white_player_name,
                 black_player.name AS black_player_name
          FROM matches match
          JOIN players white_player ON white_player.id = match.white_player_id
          JOIN players black_player ON black_player.id = match.black_player_id
+         ${ratingJoins}
          WHERE match.id = $1 AND match.club_id = $2
            AND ($3::BOOLEAN OR match.status <> 'deleted')
          ${forUpdate ? 'FOR UPDATE OF match' : ''}`,
@@ -55,11 +66,12 @@ export const MatchModel = {
         const sortColumn = sortBy === 'createdAt' ? 'match.created_at' : 'match.played_at';
         const direction = sortDirection === 'asc' ? 'ASC' : 'DESC';
         return db.query(
-            `SELECT match.*, white_player.name AS white_player_name,
+            `SELECT match.*, ${ratingColumns}, white_player.name AS white_player_name,
                     black_player.name AS black_player_name, COUNT(*) OVER ()::INTEGER AS total_count
              FROM matches match
              JOIN players white_player ON white_player.id = match.white_player_id
              JOIN players black_player ON black_player.id = match.black_player_id
+         ${ratingJoins}
              WHERE ${conditions.join(' AND ')}
              ORDER BY ${sortColumn} ${direction}, match.id ${direction}
              LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -68,11 +80,12 @@ export const MatchModel = {
     },
 
     findByPlayer: async (clubId, playerId, { limit = 20, offset = 0 } = {}) => db.query(
-        `SELECT match.*, white_player.name AS white_player_name,
+        `SELECT match.*, ${ratingColumns}, white_player.name AS white_player_name,
                 black_player.name AS black_player_name
          FROM matches match
          JOIN players white_player ON white_player.id = match.white_player_id
          JOIN players black_player ON black_player.id = match.black_player_id
+         ${ratingJoins}
          WHERE match.club_id = $1 AND match.status <> 'deleted'
            AND (match.white_player_id = $2 OR match.black_player_id = $2)
          ORDER BY match.played_at DESC, match.id DESC
@@ -81,11 +94,12 @@ export const MatchModel = {
     ).then(result => result.rows),
 
     findHeadToHead: async (clubId, playerAId, playerBId) => db.query(
-        `SELECT match.*, white_player.name AS white_player_name,
+        `SELECT match.*, ${ratingColumns}, white_player.name AS white_player_name,
                 black_player.name AS black_player_name
          FROM matches match
          JOIN players white_player ON white_player.id = match.white_player_id
          JOIN players black_player ON black_player.id = match.black_player_id
+         ${ratingJoins}
          WHERE match.club_id = $1 AND match.status = 'active' AND (
             (match.white_player_id = $2 AND match.black_player_id = $3) OR
             (match.white_player_id = $3 AND match.black_player_id = $2)
@@ -118,14 +132,14 @@ export const MatchModel = {
     update: async (id, clubId, values, trx) => qry(trx)(
         `UPDATE matches SET
              white_player_id = $3, black_player_id = $4, result = $5,
-             rating_category = $6, time_control = $6, is_rated = $7,
-             tournament_id = $8, type = $9, notes = $10, played_at = $11,
+             rating_category = $6, is_rated = $7,
+             tournament_id = $8, notes = $9, played_at = $10,
              updated_at = NOW()
          WHERE id = $1 AND club_id = $2 AND status = 'active'
          RETURNING *`,
         [id, clubId, values.whitePlayerId, values.blackPlayerId, values.result,
             values.ratingCategory, values.isRated, values.tournamentId,
-            legacyType(values.isRated, values.tournamentId), values.notes, values.playedAt]
+            values.notes, values.playedAt]
     ).then(result => result.first),
 
     void: async (id, clubId, actorUserId, reason, trx) => qry(trx)(

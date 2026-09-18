@@ -9,13 +9,13 @@
     gap: 1rem;
     margin-bottom: 1.5rem;
 }
-.controls {
+.leaderboard-page .controls {
     display: flex;
     flex-wrap: wrap;
     gap: 0.75rem;
     align-items: center;
 }
-.input {
+.leaderboard-page .input {
     width: 240px;
     padding: 0.75rem 1rem;
     border: 1px solid var(--border);
@@ -27,25 +27,6 @@
     align-items: center;
     gap: 0.5rem;
     color: var(--text-muted);
-}
-.category-switcher {
-    display: inline-flex;
-    border: 1px solid var(--border);
-    border-radius: 0.75rem;
-    overflow: hidden;
-}
-.category-switcher button {
-    border: 0;
-    border-right: 1px solid var(--border);
-    padding: 0.65rem 0.8rem;
-    background: var(--bg-secondary);
-    color: var(--text-muted);
-    cursor: pointer;
-}
-.category-switcher button:last-child { border-right: 0; }
-.category-switcher button.active {
-    background: var(--primary);
-    color: white;
 }
 .selected-rating {
     color: var(--primary);
@@ -108,13 +89,6 @@
     border-radius: 1rem;
     padding: 1.5rem;
 }
-.modal-header,
-.modal-footer {
-    display: flex;
-    justify-content: space-between;
-    gap: 1rem;
-    align-items: center;
-}
 .leaderboard-table {
     width: 100%;
     border-collapse: collapse;
@@ -142,9 +116,9 @@
 .leaderboard-card__rank { grid-row: span 3; font-weight: 800; color: var(--primary); }
 @media (max-width: 700px) {
     .leaderboard-page { padding: 16px; }
-    .leaderboard-table { display: none; }
+    .leaderboard-desktop { display: none; }
     .leaderboard-cards { display: grid; gap: 0.75rem; }
-    .controls, .input { width: 100%; }
+    .leaderboard-page .controls, .leaderboard-page .input { width: 100%; }
     .category-switcher { width: 100%; }
     .category-switcher button { flex: 1; }
 }
@@ -153,3 +127,15 @@
 .leaderboard-empty h2 { margin: 10px 0 8px; color: var(--text-strong); }
 .leaderboard-empty p { max-width: 560px; margin: 0 auto 20px; color: var(--text-muted); line-height: 1.6; }
 .leaderboard-empty a { display: inline-flex; min-height: 44px; align-items: center; padding-inline: 18px; text-decoration: none; }
+
+.leaderboard-card strong { min-width:0; overflow-wrap:anywhere; }
+.leaderboard-list { min-width:0; }
+.leaderboard-table { table-layout:fixed; }
+.leaderboard-table th, .leaderboard-table td { text-align:center; vertical-align:middle; font-variant-numeric:tabular-nums; }
+.leaderboard-table th:first-child { width:10%; }
+.leaderboard-table th:nth-child(2) { width:30%; }
+.leaderboard-table .name-link { display:inline-flex; justify-content:center; align-items:center; flex-wrap:wrap; gap:6px; max-width:100%; overflow-wrap:anywhere; text-align:center; }
+.leaderboard-table th .rating-category-icon { vertical-align:middle; margin-right:6px; }
+.leaderboard-card { grid-template-columns:1fr; justify-items:center; text-align:center; }
+.leaderboard-card__rank { grid-row:auto; }
+.leaderboard-card > span { display:inline-flex; align-items:center; justify-content:center; gap:6px; }

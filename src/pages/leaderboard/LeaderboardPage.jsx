@@ -1,4 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import { useClubQuery } from '../../shared/query/useClubQuery.js';
+import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
+import Icon from '../../shared/common/Icon.jsx';
+import React, { memo, useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import '../../styles/leaderboard.css';
 import Button from '../../shared/common/Button.jsx';
@@ -12,7 +16,7 @@ const CATEGORIES = ['blitz', 'rapid', 'classical'];
 const PAGE_SIZE = 25;
 const label = category => category[0].toUpperCase() + category.slice(1);
 
-function Sparkline({ points = [] }) {
+const Sparkline = memo(function Sparkline({ points = [] }) {
     if (!points.length) return <div className="sparkline empty">No rating history yet.</div>;
     const width = 360;
     const height = 120;
@@ -31,7 +35,7 @@ function Sparkline({ points = [] }) {
             <path d={path} fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
         </svg>
     );
-}
+});
 
 function RatingCells({ entry, selectedCategory }) {
     return CATEGORIES.map(category => (
@@ -45,13 +49,16 @@ export default function LeaderboardPage() {
     const { club, capabilities = {} } = useClub();
     const [searchParams, setSearchParams] = useSearchParams();
     const requestedCategory = searchParams.get('category');
-    const selectedCategory = CATEGORIES.includes(requestedCategory) ? requestedCategory : 'blitz';
+    const selectedCategory = CATEGORIES.includes(requestedCategory) ? requestedCategory : 'rapid';
     const page = Math.max(1, Number.parseInt(searchParams.get('page') || '1', 10) || 1);
     const search = searchParams.get('q') || '';
-    const [leaderboard, setLeaderboard] = useState({ entries: [], total: 0 });
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState('');
-    const [refreshKey, setRefreshKey] = useState(0);
+    const { data: leaderboard = { entries: [], total: 0 }, isLoading: loading, error: queryError, refetch } = useClubQuery(
+        club?.id, ['leaderboard', selectedCategory, page, search],
+        () => leaderboardApi.fetchLeaderboard(club.id, {
+            category: selectedCategory, q: search, limit: PAGE_SIZE, offset: (page - 1) * PAGE_SIZE,
+        }),
+    );
+    const error = queryError?.message || '';
     const [selectedPlayer, setSelectedPlayer] = useState(null);
     const [ratingHistory, setRatingHistory] = useState([]);
     const [historyLoading, setHistoryLoading] = useState(false);
@@ -78,26 +85,6 @@ export default function LeaderboardPage() {
         setSearchParams(next, { replace: true });
     }, [searchParams, setSearchParams]);
 
-    useEffect(() => {
-        if (!club?.id) return;
-        let active = true;
-        setLoading(true);
-        setError('');
-        leaderboardApi.fetchLeaderboard(club.id, {
-            category: selectedCategory,
-            q: search,
-            limit: PAGE_SIZE,
-            offset: (page - 1) * PAGE_SIZE,
-        }).then(data => {
-            if (active) setLeaderboard(data || { entries: [], total: 0 });
-        }).catch(fetchError => {
-            if (active) setError(fetchError.message || 'Unable to load the leaderboard.');
-        }).finally(() => {
-            if (active) setLoading(false);
-        });
-        return () => { active = false; };
-    }, [club?.id, selectedCategory, page, search, refreshKey]);
-
     function selectCategory(category) {
         updateQuery({ category, page: null });
     }
@@ -117,13 +104,13 @@ export default function LeaderboardPage() {
         <div className="leaderboard-page">
             <div className="page-header">
                 <h1>Leaderboard</h1>
-                <div className="controls">
+                <div className="controls filter-toolbar">
                     <div className="category-switcher" role="group" aria-label="Rating category">
                         {CATEGORIES.map(category => (
                             <button type="button" key={category}
                                 className={selectedCategory === category ? 'active' : ''}
                                 onClick={() => selectCategory(category)}>
-                                {label(category)}
+                                <RatingCategoryIcon category={category} />{label(category)}
                             </button>
                         ))}
                     </div>
@@ -132,26 +119,26 @@ export default function LeaderboardPage() {
                 </div>
             </div>
 
-            {error && <div className="error-banner" role="alert"><p>Couldn’t load leaderboard. Try again. {error}</p><Button variant="secondary" disabled={loading} onClick={() => setRefreshKey(current => current + 1)}>Retry</Button></div>}
+            {error && <div className="error-banner" role="alert"><p>Couldn’t load leaderboard. Try again. {error}</p><Button variant="secondary" disabled={loading} onClick={() => refetch()}>Retry</Button></div>}
             <div className="leaderboard-list" aria-busy={loading}>
                 {loading ? <div className="muted">Loading...</div> : (
                     <>
-                        {leaderboard.entries.length > 0 ? <table className="leaderboard-table">
-                            <thead><tr><th>Rank</th><th>Player</th><th>Blitz</th><th>Rapid</th><th>Classical</th><th>Total Games</th></tr></thead>
+                        {leaderboard.entries.length > 0 ? <div className="table-scroll leaderboard-desktop" tabIndex={0} role="region" aria-label="Leaderboard ratings"><table className="leaderboard-table">
+                            <thead><tr><th>Rank</th><th>Player</th><th><RatingCategoryIcon category="blitz" />Blitz</th><th><RatingCategoryIcon category="rapid" />Rapid</th><th><RatingCategoryIcon category="classical" />Classical</th><th>Total Games</th></tr></thead>
                             <tbody>
                                 {leaderboard.entries.map(entry => (
                                     <tr key={entry.playerId} className="leaderboard-row" onClick={() => openPlayer(entry)}>
                                         <td className={`rank ${entry.rank <= 3 ? `top${entry.rank}` : ''}`}>{entry.rank}</td>
-                                        <td><button type="button" className="btn-secondary"
+                                        <td><button type="button" className="name-link"
                                             onClick={event => { event.stopPropagation(); openPlayer(entry); }}
-                                            aria-label={`View ${entry.playerName} rating history`}>{entry.playerName}</button></td>
+                                            aria-label={`View ${entry.playerName} rating history`}>{entry.playerName} <ClaimedBadge status={entry.isClaimed ? 'approved' : null} /></button></td>
                                         <RatingCells entry={entry} selectedCategory={selectedCategory} />
                                         <td>{entry.totalGames}</td>
                                     </tr>
                                 ))}
                             </tbody>
-                        </table> : <section className="leaderboard-empty">
-                            <span aria-hidden="true">♜</span>
+                        </table></div> : <section className="leaderboard-empty">
+                            <span aria-hidden="true"><Icon name="trophy" size="xl" /></span>
                             <h2>The first ranking is one rated result away</h2>
                             <p>Players appear here after they complete a rated match in the selected {label(selectedCategory)} category.</p>
                             <Link className="btn-primary" to="/matches">{capabilities.canManageMatches ? 'Record a rated match' : 'View club matches'}</Link>
@@ -160,8 +147,8 @@ export default function LeaderboardPage() {
                             {leaderboard.entries.map(entry => (
                                 <button type="button" className="leaderboard-card" key={entry.playerId} onClick={() => openPlayer(entry)}>
                                     <span className="leaderboard-card__rank">#{entry.rank}</span>
-                                    <strong>{entry.playerName}</strong>
-                                    <span>{label(selectedCategory)}: {entry.selectedRating}</span>
+                                    <strong>{entry.playerName} <ClaimedBadge status={entry.isClaimed ? 'approved' : null} /></strong>
+                                    <span><RatingCategoryIcon category={selectedCategory} />{label(selectedCategory)}: {entry.selectedRating}</span>
                                     <span>{entry.totalGames} total games</span>
                                 </button>
                             ))}

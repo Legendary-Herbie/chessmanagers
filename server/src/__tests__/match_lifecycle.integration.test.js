@@ -25,6 +25,28 @@ function matchPayload(white, black, overrides = {}) {
 }
 
 describe('canonical match lifecycle', () => {
+    it('returns historical snapshots and suppresses stale values until replay completes', async () => {
+        const owner = await createUser();
+        const club = await createClub(owner);
+        const white = await createPlayer(club);
+        const black = await createPlayer(club);
+        const base = `/api/v1/clubs/${club.id}/matches`;
+        const token = authorization(owner);
+        const created = await request(app).post(base).set('Authorization', token).send(matchPayload(white, black)).expect(201);
+        const id = created.body.match.id;
+        const first = await request(app).get(base).set('Authorization', token).expect(200);
+        expect(first.body.matches[0].ratings).toEqual({ status: 'applied',
+            white: { before: 1500, after: 1520, change: 20 }, black: { before: 1500, after: 1480, change: -20 } });
+        await request(app).patch(`${base}/${id}`).set('Authorization', token)
+            .send(matchPayload(white, black, { result: 'black' })).expect(200);
+        const pending = await request(app).get(`${base}/${id}`).set('Authorization', token).expect(200);
+        expect(pending.body.match.ratings).toEqual({ status: 'pending', white: null, black: null });
+        await drainRatingRecalculationJobs({ clubId: club.id });
+        const replayed = await request(app).get(base).set('Authorization', token).expect(200);
+        expect(replayed.body.matches[0].ratings.white).toEqual({ before: 1500, after: 1480, change: -20 });
+        const playerHistory = await request(app).get(`/api/v1/clubs/${club.id}/players/${white.id}/matches`).set('Authorization', token).expect(200);
+        expect(playerHistory.body.matches[0].ratings).toEqual(replayed.body.matches[0].ratings);
+    });
     it('requires explicit chronology, category, and rated state and rejects legacy type input', async () => {
         const owner = await createUser();
         const club = await createClub(owner);
@@ -209,10 +231,10 @@ describe('canonical match lifecycle', () => {
         const white = await createPlayer(club);
         const black = await createPlayer(club);
         const outsider = await createPlayer(club);
-        const tournament = await createTournament(club, { ratingCategory: 'rapid', isRated: false });
+        const tournament = await createTournament(club, { ratingCategory: 'rapid', isRated: false, status: 'active' });
         await db.query(
-            `INSERT INTO tournament_players (tournament_id, player_id) VALUES ($1, $2), ($1, $3)`,
-            [tournament.id, white.id, black.id]
+            `INSERT INTO tournament_players (tournament_id, player_id, club_id) VALUES ($1, $2, $4), ($1, $3, $4)`,
+            [tournament.id, white.id, black.id, club.id]
         );
         const base = `/api/v1/clubs/${club.id}/matches`;
         const token = authorization(owner);
@@ -223,8 +245,15 @@ describe('canonical match lifecycle', () => {
             .send(matchPayload(white, outsider, {
                 tournamentId: tournament.id, ratingCategory: 'rapid', isRated: false,
             })).expect(400);
-        const created = await request(app).post(base).set('Authorization', token)
+        await request(app).post(base).set('Authorization', token)
             .send(matchPayload(white, black, {
+                tournamentId: tournament.id, ratingCategory: 'rapid', isRated: false,
+            })).expect(404);
+        const round = await request(app).post(`/api/v1/clubs/${club.id}/tournaments/${tournament.id}/rounds`)
+            .set('Authorization', token).send({}).expect(201);
+        const pairing = round.body.pairings[0];
+        const created = await request(app).post(base).set('Authorization', token)
+            .send(matchPayload({ id: pairing.whitePlayerId }, { id: pairing.blackPlayerId }, {
                 tournamentId: tournament.id, ratingCategory: 'rapid', isRated: false,
             })).expect(201);
         expect(created.body.match).toMatchObject({

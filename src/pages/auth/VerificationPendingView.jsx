@@ -23,6 +23,6 @@ export default function VerificationPendingView() {
         <div className="auth-form-header"><h1 className="auth-form-title">Verify your email</h1><p className="auth-form-subtitle">{message}</p></div>
         <p className="auth-switch">{email}</p>
         <Button className="auth-submit" loading={busy} disabled={!email} onClick={resend}>Resend verification email</Button>
-        <p className="auth-switch"><Link className="auth-link" to={`/auth/login${authQuery}`}>Back to sign in</Link></p>
+        <p className="auth-switch"><Link className="auth-link text-link" to={`/auth/login${authQuery}`}>Back to sign in</Link></p>
     </div>;
 }

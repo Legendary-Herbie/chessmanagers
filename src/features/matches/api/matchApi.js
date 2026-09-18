@@ -1,6 +1,9 @@
+import { createMatchSchema, updateMatchSchema } from '../../../../server/shared/validation.js';
+import { parseInput } from '../../../shared/validation/parseInput.js';
 import { api, endpoints } from '../../../config/api.js';
 
 export const matchApi = {
+    get: (clubId, matchId, options = {}) => api.get(endpoints.matches.byId(clubId, matchId), options),
     list: async (clubId, { signal, ...query } = {}) => {
         const params = new URLSearchParams();
         Object.entries(query).forEach(([key, value]) => {
@@ -8,9 +11,9 @@ export const matchApi = {
         });
         return api.get(`${endpoints.matches.list(clubId)}?${params}`, { signal });
     },
-    create: (clubId, payload) => api.post(endpoints.matches.list(clubId), payload),
+    create: (clubId, payload) => api.post(endpoints.matches.list(clubId), parseInput(createMatchSchema, payload)),
     update: (clubId, matchId, payload) => api.patch(
-        endpoints.matches.byId(clubId, matchId), payload
+        endpoints.matches.byId(clubId, matchId), parseInput(updateMatchSchema, payload)
     ),
     void: (clubId, matchId, reason) => api.post(
         endpoints.matches.void(clubId, matchId), { reason }

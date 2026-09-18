@@ -39,6 +39,9 @@ const pendingClaimPayload = z.object({
 }).strict();
 
 const EVENT_POLICIES = {
+    'player_registration.pending': { setting: 'playerClaimEvents', schema: z.object({ requestId: z.string().min(1), playerName: z.string().min(1).max(200) }).strict() },
+    'player_registration.approved': { setting: 'playerClaimEvents', schema: playerDecisionPayload.extend({ requestId: z.string().min(1) }) },
+    'player_registration.rejected': { setting: 'playerClaimEvents', schema: z.object({ requestId: z.string().min(1), playerName: z.string().min(1).max(200), reason: nullableReason }).strict() },
     'membership.request_pending': { setting: 'membershipEvents', schema: pendingMembershipPayload },
     'join_request.approved': {
         setting: 'membershipEvents',
@@ -288,6 +291,15 @@ export async function markAllNotificationsRead(userId, clubId = null) {
            )`,
         [userId, clubId]
     ).then(result => result.rowCount);
+}
+
+export async function dismissAllNotifications(userId) {
+    const result = await db.query(
+        `UPDATE notifications SET dismissed_at = NOW(), updated_at = NOW()
+         WHERE user_id = $1 AND dismissed_at IS NULL`,
+        [userId]
+    );
+    return result.rowCount;
 }
 
 export async function dismissNotification(userId, notificationId) {

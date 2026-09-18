@@ -21,7 +21,7 @@ export default function DataExportPanel({ clubId }) {
         setMessage(null);
         try {
             await action();
-            setMessage({ type: 'success', text: 'Your CSV download has started.' });
+            setMessage({ type: 'success', text: 'Your download has started.' });
         } catch (error) {
             setMessage({ type: 'error', text: error.message || 'The export could not be downloaded.' });
         } finally {
@@ -37,11 +37,16 @@ export default function DataExportPanel({ clubId }) {
             </div>
 
             {message && (
-                <div className={message.type === 'error' ? 'error' : 'success'} role="status">
+                <div className={message.type === 'error' ? 'error' : 'success'} role={message.type === 'error' ? 'alert' : 'status'}>
                     {message.text}
                 </div>
             )}
 
+            <div className="dashboard-settings-card">
+                <h3>Full club records package</h3>
+                <p className="muted">One ZIP with the roster, match history, and current ratings in all categories, including inactive and deleted records. Uploaded files and account data are excluded.</p>
+                <Button disabled={Boolean(downloading)} onClick={() => run('package', () => exportApi.downloadPackage(clubId))}>{downloading === 'package' ? 'Preparing…' : 'Export full club package'}</Button>
+            </div>
             <label className="form-row">
                 <span className="label">Lifecycle records</span>
                 <span>

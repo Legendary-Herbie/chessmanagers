@@ -1,11 +1,18 @@
+import ClaimedBadge from '../components/ClaimedBadge.jsx';
+import ActionMenu from '../../../shared/common/ActionMenu.jsx';
+import RatingCategoryIcon from '../../../shared/common/RatingCategoryIcon.jsx';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { playerRating } from '../roster/playerRating.js';
 
 export default function PlayerTable({
     players = [],
-    ratingCategory = 'blitz',
+    ratingCategory = 'rapid',
+    showAllRatings = false,
     currentLinkedPlayerId,
+    currentUser,
+    onClaim,
+    onUnlink,
     isAdmin,
     onEdit,
     onDelete,
@@ -14,15 +21,12 @@ export default function PlayerTable({
 
     return (
         <div className="players-table-wrapper">
-            <table className="players-table">
+            <table className="players-table player-roster-table">
                 <thead>
                     <tr>
                         <th>Player</th>
-                        <th>{ratingCategory[0].toUpperCase() + ratingCategory.slice(1)} Elo rating</th>
-                        <th>Account Link</th>
-                        <th>Games</th>
-                        <th>W / D / L</th>
-                        <th>Win Rate</th>
+                        <th>{showAllRatings ? 'Elo ratings' : `${ratingCategory[0].toUpperCase() + ratingCategory.slice(1)} Elo rating`}</th>
+                        <th>Games (all)</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
@@ -32,45 +36,33 @@ export default function PlayerTable({
                             id,
                             name,
                             games = 0,
-                            wins = 0,
-                            draws = 0,
-                            losses = 0,
-                            link_status,
+
                         } = player;
 
-                        const winRate = games > 0 ? Math.round(((wins + draws * 0.5) / games) * 100) : 0;
-                        const isLinked = link_status === 'approved';
-                        const isPending = link_status === 'pending';
                         const isSelf = currentLinkedPlayerId === id;
                         const canEdit = isAdmin || isSelf;
+                        const isLinked = player.link_status === 'approved';
+                        const canClaim = currentUser && !isLinked && player.link_status !== 'pending' && !currentLinkedPlayerId;
 
                         return (
                             <tr key={id}>
                                 <td>
-                                    <Link to={`/players/${id}`} className="player-table-name">
-                                        {name}
+                                    <Link to={`/players/${id}`} className="player-table-name name-link">
+                                        {name} <ClaimedBadge status={player.link_status} />
                                     </Link>
                                 </td>
                                 <td>
-                                    <span className="rating-badge">🏆 {playerRating(player, ratingCategory) ?? '—'}</span>
-                                </td>
-                                <td>
-                                    {isLinked && <span className="link-badge link-badge--approved">✓ Claimed</span>}
-                                    {isPending && <span className="link-badge link-badge--pending">⏳ Pending</span>}
-                                    {!isLinked && !isPending && <span className="link-badge link-badge--unlinked">Unlinked</span>}
+                                    <div className="player-table-ratings">{(showAllRatings ? ['blitz', 'rapid', 'classical'] : [ratingCategory]).map(category =>
+                                        <span key={category} className="rating-badge"><RatingCategoryIcon category={category} /><span className={showAllRatings ? '' : 'mobile-rating-label'}>{category[0].toUpperCase() + category.slice(1)} </span> {playerRating(player, category) ?? '—'}</span>
+                                    )}</div>
                                 </td>
                                 <td>{games}</td>
                                 <td>
-                                    <span style={{ color: 'var(--accent)', fontWeight: 700 }}>{wins}</span> /{' '}
-                                    <span style={{ color: 'var(--warning)', fontWeight: 700 }}>{draws}</span> /{' '}
-                                    <span style={{ color: 'var(--danger)', fontWeight: 700 }}>{losses}</span>
-                                </td>
-                                <td><strong>{winRate}%</strong></td>
-                                <td>
-                                    <div style={{ display: 'flex', gap: '6px' }}>
+                                    <div className="player-table-actions">
                                         <Link to={`/players/${id}`} className="btn-secondary btn-sm">
                                             View
                                         </Link>
+                                        {canClaim && <button type="button" className="btn-primary btn-sm" onClick={() => onClaim?.(player)}>Claim</button>}
                                         {canEdit && (
                                             <button
                                                 type="button"
@@ -80,15 +72,17 @@ export default function PlayerTable({
                                                 Edit
                                             </button>
                                         )}
-                                        {isAdmin && (
+                                        {(isAdmin || isSelf && isLinked) && <ActionMenu>
+                                            {isLinked && <button type="button" className="btn-secondary btn-sm" onClick={() => onUnlink?.(player)}>Unlink</button>}
+                                            {isAdmin &&
                                             <button
                                                 type="button"
                                                 className="btn-danger btn-sm"
                                                 onClick={() => onDelete && onDelete(player)}
                                             >
                                                 Archive
-                                            </button>
-                                        )}
+                                            </button>}
+                                        </ActionMenu>}
                                     </div>
                                 </td>
                             </tr>

@@ -30,14 +30,15 @@ function renderPage() {
         return Promise.reject(new Error('Unexpected endpoint'));
     });
     return render(
-        <ClubContext.Provider value={{
+        <MemoryRouter><ClubContext.Provider value={{
             club: { id: 'club_1' },
             capabilities: { canManageMatches: true },
         }}>
             <MatchesPage />
-        </ClubContext.Provider>
+        </ClubContext.Provider></MemoryRouter>
     );
 }
+
 
 async function selectPlayer(label, name) {
     vi.useFakeTimers();
@@ -57,6 +58,21 @@ describe('MatchesPage canonical match flows', () => {
     });
     afterEach(cleanup);
 
+it('clears filters even while the filter panel is closed', async () => {
+    matchApi.list.mockResolvedValue({ matches: [], total: 0 });
+    renderPage();
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    fireEvent.change(screen.getByLabelText('Filter by rating category'), { target: { value: 'rapid' } });
+    fireEvent.change(screen.getByLabelText('Search matches'), { target: { value: 'Ada' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Hide filters' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    expect(screen.getByLabelText('Search matches').value).toBe('');
+    expect(screen.queryByRole('button', { name: 'Clear filters' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Show filters' }));
+    expect(screen.getByLabelText('Filter by rating category').value).toBe('all');
+});
+
+
     it('shows useful next steps instead of rendering a broken match workspace without a club', () => {
         render(<MemoryRouter><ClubContext.Provider value={{
             club: null, capabilities: { canManageMatches: false },
@@ -75,7 +91,7 @@ describe('MatchesPage canonical match flows', () => {
         expect(api.get.mock.calls.some(([endpoint]) => endpoint.includes('/tournaments'))).toBe(false);
         expect(screen.getByLabelText('Rated match').checked).toBe(true);
         expect(screen.getByRole('group', { name: 'Rating category' })).toBeTruthy();
-        expect(screen.getByRole('button', { name: 'Blitz' }).className).toContain('active');
+        expect(screen.getByRole('button', { name: 'Rapid' }).className).toContain('active');
     });
 
     it('keeps the match form dismissible and restores page scrolling', async () => {
@@ -156,6 +172,24 @@ describe('MatchesPage canonical match flows', () => {
         fireEvent.click(screen.getByRole('button', { name: 'Retry' }));
         await waitFor(() => expect(screen.queryByRole('alert')).toBeNull());
         expect(matchApi.list).toHaveBeenCalledTimes(2);
+    });
+
+    it('keeps entry settings and refreshes the time after save and add another', async () => {
+        matchApi.create.mockResolvedValue({ ratingStatus: 'unrated' });
+        renderPage();
+        fireEvent.click(await screen.findByRole('button', { name: 'Add Match' }));
+        await selectPlayer('White', 'White Player');
+        await selectPlayer('Black', 'Black Player');
+        fireEvent.click(screen.getByRole('button', { name: 'Rapid' }));
+        fireEvent.click(screen.getByLabelText('Rated match'));
+        fireEvent.change(screen.getByLabelText('Played at'), { target: { value: '2025-01-01T12:00' } });
+        fireEvent.click(screen.getByRole('button', { name: 'Save and add another' }));
+        await waitFor(() => expect(screen.getByLabelText('White').value).toBe(''));
+        expect(screen.getByRole('dialog', { name: 'Add Match' })).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Rapid' }).getAttribute('aria-pressed')).toBe('true');
+        expect(screen.getByLabelText('Rated match').checked).toBe(false);
+        expect(screen.getByLabelText('Played at').value).not.toBe('2025-01-01T12:00');
+        expect(matchApi.create.mock.calls[0][1]).toMatchObject({ ratingCategory: 'rapid', isRated: false });
     });
 
 });

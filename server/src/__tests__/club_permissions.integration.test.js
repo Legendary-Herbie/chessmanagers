@@ -137,7 +137,7 @@ describe('club-scoped permission matrix', () => {
         expect(account.first.role).toBe('member');
     });
 
-    it('prevents a linked member from changing admin-controlled player identity', async () => {
+    it('prevents a linked member from changing the admin-controlled date of birth', async () => {
         const owner = await createUser();
         const member = await createUser({ role: 'member' });
         const club = await createClub(owner);
@@ -148,7 +148,7 @@ describe('club-scoped permission matrix', () => {
         const response = await request(app)
             .patch(`/api/v1/clubs/${club.id}/players/${player.id}`)
             .set('Authorization', authorization(member))
-            .send({ name: 'Unauthorized Rename' })
+            .send({ dateOfBirth: '1999-01-01' })
             .expect(403);
 
         expect(response.body).toEqual({

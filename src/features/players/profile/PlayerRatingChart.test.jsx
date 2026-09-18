@@ -1,0 +1,20 @@
+import React from 'react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, expect, it, vi } from 'vitest';
+import PlayerRatingChart from './PlayerRatingChart.jsx';
+import { playerApi } from '../api/playerApi.js';
+vi.mock('../api/playerApi.js', () => ({ playerApi:{ fetchRatingTimeline:vi.fn() } }));
+afterEach(() => { cleanup(); vi.clearAllMocks(); });
+it('shows opponent and result accessibly and loads all categories and date filters', async () => {
+    const game = { matchId:'m1', category:'rapid', ratingBefore:1500, ratingAfter:1520, playedAt:new Date().toISOString(), opponentName:'Sam', outcome:'win' };
+    playerApi.fetchRatingTimeline.mockResolvedValue([game]);
+    render(<PlayerRatingChart clubId="c" playerId="p" history={[game]} />);
+    const dot = screen.getByRole('button',{ name:/Win vs. Sam/ }); fireEvent.focus(dot);
+    expect(screen.getByRole('status').textContent).toContain('Win vs. Sam');
+    fireEvent.change(screen.getByLabelText('Timeframe'),{ target:{ value:'all' } });
+    await waitFor(() => expect(playerApi.fetchRatingTimeline).toHaveBeenCalledWith('c','p',expect.objectContaining({ category:'rapid',since:undefined })));
+    fireEvent.click(screen.getByLabelText('Show all rating categories'));
+    await waitFor(() => expect(playerApi.fetchRatingTimeline).toHaveBeenLastCalledWith('c','p',expect.objectContaining({ category:'all' })));
+    fireEvent.change(screen.getByLabelText('Timeframe'),{ target:{ value:'month' } });
+    await waitFor(() => expect(playerApi.fetchRatingTimeline).toHaveBeenLastCalledWith('c','p',expect.objectContaining({ since:expect.any(String) })));
+});

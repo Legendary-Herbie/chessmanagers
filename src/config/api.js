@@ -1,3 +1,4 @@
+import { invalidateAfterMutation, setQueryAccount, clearQuerySession } from '../shared/query/queryClient.js';
 export const API_BASE = import.meta.env.VITE_API_URL || '/api/v1';
 
 export function resolveAssetUrl(value) {
@@ -24,6 +25,7 @@ export const setToken = (token) => {
     browserStorage?.removeItem('cm_token');
 };
 export const clearToken = () => {
+    clearQuerySession();
     accessToken = null;
     csrfToken = null;
     browserStorage?.removeItem('cm_token');
@@ -99,6 +101,7 @@ async function requestSessionRefresh() {
         });
         if (!response.ok) throw new Error('Session refresh failed.');
         const data = await response.json();
+        setQueryAccount(data.user?.id ?? null);
         setToken(data.accessToken);
         setCsrfToken(data.csrfToken);
         return data;
@@ -300,6 +303,7 @@ export async function api(endpoint, options = {}) {
 
     if (body?.csrfToken) setCsrfToken(body.csrfToken);
 
+    if (!['GET', 'HEAD'].includes((options.method || 'GET').toUpperCase())) invalidateAfterMutation(endpoint);
     return body;
 }
 
@@ -422,6 +426,8 @@ export const endpoints = {
         joinByCode:  ()                  => '/clubs/join-by-code',
     },
     players: {
+        registrations: (clubId) => `/clubs/${clubId}/players/self-registrations`,
+        registration: (clubId, requestId) => `/clubs/${clubId}/players/self-registrations/${requestId}`,
         list:          (clubId)            => `/clubs/${clubId}/players`,
         summary:       (clubId)            => `/clubs/${clubId}/players/summary`,
         bulk:          (clubId)            => `/clubs/${clubId}/players/bulk`,

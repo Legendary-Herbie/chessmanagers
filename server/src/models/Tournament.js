@@ -1,5 +1,6 @@
 import db from '../database/database.js';
 import { notifyLinkedPlayers } from '../services/NotificationService.js';
+import { knockoutProgress } from '../services/TournamentPairingService.js';
 
 const queryFor = trx => trx ? trx.query.bind(trx) : db.query.bind(db);
 
@@ -32,7 +33,9 @@ export const TournamentModel = {
         }
         params.push(limit, offset);
         return db.query(
-            `SELECT *, COUNT(*) OVER ()::INTEGER AS total_count
+            `SELECT *, COUNT(*) OVER ()::INTEGER AS total_count,
+                (SELECT COUNT(*)::INTEGER FROM tournament_players tp WHERE tp.tournament_id = tournaments.id) AS participant_count,
+                (SELECT COUNT(*)::INTEGER FROM tournament_rounds tr WHERE tr.tournament_id = tournaments.id AND tr.club_id = tournaments.club_id AND tr.status = 'completed') AS completed_rounds
              FROM tournaments
              WHERE ${conditions.join(' AND ')}
              ORDER BY start_date DESC, id DESC
@@ -86,10 +89,13 @@ export const TournamentModel = {
         [tournamentId, clubId]
     ).then(result => result.rows),
 
-    addPlayer: async (tournamentId, playerId, clubId) => db.transaction(async trx => {
+    addPlayer: async (tournamentId, playerId, clubId, options = {}) => (options.trx ? async fn => fn(options.trx) : db.transaction)(async trx => {
         const tournament = await TournamentModel.findById(tournamentId, clubId, { forUpdate: true, trx });
         if (!tournament) return { ok: false, code: 'TOURNAMENT_NOT_FOUND' };
         if (tournament.status === 'completed') return { ok: false, code: 'TOURNAMENT_COMPLETED' };
+        if (['round_robin', 'knockout'].includes(tournament.type) && tournament.current_round > 0) {
+            return { ok: false, code: tournament.type === 'round_robin' ? 'ROUND_ROBIN_ROSTER_FROZEN' : 'TOURNAMENT_ROSTER_FROZEN' };
+        }
         const player = await trx.query(
             `SELECT id FROM players
              WHERE id = $1 AND club_id = $2 AND status = 'active' AND deleted_at IS NULL
@@ -99,14 +105,14 @@ export const TournamentModel = {
         if (!player) return { ok: false, code: 'PLAYER_NOT_FOUND' };
         const entry = await trx.query(
             `INSERT INTO tournament_players (
-                tournament_id, player_id, registration_round, status, seed
+                tournament_id, player_id, registration_round, status, seed, club_id
              ) VALUES (
                 $1, $2, $3, 'active',
-                COALESCE((SELECT MAX(seed) + 1 FROM tournament_players WHERE tournament_id = $1), 1)
+                COALESCE((SELECT MAX(seed) + 1 FROM tournament_players WHERE tournament_id = $1), 1), $4
              )
              ON CONFLICT (tournament_id, player_id) DO NOTHING
              RETURNING *`,
-            [tournamentId, playerId, tournament.current_round + 1]
+            [tournamentId, playerId, tournament.current_round + 1, clubId]
         ).then(result => result.first);
         if (entry) {
             await notifyLinkedPlayers({
@@ -147,6 +153,9 @@ export const TournamentModel = {
         const tournament = await TournamentModel.findById(tournamentId, clubId, { forUpdate: true, trx });
         if (!tournament) return { ok: false, code: 'TOURNAMENT_NOT_FOUND' };
         if (tournament.status === 'completed') return { ok: false, code: 'TOURNAMENT_COMPLETED' };
+        if (['round_robin', 'knockout'].includes(tournament.type) && tournament.current_round > 0) {
+            return { ok: false, code: tournament.type === 'round_robin' ? 'ROUND_ROBIN_ROSTER_FROZEN' : 'TOURNAMENT_ROSTER_FROZEN' };
+        }
         const entry = await trx.query(
             `UPDATE tournament_players
              SET status = 'withdrawn', withdrawn_round = $3
@@ -167,17 +176,39 @@ export const TournamentModel = {
         return entry ? { ok: true, entry } : { ok: false, code: 'PLAYER_NOT_ACTIVE' };
     }),
 
-    update: async (id, clubId, { name, startDate, endDate }) => db.query(
+    update: async (id, clubId, { name, startDate, endDate, tiebreaks }) => db.query(
         `UPDATE tournaments
          SET name = COALESCE($1, name), start_date = COALESCE($2, start_date),
              end_date = CASE WHEN $3::BOOLEAN THEN $4::TIMESTAMPTZ ELSE end_date END,
+             tiebreaks = COALESCE($7::TEXT[], tiebreaks),
              updated_at = NOW()
          WHERE id = $5 AND club_id = $6 AND deleted_at IS NULL
          RETURNING *`,
-        [name, startDate, endDate !== undefined, endDate ?? null, id, clubId]
+        [name, startDate, endDate !== undefined, endDate ?? null, id, clubId, tiebreaks ?? null]
     ).then(result => result.first),
 
-    setStatus: async (id, clubId, status) => db.transaction(async trx => {
+    setStatus: async (id, clubId, status, options = {}) => (options.trx ? async fn => fn(options.trx) : db.transaction)(async trx => {
+        const existing = await TournamentModel.findById(id, clubId, { forUpdate: true, trx });
+        if (!existing) return null;
+        if (existing.status === status) return existing;
+        const allowed = (existing.status === 'upcoming' && status === 'active')
+            || (existing.status === 'active' && status === 'completed')
+            || (existing.status === 'completed' && status === 'active');
+        if (!allowed) throw Object.assign(new Error(`Cannot change a ${existing.status} tournament to ${status}.`), { status: 409 });
+        if (status === 'completed' && existing.type === 'knockout') {
+            const games = await trx.query('SELECT * FROM tournament_pairings WHERE tournament_id = $1 AND club_id = $2 ORDER BY round_number, board', [id, clubId]);
+            const progress = knockoutProgress(games.rows.map(game => ({
+                roundNumber: game.round_number, bracketSlot: game.bracket_slot, isPlayoff: game.is_playoff,
+                whitePlayerId: game.white_player_id, blackPlayerId: game.black_player_id, result: game.result, isBye: game.is_bye,
+            })));
+            if (!progress.championId) throw Object.assign(new Error('Resolve the knockout final, including any drawn-game tiebreaks, before completing the tournament.'), { status: 409 });
+        }
+        if (status === 'completed' && existing.current_round > 0) {
+            const round = await trx.query(`SELECT status FROM tournament_rounds
+                WHERE tournament_id = $1 AND club_id = $2 AND round_number = $3`,
+            [id, clubId, existing.current_round]).then(result => result.first);
+            if (round?.status !== 'completed') throw Object.assign(new Error('Complete every pairing in the current round first.'), { status: 409 });
+        }
         const tournament = await trx.query(
             `UPDATE tournaments SET status = $1, updated_at = NOW()
              WHERE id = $2 AND club_id = $3 AND deleted_at IS NULL RETURNING *`,
@@ -199,7 +230,7 @@ export const TournamentModel = {
         return tournament;
     }),
 
-    delete: async (id, clubId, reason = null) => db.query(
+    archive: async (id, clubId, reason = null) => db.query(
         `UPDATE tournaments
          SET deleted_at = NOW(), delete_reason = $3, updated_at = NOW()
          WHERE id = $1 AND club_id = $2 AND deleted_at IS NULL RETURNING id`,

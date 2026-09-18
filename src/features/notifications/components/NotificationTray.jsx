@@ -1,3 +1,6 @@
+import ActionMenu from '../../../shared/common/ActionMenu.jsx';
+import { useVisiblePolling } from '../../../shared/hooks/useVisiblePolling.js';
+import Icon from '../../../shared/common/Icon.jsx';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useClub } from '../../../app/contextHooks.js';
@@ -5,6 +8,9 @@ import { notificationApi } from '../api/notificationApi.js';
 import { notificationDestination } from '../notificationDestination.js';
 
 const EVENT_COPY = {
+    'player_registration.pending': 'A player self-registration needs review.',
+    'player_registration.approved': 'Your self-registration was approved. Your player profile is ready.',
+    'player_registration.rejected': 'Your self-registration was not approved. You can submit a corrected request.',
     'membership.request_pending': 'A membership request needs review.',
     'join_request.approved': 'Your membership request was approved.',
     'join_request.rejected': 'Your membership request was not approved.',
@@ -27,6 +33,7 @@ const EVENT_COPY = {
 
 function notificationDetail(notification) {
     const payload = notification.payload || {};
+    if (notification.eventType === 'player_registration.rejected') return [payload.playerName, payload.reason].filter(Boolean).join(' · ');
     if (notification.eventType.startsWith('match.')) {
         return `${payload.whitePlayerName || 'White player'} vs ${payload.blackPlayerName || 'Black player'}`;
     }
@@ -38,17 +45,9 @@ function notificationDetail(notification) {
     return null;
 }
 
-function BellIcon() {
-    return (
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-            <path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-    );
-}
-
 export default function NotificationTray() {
     const navigate = useNavigate();
-    const { selectClub, activeClubs = [] } = useClub();
+    const { selectClub, activeClubs = [], club, capabilities = {} } = useClub();
     const trayRef = useRef(null);
     const [open, setOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
@@ -80,17 +79,16 @@ export default function NotificationTray() {
         }
     }, []);
 
+    useVisiblePolling(load, 60_000);
     useEffect(() => {
-        const requestState = loadVersion.current;
-        load();
-        const timer = setInterval(load, 60_000);
-        return () => { clearInterval(timer); requestState.value++; };
-    }, [load]);
+        const state = loadVersion.current;
+        return () => { state.value++; };
+    }, []);
 
     useEffect(() => {
         if (!open) return undefined;
         const close = event => {
-            if (!trayRef.current?.contains(event.target)) setOpen(false);
+            if (!trayRef.current?.contains(event.target) && !event.target.closest?.('.notification-actions-menu')) setOpen(false);
         };
         const escape = event => {
             if (event.key === 'Escape') setOpen(false);
@@ -116,11 +114,14 @@ export default function NotificationTray() {
         setLoading(false);
         setMutating(true);
         setError(null);
+        const previous = { notifications, unreadCount };
+        update();
         try {
             await request();
-            update();
             return true;
         } catch (requestError) {
+            setNotifications(previous.notifications);
+            setUnreadCount(previous.unreadCount);
             setError(requestError.message || fallback);
             return false;
         } finally {
@@ -154,6 +155,11 @@ export default function NotificationTray() {
         navigate(notificationDestination(notification));
     };
 
+    const dismissAll = () => runMutation(() => notificationApi.dismissAll(), () => {
+        setNotifications([]);
+        setUnreadCount(0);
+    }, 'Could not delete notifications. Please try again.');
+
     const dismiss = async notification => {
         if (mutationPending.current) return;
         setDeletingId(notification.id);
@@ -169,12 +175,13 @@ export default function NotificationTray() {
             <button
                 type="button"
                 className="notification-tray__trigger"
+                title="Notifications"
                 aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ''}`}
                 aria-haspopup="dialog"
                 aria-expanded={open}
                 onClick={toggle}
             >
-                <BellIcon />
+                <Icon name="bell" size="lg" />
                 {unreadCount > 0 && (
                     <span className="notification-tray__badge" aria-hidden="true">
                         {unreadCount > 99 ? '99+' : unreadCount}
@@ -189,9 +196,11 @@ export default function NotificationTray() {
                             <strong>Notifications</strong>
                             <span>{unreadCount ? `${unreadCount} unread` : 'All caught up'}</span>
                         </div>
-                        {unreadCount > 0 && (
-                            <button type="button" disabled={mutating} onClick={markAllRead}>Mark all read</button>
-                        )}
+                        <ActionMenu label="Notification actions" panelClassName="notification-actions-menu">
+                            <button type="button" className="app-nav__dropdown-item" disabled={mutating || unreadCount === 0} onClick={markAllRead}>Mark all as read</button>
+                            <button type="button" className="app-nav__dropdown-item app-nav__dropdown-item--danger" disabled={mutating || notifications.length === 0} onClick={dismissAll}>Delete all</button>
+                            <button type="button" className="app-nav__dropdown-item" disabled={!club || !capabilities.canManageClubSettings} title={!capabilities.canManageClubSettings ? 'Club owners manage notification settings' : undefined} onClick={() => { setOpen(false); navigate('/club?tab=notifications'); }}>Notification settings</button>
+                        </ActionMenu>
                     </div>
 
                     {loading && notifications.length === 0 && (
@@ -224,7 +233,7 @@ export default function NotificationTray() {
                                             aria-label={`Delete notification: ${EVENT_COPY[notification.eventType] || 'Club update'}`}
                                             disabled={mutating || deletingId === notification.id}
                                             onClick={() => dismiss(notification)}>
-                                            <span aria-hidden="true">×</span>
+                                            <Icon name="x" />
                                         </button>
                                     </div>
                                 </li>

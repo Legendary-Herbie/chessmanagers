@@ -1,4 +1,6 @@
 import { Router } from 'express';
+import { listRegistrations, submitRegistration, reviewRegistration } from '../controllers/playerRegistrationController.js';
+import { playerRegistrationSchema, playerRegistrationParamsSchema, playerRegistrationReviewSchema } from '../middleware/validate.js';
 import {
     archivePlayer,
     claimPlayer,
@@ -59,6 +61,9 @@ router.post('/', requireClubAdmin, validate(createPlayerSchema), createPlayer);
 router.post('/bulk', requireClubAdmin, validate(createPlayersBulkSchema), createPlayersBulk);
 router.get('/summary', getRosterSummary);
 router.get('/inactive', requireClubAdmin, getInactivePlayers);
+router.get('/self-registrations', listRegistrations);
+router.post('/self-registrations', validate(playerRegistrationSchema), submitRegistration);
+router.patch('/self-registrations/:requestId', requireClubAdmin, validateRequest({ params: playerRegistrationParamsSchema }), validate(playerRegistrationReviewSchema), reviewRegistration);
 
 // Compatibility aliases for clients created before player-link routes were split.
 router.patch('/links/:linkId/approve', validateRequest({ params: clubLinkParamsSchema }), requireClubAdmin, validate(emptyBodySchema), approveLink);

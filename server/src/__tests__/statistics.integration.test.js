@@ -49,6 +49,7 @@ describe('canonical leaderboard and statistics', () => {
             .get(`/api/v1/clubs/${club.id}/leaderboard?category=blitz&limit=3`)
             .set('Authorization', authorization(owner)).expect(200);
         expect(response.body.leaderboard.total).toBe(6);
+        expect(response.body.leaderboard.entries.map(entry => entry.isClaimed)).toEqual([false, true, false]);
         expect(response.body.leaderboard.entries.map(entry => entry.playerName)).toEqual([
             'Games More', 'Games Less', 'Alpha',
         ]);
@@ -164,5 +165,10 @@ describe('canonical leaderboard and statistics', () => {
         expect(ownerResponse.body.dashboard.admin).toEqual({
             pendingJoinRequests: 0, pendingPlayerLinks: 0,
         });
+        const defaultResponse = await request(app)
+            .get(`/api/v1/clubs/${club.id}/leaderboard/dashboard`)
+            .set('Authorization', authorization(owner)).expect(200);
+        expect(defaultResponse.body.dashboard.selectedCategory).toBe('rapid');
+        expect(defaultResponse.body.dashboard.topPlayers).toEqual([]);
     });
 });

@@ -1,50 +1,23 @@
 import { z } from 'zod';
+import { createClubSchema, clubStructuredSettingsSchema, clubRatingSettingsSchema } from '../../../server/shared/validation.js';
 
 export const CLUB_BADGE_MAX_BYTES = 5 * 1024 * 1024;
 export const CLUB_BADGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
-const optionalWebsite = z.string().trim().max(500, 'Website must be 500 characters or fewer.').refine(value => {
-    if (!value) return true;
-    try {
-        const url = new URL(value);
-        return url.protocol === 'http:' || url.protocol === 'https:';
-    } catch {
-        return false;
-    }
-}, 'Enter a complete website address beginning with http:// or https://.');
-
-const optionalEmail = z.string().trim().max(320, 'Email must be 320 characters or fewer.').refine(
-    value => !value || z.string().email().safeParse(value).success,
-    'Enter a valid email address.',
-);
-
-const ratingCategorySchema = z.object({
-    initialRating: z.number().int('Initial rating must be a whole number.').min(100).max(4000),
-    ratingFloor: z.number().int('Rating floor must be a whole number.').min(0).max(4000),
-    establishedKFactor: z.number().int('Established K-factor must be a whole number.').min(1).max(100),
-    provisionalKFactor: z.number().int('Provisional K-factor must be a whole number.').min(1).max(100),
-    provisionalGames: z.number().int('Provisional games must be a whole number.').min(1).max(100),
-}).strict().refine(value => value.ratingFloor <= value.initialRating, {
-    path: ['ratingFloor'],
-    message: 'Rating floor cannot exceed the initial rating.',
-});
-
+const contacts = clubStructuredSettingsSchema.shape.contacts.unwrap().shape;
+const blankAsNull = schema => z.preprocess(value => value === '' ? null : value, schema);
 const profileSchema = z.object({
-    name: z.string().trim().min(1, 'Club name is required.').max(150, 'Club name must be 150 characters or fewer.'),
-    federation: z.string().trim().min(1, 'Federation is required.').max(5, 'Federation must be 5 characters or fewer.'),
-    description: z.string().trim().max(1000, 'Description must be 1,000 characters or fewer.'),
-    contactInfo: z.string().trim().max(500, 'Contact information must be 500 characters or fewer.'),
-    website: optionalWebsite,
-    email: optionalEmail,
-    phone: z.string().trim().max(50, 'Phone must be 50 characters or fewer.'),
-    address: z.string().trim().max(500, 'Address must be 500 characters or fewer.'),
-    affiliation: z.string().trim().max(200, 'Affiliation must be 200 characters or fewer.'),
-    primaryColor: z.string().regex(/^#[0-9a-fA-F]{6}$/, 'Choose a valid presentation color.'),
-    ratingSettings: z.object({
-        blitz: ratingCategorySchema,
-        rapid: ratingCategorySchema,
-        classical: ratingCategorySchema,
-    }).strict().optional(),
+    name: createClubSchema.shape.name,
+    federation: createClubSchema.shape.federation,
+    description: createClubSchema.shape.description,
+    contactInfo: createClubSchema.shape.contactInfo,
+    website: blankAsNull(contacts.website),
+    email: blankAsNull(contacts.email),
+    phone: contacts.phone,
+    address: contacts.address,
+    affiliation: clubStructuredSettingsSchema.shape.affiliation,
+    primaryColor: clubStructuredSettingsSchema.shape.presentation.unwrap().shape.primaryColor,
+    ratingSettings: clubRatingSettingsSchema.optional(),
 }).strict();
 
 function inputFromProfile(profile, isOwner) {
@@ -114,6 +87,12 @@ export function validateClubProfile(profile, { isOwner = false, badgeFile = null
             ratingSettings: values.ratingSettings,
         },
     };
+}
+
+export function validateClubRatingSettings(settings) {
+    const parsed = profileSchema.shape.ratingSettings.unwrap().safeParse(settings);
+    return parsed.success ? { success: true, data: parsed.data, errors: {} }
+        : { success: false, data: null, errors: issuesToErrors(parsed.error.issues.map(issue => ({ ...issue, path: ['ratingSettings', ...issue.path] }))) };
 }
 
 const API_FIELD_ALIASES = {

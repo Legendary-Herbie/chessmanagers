@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
+import { Link, useNavigate } from 'react-router-dom';
 import '../../styles/tournaments.css';
 import { useClub } from '../../app/contextHooks.js';
 import Button from '../../shared/common/Button.jsx';
@@ -19,7 +20,7 @@ function emptyForm() {
         type: 'swiss',
         startDate: localDateTime(),
         endDate: '',
-        ratingCategory: 'blitz',
+        ratingCategory: 'rapid',
         isRated: true,
     };
 }
@@ -27,6 +28,7 @@ function emptyForm() {
 const title = value => value.replaceAll('_', ' ').replace(/\b\w/g, letter => letter.toUpperCase());
 
 export default function TournamentsPage() {
+    const navigate = useNavigate();
     const { club, capabilities } = useClub();
     const isAdmin = Boolean(capabilities.canManageMatches);
     const [tournaments, setTournaments] = useState([]);
@@ -59,14 +61,14 @@ export default function TournamentsPage() {
         setSaving(true);
         setError('');
         try {
-            await tournamentApi.create(club.id, {
+            const response = await tournamentApi.create(club.id, {
                 ...form,
                 startDate: new Date(form.startDate).toISOString(),
                 endDate: form.endDate ? new Date(form.endDate).toISOString() : null,
             });
             setModalOpen(false);
             setForm(emptyForm());
-            await load();
+            navigate(`/tournaments/${response.tournament.id}`);
         } catch (requestError) {
             setError(requestError.message || 'Unable to create tournament.');
         } finally {
@@ -81,7 +83,7 @@ export default function TournamentsPage() {
     return (
         <div className="tournaments-page">
             <div className="page-header">
-                <div><h1>Tournaments</h1><p className="muted">Run deterministic Swiss and Round-Robin events.</p></div>
+                <div><h1>Tournaments</h1><p className="muted">Organize Swiss and Round Robin tournaments.</p></div>
                 {isAdmin && <Button onClick={() => { setForm(emptyForm()); setModalOpen(true); }}>New tournament</Button>}
             </div>
             {error && !modalOpen && <div className="error" role="alert"><p>Couldn’t load tournaments. Try again. {error}</p><Button variant="secondary" disabled={loading} onClick={() => load()}>Retry</Button></div>}
@@ -99,11 +101,12 @@ export default function TournamentsPage() {
                         <div className="tournament-card__top"><h2>{tournament.name}</h2><span className={`tournament-status ${tournament.status}`}>{title(tournament.status)}</span></div>
                         <div className="tournament-meta">
                             <span>{title(tournament.type)}</span>
-                            <span>{title(tournament.rating_category)}</span>
-                            <span>{tournament.is_rated ? 'Rated' : 'Unrated'}</span>
+                            <span><RatingCategoryIcon category={tournament.rating_category} />{title(tournament.rating_category)}</span>
+
                         </div>
-                        <p>Starts {new Date(tournament.start_date).toLocaleString()}</p>
-                        <p className="muted">Round {tournament.current_round || 0}</p>
+                        {tournament.status === 'completed' && tournament.end_date && Number.isFinite(Date.parse(tournament.end_date)) && <p className="tournament-card__date">Ended <time dateTime={tournament.end_date}>{new Date(tournament.end_date).toLocaleDateString()}</time></p>}
+                        <div className="tournament-card__metrics"><div><strong>{tournament.participant_count ?? 0}</strong><span>Participants</span></div><div><strong>{tournament.current_round || 0}</strong><span>Rounds paired</span></div></div>
+                        {tournament.current_round > 0 && <div className="tournament-round-progress"><progress aria-label="Generated rounds completed" value={tournament.completed_rounds ?? 0} max={tournament.current_round} /><small>{tournament.completed_rounds ?? 0} of {tournament.current_round} generated rounds completed</small></div>}
                     </Link>
                 ))}
                 {!loading && !tournaments.length && <div className="empty-tournaments"><h2>No tournaments found</h2><p className="muted">Create an event or adjust the filters.</p></div>}
@@ -114,7 +117,7 @@ export default function TournamentsPage() {
                     <div className="modal-body">
                         {error && <div className="error" role="alert">{error}</div>}
                         <label className="form-row"><span className="label">Name</span><input className="input" required maxLength={150} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /></label>
-                        <label className="form-row"><span className="label">Format</span><select className="input" value={form.type} onChange={event => setForm({ ...form, type: event.target.value })}><option value="swiss">Swiss</option><option value="round_robin">Round Robin</option></select></label>
+                        <label className="form-row"><span className="label">Format</span><select className="input" value={form.type} onChange={event => setForm({ ...form, type: event.target.value })}>                        <option value="swiss">Swiss</option><option value="round_robin">Round Robin</option></select></label>
                         <label className="form-row"><span className="label">Rating category</span><select className="input" value={form.ratingCategory} onChange={event => setForm({ ...form, ratingCategory: event.target.value })}><option value="blitz">Blitz</option><option value="rapid">Rapid</option><option value="classical">Classical</option></select></label>
                         <label className="rated-toggle"><input type="checkbox" checked={form.isRated} onChange={event => setForm({ ...form, isRated: event.target.checked })} />Rated tournament</label>
                         <label className="form-row"><span className="label">Starts</span><input type="datetime-local" className="input" required value={form.startDate} onChange={event => setForm({ ...form, startDate: event.target.value })} /></label>

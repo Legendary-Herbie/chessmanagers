@@ -1,3 +1,8 @@
+import ErrorBoundary from '../../shared/common/ErrorBoundary.jsx';
+import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
+import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
+import MatchRating from '../../features/matches/components/MatchRating.jsx';
+import Icon from '../../shared/common/Icon.jsx';
 import React, { useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { useAuth, useClub, useNotifications } from '../../app/contextHooks.js';
@@ -19,10 +24,10 @@ export default function PlayerPage() {
     const { playerId } = useParams();
     const navigate = useNavigate();
     const { user } = useAuth();
-    const { club, linkedPlayer, capabilities, loading: clubLoading } = useClub();
+    const { club, linkedPlayer, capabilities, loading: clubLoading, refreshClub } = useClub();
     const { notify } = useNotifications();
     const isAdmin = Boolean(capabilities.canManagePlayers);
-    const [ratingCategory, setRatingCategory] = useState('blitz');
+    const [ratingCategory, setRatingCategory] = useState('rapid');
 
     const {
         player,
@@ -59,12 +64,16 @@ export default function PlayerPage() {
         setConfirmModal({
             isOpen: true,
             title: 'Claim Player Profile',
-            message: `Request to claim player profile "${player?.name}"? An admin will review your request.`,
+            message: isAdmin ? `Claim "${player?.name}" as your player profile? Your club role allows immediate approval.` : `Request to claim player profile "${player?.name}"? An admin will review your request.`,
             variant: 'primary',
             onConfirm: async () => {
-                await runPlayerAction(claimPlayer, {
+                await runPlayerAction(async () => {
+                    const link = await claimPlayer();
+                    if (link?.status === 'approved') await refreshClub();
+                    return link;
+                }, {
                     notify,
-                    successMessage: 'Claim request submitted.',
+                    successMessage: link => link?.status === 'approved' ? 'Player profile linked. Your claim was automatically approved.' : 'Claim request submitted.',
                     fallbackError: 'Failed to submit claim request.',
                 });
                 closeConfirmModal();
@@ -113,7 +122,7 @@ export default function PlayerPage() {
     if (clubLoading || (loading && !player)) {
         return (
             <div className="players-container">
-                <div style={{ textAlign: 'center', padding: '48px', color: 'var(--text-muted)' }}>
+                <div className="page-empty">
                     Loading player profile...
                 </div>
             </div>
@@ -164,13 +173,13 @@ export default function PlayerPage() {
     const canEdit = isAdmin || isSelf;
     const isLinked = link_status === 'approved';
     const isPending = link_status === 'pending';
-    const canClaim = user && !isAdmin && !isLinked && !isPending && !linkedPlayer;
+    const canClaim = user && !isLinked && !isPending && !linkedPlayer;
 
     return (
         <div className="players-container">
             {/* Breadcrumb navigation */}
             <div style={{ fontSize: '0.875rem', color: 'var(--text-muted)' }}>
-                <Link to="/players" style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 600 }}>
+                <Link to="/players" className="text-link">
                     ← Players Roster
                 </Link>
                 <span style={{ margin: '0 8px' }}>/</span>
@@ -184,13 +193,16 @@ export default function PlayerPage() {
                         {photo_url ? <img src={resolveAssetUrl(photo_url)} alt={`${name} profile`} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 'inherit' }} /> : initials}
                     </div>
                     <div className="player-detail__title-block">
-                        <h1>{name}</h1>
+                        <h1>{name} <ClaimedBadge status={link_status} /></h1>
+                        <div className="player-external-links">
+                            {player.chesscom_username && <a className="text-link" href={`https://www.chess.com/member/${encodeURIComponent(player.chesscom_username)}`} target="_blank" rel="noopener noreferrer">Chess.com ↗</a>}
+                            {player.lichess_username && <a className="text-link" href={`https://lichess.org/@/${encodeURIComponent(player.lichess_username)}`} target="_blank" rel="noopener noreferrer">Lichess ↗</a>}
+                        </div>
                         <div className="player-detail__badges">
                             <span className="rating-badge" style={{ fontSize: '0.85rem', padding: '4px 10px' }}>
-                                🏆 {rating} {categoryLabel(ratingCategory)} Elo
+                                <RatingCategoryIcon category={ratingCategory} /> {rating} {categoryLabel(ratingCategory)} Elo
                             </span>
-                            {isLinked && <span className="link-badge link-badge--approved">✓ Claimed Profile</span>}
-                            {isPending && <span className="link-badge link-badge--pending">⏳ Pending Claim</span>}
+                            {isPending && <span className="link-badge link-badge--pending"><Icon name="clock" /> Pending Claim</span>}
                             {!isLinked && !isPending && <span className="link-badge link-badge--unlinked">Unlinked Profile</span>}
                             <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginLeft: '6px' }}>
                                 Joined {new Date(created_at).toLocaleDateString()}
@@ -207,7 +219,7 @@ export default function PlayerPage() {
                     )}
                     {canEdit && (
                         <button type="button" className="btn-secondary" onClick={() => setIsEditModalOpen(true)}>
-                            ✏️ Edit Profile
+                            <Icon name="edit" /> Edit Profile
                         </button>
                     )}
                     {(isAdmin || isSelf) && isLinked && (
@@ -231,7 +243,7 @@ export default function PlayerPage() {
                         className={`player-tab-btn ${ratingCategory === category ? 'player-tab-btn--active' : ''}`}
                         onClick={() => setRatingCategory(category)}
                     >
-                        {categoryLabel(category)}
+                        <RatingCategoryIcon category={category} />{categoryLabel(category)}
                     </button>
                 ))}
             </div>
@@ -241,7 +253,7 @@ export default function PlayerPage() {
 
             {/* Biography */}
             {bio && (
-                <div style={{ backgroundColor: 'var(--bg-surface)', border: '1px solid var(--border)', borderRadius: '12px', padding: '16px 20px' }}>
+                <div className="app-card player-bio">
                     <h4 style={{ margin: '0 0 6px 0', fontSize: '0.85rem', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
                         Biography & Notes
                     </h4>
@@ -295,38 +307,38 @@ export default function PlayerPage() {
                     className={`player-tab-btn ${activeTab === 'overview' ? 'player-tab-btn--active' : ''}`}
                     onClick={() => setActiveTab('overview')}
                 >
-                    📈 Rating History Trajectory
+                    <Icon name="chart" /> Rating history
                 </button>
                 <button
                     type="button"
                     className={`player-tab-btn ${activeTab === 'matches' ? 'player-tab-btn--active' : ''}`}
                     onClick={() => setActiveTab('matches')}
                 >
-                    ⚔️ Match History ({matches.length})
+                    <Icon name="matches" /> Match History ({matches.length})
                 </button>
                 <button
                     type="button"
                     className={`player-tab-btn ${activeTab === 'headToHead' ? 'player-tab-btn--active' : ''}`}
                     onClick={() => setActiveTab('headToHead')}
                 >
-                    🤝 Head-to-Head Rivalry
+                    <Icon name="players" /> Head-to-head
                 </button>
             </div>
 
             {/* Tab 1: Overview & Rating Chart */}
             {activeTab === 'overview' && (
-                <PlayerRatingChart
+                <ErrorBoundary resetKey={`${club.id}:${playerId}`} message="Unable to display rating history."><PlayerRatingChart clubId={club.id} playerId={playerId}
                     history={ratingHistory}
                     startRating={start_rating}
                     category={ratingCategory}
-                />
+                /></ErrorBoundary>
             )}
 
             {/* Tab 2: Match History Table */}
             {activeTab === 'matches' && (
                 <div className="players-table-wrapper">
                     {matches.length === 0 ? (
-                        <div style={{ padding: '32px', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        <div className="page-empty">
                             No match history recorded for this player yet.
                         </div>
                     ) : (
@@ -343,7 +355,7 @@ export default function PlayerPage() {
                             <tbody>
                                 {matches.map((m) => {
                                     const isWhite = m.whitePlayerId === player.id;
-                                    const colorPlayed = isWhite ? 'White ♔' : 'Black ♚';
+                                    const colorPlayed = isWhite ? 'White' : 'Black';
                                     const opponentName = isWhite ? m.blackPlayerName : m.whitePlayerName;
                                     const opponentId = isWhite ? m.blackPlayerId : m.whitePlayerId;
 
@@ -351,24 +363,25 @@ export default function PlayerPage() {
                                     let outcomeColor = 'var(--warning)';
 
                                     if (m.result === 'draw') {
-                                        outcome = 'Draw 🤝';
+                                        outcome = 'Draw';
                                         outcomeColor = 'var(--warning)';
                                     } else if ((m.result === 'white' && isWhite) || (m.result === 'black' && !isWhite)) {
-                                        outcome = 'Win 🏆';
+                                        outcome = 'Win';
                                         outcomeColor = 'var(--accent)';
                                     } else {
-                                        outcome = 'Loss ❌';
+                                        outcome = 'Loss';
                                         outcomeColor = 'var(--danger)';
                                     }
 
                                     return (
                                         <tr key={m.id}>
                                             <td>{new Date(m.playedAt).toLocaleDateString()}</td>
-                                            <td>{colorPlayed}</td>
+                                            <td>{colorPlayed}<div className="player-match-rating"><MatchRating match={m} color={isWhite ? 'white' : 'black'} /></div></td>
                                             <td>
-                                                <Link to={`/players/${opponentId}`} style={{ color: 'var(--text-strong)', textDecoration: 'none', fontWeight: 600 }}>
+                                                <Link to={`/players/${opponentId}`} className="name-link">
                                                     {opponentName}
                                                 </Link>
+                                                <div className="player-match-rating"><MatchRating match={m} color={isWhite ? 'black' : 'white'} /></div>
                                             </td>
                                             <td>
                                                 <strong style={{ color: outcomeColor }}>{outcome}</strong>
@@ -399,6 +412,7 @@ export default function PlayerPage() {
                 clubId={club.id}
                 player={player}
                 isAdmin={isAdmin}
+                isOwner={Boolean(capabilities.canManageClubSettings)}
                 onPlayerUpdated={refetch}
             />
 

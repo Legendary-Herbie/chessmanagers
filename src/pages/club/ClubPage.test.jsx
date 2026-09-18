@@ -1,10 +1,11 @@
 import React from 'react';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { createMemoryRouter, RouterProvider } from 'react-router-dom';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AuthContext, ClubContext, NotificationsContext } from '../../app/contextHooks.js';
 import { clubApi } from '../../features/clubs/api/clubApi.js';
 import ClubPage from './ClubPage.jsx';
+import { transferableAbortController } from 'node:util';
 
 vi.mock('../../features/clubs/api/clubApi.js', () => ({
     clubApi: {
@@ -14,6 +15,7 @@ vi.mock('../../features/clubs/api/clubApi.js', () => ({
         update: vi.fn(),
         updatePresentation: vi.fn(),
         uploadBadge: vi.fn(),
+        delete: vi.fn(),
     },
 }));
 
@@ -55,9 +57,7 @@ function renderPage({ refreshClub = vi.fn() } = {}) {
                 refreshClub,
             }}>
                 <NotificationsContext.Provider value={{ notify }}>
-                    <MemoryRouter initialEntries={['/club?tab=profile']}>
-                        <ClubPage />
-                    </MemoryRouter>
+                    <RouterProvider router={createMemoryRouter([{ path: '*', element: <ClubPage /> }], { initialEntries: ['/club?tab=profile'] })} />
                 </NotificationsContext.Provider>
             </ClubContext.Provider>
         </AuthContext.Provider>,
@@ -67,13 +67,37 @@ function renderPage({ refreshClub = vi.fn() } = {}) {
 
 describe('ClubPage profile validation', () => {
     beforeEach(() => {
+        vi.stubGlobal('AbortController', class { constructor() { return transferableAbortController(); } });
         vi.clearAllMocks();
         clubApi.fetchMembers.mockResolvedValue([]);
         clubApi.fetchInvites.mockResolvedValue([]);
         clubApi.getJoinCode.mockResolvedValue({ joinCode: { active: false } });
         clubApi.update.mockResolvedValue({ club });
     });
-    afterEach(cleanup);
+    afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
+
+    it('applies a rating preset only to the chosen category and saves through the floating bar', async () => {
+        renderPage();
+        fireEvent.click(screen.getByRole('button', { name: 'Rating rules' }));
+        fireEvent.change(await screen.findByLabelText('rapid rating preset'), { target: { value: 'fide' } });
+        expect(screen.getByLabelText('blitz rating preset').value).toBe('club');
+        fireEvent.click(screen.getByRole('button', { name: 'Save Changes' }));
+        await waitFor(() => expect(clubApi.update).toHaveBeenCalledWith('club_1', { ratingSettings: {
+            ...ratingSettings, rapid: { initialRating: 1500, ratingFloor: 1400, establishedKFactor: 20, provisionalKFactor: 40, provisionalGames: 30 },
+        } }));
+    });
+
+    it('does not delete a club without typing the confirmation', async () => {
+        renderPage();
+        fireEvent.click(screen.getByRole('button', { name: 'Ownership' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Delete club' }));
+        const buttons = screen.getAllByRole('button', { name: 'Delete club' });
+        expect(buttons.at(-1).disabled).toBe(true);
+        expect(clubApi.delete).not.toHaveBeenCalled();
+        fireEvent.change(screen.getByLabelText('Type DELETE to confirm'), { target: { value: 'DELETE' } });
+        fireEvent.click(buttons.at(-1));
+        await waitFor(() => expect(clubApi.delete).toHaveBeenCalledWith('club_1'));
+    });
 
     it('blocks submission and identifies the malformed field', async () => {
         renderPage();
@@ -99,5 +123,15 @@ describe('ClubPage profile validation', () => {
         })));
         expect(refreshClub).toHaveBeenCalled();
         expect(notify).toHaveBeenCalledWith('Club profile saved.', 'success');
+        expect(clubApi.update.mock.calls[0][1]).not.toHaveProperty('ratingSettings');
+        expect(clubApi.update.mock.calls[0][1].settings).not.toHaveProperty('notifications');
+    });
+
+    it('saves notification preferences without changing profile or rating rules', async () => {
+        renderPage();
+        fireEvent.click(screen.getByRole('button', { name: 'Notifications', exact: true }));
+        fireEvent.click(await screen.findByLabelText('Allow notification email delivery'));
+        fireEvent.click(screen.getByRole('button', { name: 'Save notifications' }));
+        await waitFor(() => expect(clubApi.update).toHaveBeenCalledWith('club_1', { settings: { notifications: { emailEnabled: true } } }));
     });
 });

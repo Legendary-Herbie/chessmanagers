@@ -1,0 +1,11 @@
+.toggle-card { display:flex; align-items:center; justify-content:space-between; gap:20px; padding:16px; border:1px solid var(--border); border-radius:12px; background:var(--bg-surface); }
+.toggle-card__title { font-weight:600; color:var(--text-strong); }
+.toggle-card p { margin:4px 0 0; color:var(--text-muted); font-size:14px; }
+.toggle-switch { flex:0 0 52px; height:44px; border:0; padding:8px 0; background:transparent; position:relative; cursor:pointer; }
+.toggle-switch::before { content:''; position:absolute; inset:8px 0; border-radius:999px; background:var(--text-muted); }
+.toggle-switch span { display:block; position:relative; width:20px; height:20px; margin:4px; border-radius:50%; background:white; transition:transform 120ms ease; }
+.toggle-switch[aria-checked=true]::before { background:var(--primary); }
+.toggle-switch[aria-checked=true] span { transform:translateX(24px); }
+.toggle-switch:focus-visible { outline:2px solid var(--primary); outline-offset:3px; border-radius:8px; }
+.toggle-switch:disabled { opacity:.5; cursor:not-allowed; }
+@media(prefers-reduced-motion:reduce) { .toggle-switch span { transition:none; } }

@@ -222,3 +222,7 @@
 }
 .public-join-message { margin-bottom: 1rem; color: var(--status-success-text); background: var(--status-success-bg); }
 .public-join-message--error { color: var(--status-error-text); background: var(--status-error-bg); }
+
+.public-breadcrumbs { display:flex; flex-wrap:wrap; gap:.5rem; list-style:none; padding:0; overflow-wrap:anywhere; }
+.public-breadcrumbs li + li::before { content:"/"; margin-right:.5rem; opacity:.5; }
+.public-ranking-actions { display:flex; flex-wrap:wrap; gap:.75rem; align-items:center; margin-top:1rem; }

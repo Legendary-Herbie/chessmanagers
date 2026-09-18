@@ -1,7 +1,23 @@
 .account-page { padding: 24px; max-width: 900px; margin: 0 auto; }
 .account-page .page-header { margin-bottom: 1rem; }
-.account-page section { margin: 1rem 0; padding: 1.25rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--bg-secondary); }
+.account-page .settings-card { margin: 1rem 0; padding: 1.25rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--bg-surface); }
 .account-page section h2 { margin-top: 0; }
-.account-page .modal-body { max-width: 560px; }
+.account-page .form-card { max-width: 560px; }
 .account-page .danger-zone { border-color: rgba(239, 68, 68, 0.4); }
 @media (max-width: 700px) { .account-page { padding: 16px; } }
+
+.account-profile { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(190px,100%),1fr)); gap:1rem; margin:0; }
+.account-profile dt { color:var(--text-muted); font-size:.85rem; }
+.account-profile dd { margin:.25rem 0 0; overflow-wrap:anywhere; }
+.account-delete-content { padding:1.25rem; overflow:auto; }
+
+.account-page { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:20px; max-width:1000px; }
+.account-page > .page-header, .account-page > .error { grid-column:1/-1; }
+.account-page .settings-card { margin:0; padding:24px; box-shadow:var(--shadow-sm); min-width:0; }
+.account-page .settings-card h2 { display:flex; align-items:center; gap:8px; font-size:20px; }
+.account-page .settings-card .form-card { display:grid; gap:16px; }
+.account-page .form-row { display:grid; gap:6px; }
+.account-page .input { width:100%; min-width:0; }
+.account-member-badge { display:inline-flex; padding:4px 8px; margin-bottom:16px; border-radius:8px; color:var(--status-info-text); background:var(--status-info-bg); font-size:12px; }
+.account-page .danger-zone { border-color:var(--status-error-text); }
+@media(max-width:760px) { .account-page { grid-template-columns:1fr; gap:16px; } .account-page .settings-card { padding:20px; } }

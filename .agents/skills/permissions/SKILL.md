@@ -28,7 +28,7 @@ Member:
 
 Linked Player:
 - all member permissions
-- edit avatar/photo and bio
+- edit own avatar/photo, bio, federation ID, external chess profile usernames, and unlocked name
 - request self-unlink where supported
 
 Admin:
@@ -43,6 +43,7 @@ Owner:
 - assign/revoke admins
 - transfer ownership
 - delete/close club
+- lock/unlock player names and edit locked names
 
 ## Resource checks
 

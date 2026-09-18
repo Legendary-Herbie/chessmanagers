@@ -13,11 +13,13 @@ function withoutTotalCount(row) {
 
 export const LeaderboardModel = {
     // Eligibility and rank are calculated before pagination. Account linking is
-    // deliberately absent: linked and unlinked roster players rank identically.
-    getByClub: async (clubId, { category = 'blitz', limit = 50, offset = 0, q = '' } = {}) => {
+    // does not affect eligibility or ordering: all roster players rank identically.
+    getByClub: async (clubId, { category = 'rapid', limit = 50, offset = 0, q = '' } = {}) => {
         const result = await db.query(
             `WITH eligible AS (
                 SELECT player.id AS "playerId", player.public_id AS "publicPlayerId", player.name AS "playerName",
+                    EXISTS (SELECT 1 FROM player_links link WHERE link.player_id = player.id
+                        AND link.club_id = player.club_id AND link.status = 'approved') AS "isClaimed",
                     $2::TEXT AS "selectedCategory",
                     ROUND(selected.current_rating)::INTEGER AS "selectedRating",
                     selected.current_rating AS "rawSelectedRating",
@@ -74,7 +76,7 @@ export const LeaderboardModel = {
                 FROM eligible
             )
             SELECT row_rank::INTEGER AS rank,
-                "playerId", "publicPlayerId", "playerName", "selectedCategory", "selectedRating", "peakRating",
+                "playerId", "publicPlayerId", "playerName", "isClaimed", "selectedCategory", "selectedRating", "peakRating",
                 "blitzRating", "rapidRating", "classicalRating", "categoryGames", "categoryWins",
                 "categoryDraws", "categoryLosses", "weightedWinRate", "totalGames",
                 total_count::INTEGER AS "totalCount"
@@ -88,15 +90,19 @@ export const LeaderboardModel = {
         };
     },
 
-    getRatingHistory: async (clubId, playerId, { category = 'blitz', limit = 30 } = {}) => db.query(
-        `SELECT played_at AS "playedAt", rating_before AS "ratingBefore",
-                rating_after AS "ratingAfter", match_id AS "matchId", category,
-                played_at, rating_before, rating_after AS rating, match_id
-         FROM (SELECT played_at, rating_before, rating_after, match_id, category
-               FROM rating_history WHERE player_id = $1 AND club_id = $2 AND category = $3
-               ORDER BY played_at DESC, match_id DESC LIMIT $4) latest
-         ORDER BY played_at ASC, match_id ASC`,
-        [playerId, clubId, category, limit]
+    getRatingHistory: async (clubId, playerId, { category = 'rapid', limit = 30, offset = 0, since = null } = {}) => db.query(
+        `SELECT * FROM (
+            SELECT history.played_at AS "playedAt", history.rating_before AS "ratingBefore", history.rating_after AS "ratingAfter",
+                history.match_id AS "matchId", history.category, history.played_at, history.rating_before, history.rating_after AS rating, history.match_id,
+                opponent.name AS "opponentName",
+                CASE WHEN match.result = 'draw' THEN 'draw' WHEN (match.white_player_id = $1 AND match.result = 'white') OR (match.black_player_id = $1 AND match.result = 'black') THEN 'win' ELSE 'loss' END AS outcome
+            FROM rating_history history JOIN matches match ON match.id = history.match_id AND match.club_id = history.club_id
+            JOIN players opponent ON opponent.id = CASE WHEN match.white_player_id = $1 THEN match.black_player_id ELSE match.white_player_id END AND opponent.club_id = history.club_id
+            WHERE history.player_id = $1 AND history.club_id = $2 AND ($3 = 'all' OR history.category = $3)
+                AND ($6::TIMESTAMPTZ IS NULL OR history.played_at >= $6) AND match.status = 'active'
+            ORDER BY history.played_at DESC, history.match_id DESC LIMIT $4 OFFSET $5
+        ) latest ORDER BY "playedAt" ASC, "matchId" ASC`,
+        [playerId, clubId, category, limit, offset, since]
     ).then(result => result.rows),
 
     getPlayerStatistics: async (clubId, playerId) => {
@@ -178,7 +184,7 @@ export const LeaderboardModel = {
 
     // All dashboard metrics use the all-time period. Active players are active
     // roster players with at least one active (non-voided/non-deleted) game.
-    getDashboardStats: async (clubId, { category = 'blitz', includeAdmin = false } = {}) => {
+    getDashboardStats: async (clubId, { category = 'rapid', includeAdmin = false } = {}) => {
         const [metrics, recentMatches, leaderboard, breakdown] = await Promise.all([
             db.query(
                 `SELECT

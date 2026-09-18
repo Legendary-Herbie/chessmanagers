@@ -9,11 +9,17 @@ import {
 import { toMatchDto } from '../utils/matchDtos.js';
 
 const FAILURES = {
+    KNOCKOUT_BRACKET_LOCKED: [409, 'Later knockout pairings depend on this result. It cannot be changed after play advances.'],
+    REQUEST_ID_CONFLICT: [409, 'This submission ID was already used for a different match.'],
     MATCH_NOT_FOUND: [404, 'Match not found.'],
+    MATCH_CHANGED: [409, 'The match settings changed during this request. Refresh and try again.'],
     MATCH_NOT_ACTIVE: [409, 'Only an active match can be changed.'],
     SAME_PLAYER: [400, 'White and black must be different players.'],
     PLAYERS_NOT_ACTIVE_IN_CLUB: [404, 'Both players must be active players in this club.'],
     TOURNAMENT_NOT_FOUND: [404, 'Tournament not found in this club.'],
+    TOURNAMENT_NOT_ACTIVE: [409, 'Resume or start the tournament before recording results.'],
+    TOURNAMENT_PLAYER_INELIGIBLE: [409, 'Both players must be active and registered for this round.'],
+    TOURNAMENT_ROUND_NOT_OPEN: [409, 'New results require the current open round; completed rounds only accept corrections.'],
     TOURNAMENT_ROSTER_MISMATCH: [400, 'Both players must be on the tournament roster.'],
     TOURNAMENT_RATING_MISMATCH: [400, 'The match rating category and rated setting must match the tournament.'],
     TOURNAMENT_PAIRING_NOT_FOUND: [404, 'Tournament pairing not found.'],

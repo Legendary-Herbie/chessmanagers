@@ -35,9 +35,9 @@ export function sendVerificationEmail(user, token, continuation = '') {
     const url = frontendUrl(`/auth/verify?${params}`);
     return deliver({
         to: user.email,
-        subject: 'Verify your Chess Managers email',
-        text: `Welcome to Chess Managers. Verify your email: ${url}\n\nThis link expires in ${env.EMAIL_VERIFICATION_EXPIRY_HOURS} hours.`,
-        html: `<!doctype html><html><body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#172033"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:40px 16px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #dfe4ea;border-radius:16px"><tr><td style="padding:36px"><div style="font-size:22px;font-weight:800;color:#2f6fed">Chess Managers</div><h1 style="margin:28px 0 12px;font-size:28px;color:#172033">Verify your email</h1><p style="margin:0 0 26px;line-height:1.6;color:#526071">Confirm this address to finish creating your account and continue to your club.</p><a href="${url}" style="display:inline-block;padding:14px 22px;border-radius:10px;background:#2f6fed;color:#ffffff;text-decoration:none;font-weight:700">Verify email address</a><p style="margin:26px 0 0;font-size:13px;line-height:1.6;color:#748094">This link expires in ${env.EMAIL_VERIFICATION_EXPIRY_HOURS} hours. If you did not create an account, you can ignore this email.</p></td></tr></table></td></tr></table></body></html>`,
+        subject: 'Verify your 1chessclub email',
+        text: `Welcome to 1chessclub. Verify your email: ${url}\n\nThis link expires in ${env.EMAIL_VERIFICATION_EXPIRY_HOURS} hours.`,
+        html: `<!doctype html><html><body style="margin:0;background:#f4f6f8;font-family:Arial,sans-serif;color:#172033"><table role="presentation" width="100%" cellspacing="0" cellpadding="0"><tr><td align="center" style="padding:40px 16px"><table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:560px;background:#ffffff;border:1px solid #dfe4ea;border-radius:16px"><tr><td style="padding:36px"><div style="font-size:22px;font-weight:800;color:#2f6fed">1chessclub</div><h1 style="margin:28px 0 12px;font-size:28px;color:#172033">Verify your email</h1><p style="margin:0 0 26px;line-height:1.6;color:#526071">Confirm this address to finish creating your account and continue to your club.</p><a href="${url}" style="display:inline-block;padding:14px 22px;border-radius:10px;background:#2f6fed;color:#ffffff;text-decoration:none;font-weight:700">Verify email address</a><p style="margin:26px 0 0;font-size:13px;line-height:1.6;color:#748094">This link expires in ${env.EMAIL_VERIFICATION_EXPIRY_HOURS} hours. If you did not create an account, you can ignore this email.</p></td></tr></table></td></tr></table></body></html>`,
         type: 'verification',
         token,
     });
@@ -49,7 +49,7 @@ export function sendPasswordResetEmail(user, token, continuation = '') {
     const url = frontendUrl(`/auth/reset-password?${params}`);
     return deliver({
         to: user.email,
-        subject: 'Reset your Chess Managers password',
+        subject: 'Reset your 1chessclub password',
         text: `Reset your password by opening ${url}`,
         type: 'password-reset',
         token,
@@ -61,7 +61,7 @@ export function sendNotificationEmail({ to, clubName, eventType }) {
     return deliver({
         to,
         subject: `${clubName}: ${readableEvent}`,
-        text: `You have a new ${readableEvent} notification from ${clubName}. Open Chess Managers to view it.`,
+        text: `You have a new ${readableEvent} notification from ${clubName}. Open 1chessclub to view it.`,
         type: 'notification',
         token: null,
     });

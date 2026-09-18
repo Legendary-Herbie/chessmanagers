@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import db from '../database/database.js';
+import { up as canonicalUp, down as canonicalDown } from '../database/migrations/1700000000018_canonical_match_fields.js';
 import { readBaselineSchema } from '../database/migrations/1700000000000_baseline.js';
 import { RECONCILIATION_SQL } from '../database/migrations/1700000000002_reconcile_multitenant_model.js';
 import { MembershipModel } from '../models/Membership.js';
@@ -143,7 +144,12 @@ describe('multi-tenant reconciliation schema', () => {
         const owner = await createUser();
         const club = await createClub(owner);
 
-        await db.query(RECONCILIATION_SQL);
+        await db.transaction(async trx => {
+            const pgm = { sql: text => trx.query(text) };
+            await canonicalDown(pgm);
+            await trx.query(RECONCILIATION_SQL);
+            await canonicalUp(pgm);
+        });
 
         const preserved = await db.query('SELECT slug, visibility, status FROM clubs WHERE id = $1', [club.id]);
         expect(preserved.first).toMatchObject({

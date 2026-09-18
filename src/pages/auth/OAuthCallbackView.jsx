@@ -27,5 +27,5 @@ export default function OAuthCallbackView() {
         establishSession().then(() => navigate(safeContinuation(continuation), { replace: true }))
             .catch(requestError => setError(requestError.message || 'Google sign-in failed.'));
     }, [continuation, establishSession, navigate, oauthError]);
-    return <div className="auth-form-wrapper"><div className="auth-form-header"><h1 className="auth-form-title">Google sign-in</h1><p className="auth-form-subtitle">{error || 'Completing your session…'}</p></div>{error && <p className="auth-switch"><Link className="auth-link" to="/auth/login">Back to sign in</Link></p>}</div>;
+    return <div className="auth-form-wrapper"><div className="auth-form-header"><h1 className="auth-form-title">Google sign-in</h1><p className="auth-form-subtitle">{error || 'Completing your session…'}</p></div>{error && <p className="auth-switch"><Link className="auth-link text-link" to="/auth/login">Back to sign in</Link></p>}</div>;
 }

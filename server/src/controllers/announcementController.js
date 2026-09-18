@@ -9,6 +9,7 @@ import {
     listAnnouncements,
     publishAnnouncement,
     updateAnnouncement,
+    recordAnnouncementView,
 } from '../services/AnnouncementService.js';
 import {
     removeAttachment,
@@ -48,6 +49,14 @@ export async function getClubAnnouncement(req, res, next) {
         });
         if (!announcement) return res.status(404).json({ error: 'Announcement not found.' });
         return res.json({ announcement });
+    } catch (error) { return next(error); }
+}
+
+export async function viewClubAnnouncement(req, res, next) {
+    try {
+        const result = await recordAnnouncementView({ clubId: req.params.clubId, announcementId: req.params.announcementId, userId: req.user.id });
+        if (!result) return res.status(404).json({ error: 'Published announcement not found.' });
+        return res.json(result);
     } catch (error) { return next(error); }
 }
 

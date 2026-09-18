@@ -2,6 +2,9 @@ import { PlayerModel } from '../models/Player.js';
 import { PlayerLinkModel } from '../models/PlayerLink.js';
 
 const MESSAGES = {
+    REGISTRATION_PENDING: [409, 'Your self-registration is awaiting review. You cannot also claim another player.'],
+    PLAYER_NAME_LOCKED: [403, 'The club owner has locked this player name.'],
+    OWNER_ONLY_NAME_LOCK: [403, 'Only the club owner can lock or unlock player names.'],
     PLAYER_NOT_FOUND: [404, 'Player not found in this club.'],
     LINK_NOT_FOUND: [404, 'Link request not found in this club.'],
     PLAYER_DELETED: [409, 'Deleted players cannot be changed.'],
@@ -23,8 +26,8 @@ function sendFailure(res, result) {
 
 export async function getPlayers(req, res, next) {
     try {
-        const { q = '', limit = 50, offset = 0 } = req.validatedQuery;
-        const result = await PlayerModel.findByClub(req.params.clubId, req.user.id, { q, limit, offset });
+        const { q = '', limit = 50, offset = 0, category, status, sortBy } = req.validatedQuery;
+        const result = await PlayerModel.findByClub(req.params.clubId, req.user.id, { q, limit, offset, category, status, sortBy });
         res.json({ players: result.players, total: result.total, limit, offset });
     } catch (error) {
         next(error);
@@ -88,12 +91,14 @@ export async function createPlayersBulk(req, res, next) {
 export async function updatePlayer(req, res, next) {
     try {
         if (!req.clubContext.capabilities.canManagePlayers) {
-            const officialFields = ['name', 'dateOfBirth', 'federationId'];
+            const officialFields = ['dateOfBirth', 'nameLocked'];
             if (officialFields.some(field => Object.prototype.hasOwnProperty.call(req.validated, field))) {
                 return res.status(403).json({ error: 'Only club admins may change official player identity fields.' });
             }
             const selfChanges = {};
-            if (Object.prototype.hasOwnProperty.call(req.validated, 'bio')) selfChanges.bio = req.validated.bio;
+            for (const field of ['name', 'bio', 'federationId', 'chesscomUsername', 'lichessUsername']) {
+                if (Object.hasOwn(req.validated, field)) selfChanges[field] = req.validated[field];
+            }
             const selfResult = await PlayerModel.updateSelfProfile({
                 clubId: req.params.clubId,
                 playerId: req.params.playerId,

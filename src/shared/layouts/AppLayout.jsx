@@ -1,3 +1,9 @@
+import SiteFooter from '../common/SiteFooter.jsx';
+import CommandPalette from '../common/CommandPalette.jsx';
+import OfflineMatches from '../../features/matches/offline/OfflineMatches.jsx';
+import { useSearchShortcut } from '../hooks/useSearchShortcut.js';
+import ActionMenu from '../common/ActionMenu.jsx';
+import Icon from '../common/Icon.jsx';
 import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth, useClub, useTheme } from '../../app/contextHooks.js';
@@ -12,24 +18,10 @@ const navItems = [
     { to: '/leaderboard', label: 'Leaderboard', icon: 'leaderboard' },
     { to: '/players', label: 'Players', icon: 'players' },
     { to: '/matches', label: 'Matches', icon: 'matches' },
-    { to: '/clubs', label: 'Clubs', icon: 'clubs' },
     { to: '/tournaments', label: 'Tournaments', icon: 'tournaments' },
     { to: '/announcements', label: 'Announcements', icon: 'announcements' },
+    { to: '/clubs', label: 'Clubs', icon: 'clubs' },
 ];
-
-const iconPaths = {
-    dashboard: <><rect x="3" y="3" width="7" height="7" rx="1" /><rect x="14" y="3" width="7" height="7" rx="1" /><rect x="3" y="14" width="7" height="7" rx="1" /><rect x="14" y="14" width="7" height="7" rx="1" /></>,
-    leaderboard: <><path d="M5 21V11h4v10" /><path d="M10 21V3h4v18" /><path d="M15 21v-6h4v6" /></>,
-    players: <><circle cx="9" cy="8" r="3" /><circle cx="17" cy="9" r="2.5" /><path d="M3 20c0-4 2.5-6 6-6s6 2 6 6" /><path d="M14 15c3.8-.7 7 1 7 5" /></>,
-    matches: <><path d="M7 3l10 18" /><path d="M17 3L7 21" /><circle cx="12" cy="12" r="2" /></>,
-    clubs: <><path d="M12 21s7-3.5 7-10V5l-7-2-7 2v6c0 6.5 7 10 7 10z" /><circle cx="12" cy="9" r="2" /><path d="M8.5 15c.7-2 2-3 3.5-3s2.8 1 3.5 3" /></>,
-    tournaments: <><path d="M8 4h8v4a4 4 0 01-8 0V4z" /><path d="M8 6H4v1a5 5 0 005 5M16 6h4v1a5 5 0 01-5 5" /><path d="M12 12v5M8 21h8M9 17h6" /></>,
-    announcements: <><path d="M4 13V8l13-4v13L4 13z" /><path d="M7 14l2 6h4l-2-7" /><path d="M20 8v5" /></>,
-};
-
-function NavIcon({ name }) {
-    return <svg className="app-nav__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">{iconPaths[name]}</svg>;
-}
 
 function navLinkClass({ isActive }) {
     return `app-nav__link${isActive ? ' app-nav__link--active' : ''}`;
@@ -44,6 +36,7 @@ function storedSidebarPreference() {
 }
 
 export default function AppLayout() {
+    useSearchShortcut(false);
     const { user, logout } = useAuth();
     const {
         club,
@@ -127,21 +120,23 @@ export default function AppLayout() {
     }, [menuOpen]);
 
     const handleLogout = async () => {
+        if (!window.dispatchEvent(new Event('app:before-context-change', { cancelable: true }))) return;
         setMenuOpen(false);
         await logout();
         navigate('/auth/login', { replace: true });
     };
 
-    const handleThemeToggle = () => {
-        toggleTheme();
-        setMenuOpen(false);
-    };
-
     const handleClubChange = async (event) => {
+        if (!window.dispatchEvent(new Event('app:before-context-change', { cancelable: true }))) return;
         const nextClubId = event.target.value;
         setSwitchingClubId(nextClubId);
         setMobileNavOpen(false);
-        navigate('/dashboard');
+        const section = location.pathname.split('/')[1];
+        const path = ['players', 'tournaments', 'announcements'].includes(section) ? `/${section}` : location.pathname;
+        const query = new URLSearchParams(location.search);
+        ['page', 'q', 'action', 'playerId'].forEach(key => query.delete(key));
+        if (path === '/club') query.delete('tab');
+        navigate({ pathname: path, search: query.toString() }, { replace: true });
         try {
             await selectClub(nextClubId);
         } finally {
@@ -190,17 +185,13 @@ export default function AppLayout() {
             <header className={`app-nav${sidebarCollapsed ? ' app-nav--collapsed' : ''}`}>
                 <div className="app-nav__inner">
                     <div className="app-nav__top">
-                        <button
-                            type="button"
-                            className="app-nav__brand app-nav__brand-toggle"
-                            aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-                            aria-expanded={!sidebarCollapsed}
-                            onClick={() => setSidebarCollapsed(current => !current)}
-                        >
+                        {sidebarCollapsed ? <button type="button" className="app-nav__brand app-nav__brand-toggle" aria-label="Expand sidebar" title="Expand sidebar" aria-expanded={false} onClick={() => setSidebarCollapsed(false)}>
                             <BrandLogo className="app-nav__brand-logo" collapse="phone" />
-                            <span className="app-nav__brand-toggle-icon" aria-hidden="true">{sidebarCollapsed ? '›' : '‹'}</span>
-                        </button>
-                        <NavLink className="app-nav__mobile-brand" to="/dashboard" aria-label="Chess Managers dashboard">
+                            <span className="app-nav__brand-toggle-icon"><Icon name="sidebar" size="lg" /></span>
+                        </button> : <NavLink className="app-nav__brand" to="/dashboard" aria-label="1chessclub dashboard"><BrandLogo className="app-nav__brand-logo" collapse="phone" /></NavLink>}
+                        <div className="app-nav__header-actions"><CommandPalette />
+                        {!sidebarCollapsed && <button type="button" className="app-nav__desktop-toggle" title="Collapse sidebar" aria-label="Collapse sidebar" aria-expanded onClick={() => setSidebarCollapsed(true)}><Icon name="sidebar" size="lg" /></button>}</div>
+                        <NavLink className="app-nav__mobile-brand" to="/dashboard" aria-label="1chessclub dashboard">
                             <BrandLogo className="app-nav__brand-logo" collapse="phone" />
                         </NavLink>
                         <button
@@ -210,7 +201,7 @@ export default function AppLayout() {
                             aria-expanded={mobileNavOpen}
                             onClick={() => setMobileNavOpen(current => !current)}
                         >
-                            <span aria-hidden="true">{mobileNavOpen ? '✕' : '☰'}</span>
+                            <span aria-hidden="true"><Icon name={mobileNavOpen ? 'x' : 'menu'} size="xl" /></span>
                         </button>
                     </div>
 
@@ -234,15 +225,19 @@ export default function AppLayout() {
                             ))}
                         </select>
                     </label>
-                    <button
-                        type="button"
-                        className="app-nav__club-collapsed"
-                        title={`Active club: ${clubName}`}
-                        aria-label={`Expand sidebar. Active club: ${clubName}`}
-                        onClick={() => setSidebarCollapsed(false)}
-                    >
-                        ♜
-                    </button>
+                    <div className="app-nav__club-collapsed-menu">
+                        <ActionMenu label="Switch club" icon="club" heading="Active club" panelClassName="club-switch-menu"
+                            disabled={clubLoading || switchingClubId !== null || activeClubs.length === 0}>
+                            {activeClubs.map(entry => <button type="button" key={entry.club.id}
+                                className={`club-switch-menu__option${entry.club.id === selectedClubId ? ' is-active' : ''}`}
+                                aria-current={entry.club.id === selectedClubId ? 'true' : undefined}
+                                onClick={() => { if (entry.club.id !== selectedClubId) handleClubChange({ target: { value: entry.club.id } }); }}>
+                                <span className="club-switch-menu__identity"><strong>{entry.club.name}</strong>
+                                    <span>{entry.membership.role[0].toUpperCase() + entry.membership.role.slice(1)}</span></span>
+                                {entry.club.id === selectedClubId && <Icon name="check" />}
+                            </button>)}
+                        </ActionMenu>
+                    </div>
 
                     <nav className={`app-nav__links${mobileNavOpen ? ' app-nav__links--mobile-open' : ''}`} aria-label="Primary navigation">
                         {navItems.map(item => (
@@ -251,8 +246,9 @@ export default function AppLayout() {
                                 to={item.to}
                                 end={item.end}
                                 className={navLinkClass}
+                                title={sidebarCollapsed ? item.label : undefined}
                             >
-                                <NavIcon name={item.icon} />
+                                <Icon className="app-nav__icon" name={item.icon} size="xl" />
                                 <span className="app-nav__link-label">{item.label}</span>
                             </NavLink>
                         ))}
@@ -260,6 +256,7 @@ export default function AppLayout() {
 
                     <div className="app-nav__utilities">
                         <NotificationTray />
+                        <button type="button" className="app-nav__theme-button" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Use light mode' : 'Use dark mode'} title={theme === 'dark' ? 'Use light mode' : 'Use dark mode'}><Icon name={theme === 'dark' ? 'sun' : 'moon'} size="xl" /><span className="app-nav__link-label">{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span></button>
                         <div className="app-nav__account" ref={dropdownRef}>
                         <button
                             type="button"
@@ -267,12 +264,13 @@ export default function AppLayout() {
                             aria-haspopup="menu"
                             aria-controls="account-menu"
                             aria-label={`${menuOpen ? 'Close' : 'Open'} account menu for ${displayName}`}
+                            title={sidebarCollapsed ? displayName : undefined}
                             aria-expanded={menuOpen}
                             onClick={() => setMenuOpen(open => !open)}
                         >
                             <span className="app-nav__avatar" aria-hidden="true">{initial}</span>
                             <span className="app-nav__account-copy">
-                                <span className="app-nav__account-name">{displayName}</span>
+                                <span className="app-nav__account-name" title={displayName}>{displayName.length > 28 ? `${displayName.slice(0, 25)}...` : displayName}</span>
                                 <span className="app-nav__account-club">{clubName}</span>
                             </span>
                             <span className="app-nav__chevron" aria-hidden="true" />
@@ -281,8 +279,8 @@ export default function AppLayout() {
                         {menuOpen && (
                             <div id="account-menu" className="app-nav__dropdown app-nav__dropdown--open" role="menu" aria-label="Account menu">
                                 <div className="app-nav__dropdown-header">
-                                    <strong>{displayName}</strong>
-                                    <span>{clubName}</span>
+                                    <strong title={displayName}>{displayName.length > 28 ? `${displayName.slice(0, 25)}...` : displayName}</strong>
+                                    <span title={clubName}>{clubName.length > 32 ? `${clubName.slice(0, 29)}...` : clubName}</span>
                                 </div>
 
                                 <NavLink className="app-nav__dropdown-item" role="menuitem" to="/create-club">
@@ -329,14 +327,7 @@ export default function AppLayout() {
                                     </button>
                                 )}
 
-                                <button
-                                    type="button"
-                                    className="app-nav__dropdown-item"
-                                    role="menuitem"
-                                    onClick={handleThemeToggle}
-                                >
-                                    {theme === 'dark' ? 'Use light mode' : 'Use dark mode'}
-                                </button>
+
 
                                 <button
                                     type="button"
@@ -354,7 +345,7 @@ export default function AppLayout() {
             </header>
 
             <main className="app-main">
-                <div className="app-main__inner">
+                <div className="app-main__inner"><OfflineMatches />
                     <div role="status" aria-live="polite" aria-atomic="true">
                         {workspaceLoading && <div className="club-workspace-state">
                             <h1>{loadingMessage}</h1>
@@ -366,10 +357,11 @@ export default function AppLayout() {
                             <h1>Couldn’t open {selectedClubName || 'your club'}</h1>
                             <p>{clubError}</p>
                             <button type="button" className="btn-secondary" onClick={() => refreshClubs(selectedClubId)}>Retry</button>
-                        </div> : <Outlet key={`${location.pathname}${location.search}`} />)}
+                        </div> : <Outlet key={`${club?.id ?? ''}:${location.pathname}`} />)}
                     </div>
                 </div>
             </main>
+            <SiteFooter />
 
             <ConfirmDialog
                 isOpen={leaveConfirmationOpen}

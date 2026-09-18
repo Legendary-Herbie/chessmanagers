@@ -1,4 +1,5 @@
-import { BrowserRouter } from 'react-router-dom';
+import ErrorBoundary, { CardError } from '../shared/common/ErrorBoundary.jsx';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import Providers from './providers.jsx';
 import AppRoutes from './routes.jsx';
 import { useEffect } from 'react';
@@ -23,13 +24,13 @@ function AuthLogoutListener() {
 
 // ─── App ──────────────────────────────────────────────────────────────────────
 
-export default function App() {
-    return (
-        <BrowserRouter>
+const router = createBrowserRouter([{ path: '*', errorElement: <CardError message="The app could not be displayed." onRetry={() => window.location.reload()} />, element:
             <Providers>
                 <AuthLogoutListener />
                 <AppRoutes />
             </Providers>
-        </BrowserRouter>
-    );
+}]);
+
+export default function App() {
+    return <ErrorBoundary message="The app could not be displayed."><RouterProvider router={router} /></ErrorBoundary>;
 }
