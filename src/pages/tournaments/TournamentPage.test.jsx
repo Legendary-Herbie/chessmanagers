@@ -49,6 +49,46 @@ describe('TournamentPage duplicate result protection', () => {
     });
     afterEach(cleanup);
 
+    it('offers knockout tiebreak pairing and keeps earlier scores read-only', async () => {
+        tournamentApi.get.mockResolvedValue({ ...detail,
+            tournament: { ...detail.tournament, type: 'knockout', current_round: 2 },
+            knockout: { championId: null, needsPlayoff: true },
+            rounds: [
+                { ...detail.rounds[0], status: 'completed', pairings: [{ ...detail.rounds[0].pairings[0], result: 'draw' }] },
+                { id: 'round_2', roundNumber: 2, status: 'completed', pairings: [{ ...detail.rounds[0].pairings[0], id: 'replay', isPlayoff: true, result: 'draw' }] },
+            ],
+        });
+        renderPage();
+        expect(await screen.findByRole('button', { name: 'Pair tiebreak games' })).toBeTruthy();
+        expect(screen.queryByRole('button', { name: 'Complete', exact: true })).toBeNull();
+        fireEvent.change(screen.getByLabelText('Select round'), { target: { value: '1' } });
+        expect(screen.queryByRole('group', { name: 'Result for round 1, board 1' })).toBeNull();
+        expect(within(screen.getByRole('region', { name: 'Pairings' })).getByText('½–½')).toBeTruthy();
+    });
+
+    it('shows knockout advancement instead of point tiebreaks and permits completing a final', async () => {
+        tournamentApi.get.mockResolvedValue({ ...detail,
+            tournament: { ...detail.tournament, type: 'knockout' },
+            knockout: { championId: 'player_1', needsPlayoff: false },
+            standings: [{ playerId: 'player_1', playerName: 'Alpha', rank: 1, knockoutStatus: 'Champion', wins: 1, draws: 0, losses: 0 }],
+        });
+        renderPage(true, 'standings');
+        expect(await screen.findByRole('columnheader', { name: 'Progress' })).toBeTruthy();
+        expect(screen.getByText('Champion')).toBeTruthy();
+        expect(screen.getByRole('button', { name: 'Complete', exact: true })).toBeTruthy();
+        expect(screen.queryByRole('columnheader', { name: /Buchholz/ })).toBeNull();
+    });
+
+    it('explains the frozen Round Robin roster and hides add and withdrawal controls', async () => {
+        tournamentApi.get.mockResolvedValue({ ...detail, tournament: { ...detail.tournament, type: 'round_robin' } });
+        renderPage(true, 'participants');
+        fireEvent.click(await screen.findByRole('button', { name: 'Manage participants' }));
+        const dialog = screen.getByRole('dialog', { name: 'Manage participants' });
+        expect(within(dialog).getByText(/This roster is fixed/)).toBeTruthy();
+        expect(within(dialog).queryByRole('button', { name: 'Add', exact: true })).toBeNull();
+        expect(screen.queryByRole('button', { name: 'Withdraw' })).toBeNull();
+    });
+
     it('supports keyboard tab navigation and hides settings from members', async () => {
         renderPage(false, 'settings');
         const standings = await screen.findByRole('tab', { name: 'Standings & Crosstable' });
@@ -113,7 +153,8 @@ describe('TournamentPage duplicate result protection', () => {
     it('explains permanent deletion and requires confirmation before deleting', async () => {
         tournamentApi.delete.mockRejectedValueOnce(new Error('Try deletion again.'));
         renderPage();
-        fireEvent.click(await screen.findByRole('button', { name: 'Delete', exact: true }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Tournament actions' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Delete', exact: true }));
         const dialog = screen.getByRole('dialog', { name: 'Permanently delete tournament?' });
         expect(dialog.textContent).toContain('Your club, players, and unrelated records will remain.');
         expect(tournamentApi.delete).not.toHaveBeenCalled();
@@ -259,7 +300,8 @@ describe('TournamentPage duplicate result protection', () => {
         tournamentApi.archive.mockResolvedValue({});
         renderPage();
 
-        fireEvent.click(await screen.findByRole('button', { name: 'Archive' }));
+        fireEvent.click(await screen.findByRole('button', { name: 'Tournament actions' }));
+        fireEvent.click(screen.getByRole('menuitem', { name: 'Archive' }));
         const dialog = screen.getByRole('dialog', { name: 'Archive tournament?' });
         expect(tournamentApi.archive).not.toHaveBeenCalled();
 

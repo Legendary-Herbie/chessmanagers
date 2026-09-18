@@ -70,8 +70,8 @@ describe('public visibility and DTO boundaries', () => {
             settings: { internalPairingSeed: 42 },
         });
         await db.query(
-            'INSERT INTO tournament_players (tournament_id, player_id) VALUES ($1, $2)',
-            [tournament.id, player.id]
+            'INSERT INTO tournament_players (tournament_id, player_id, club_id) VALUES ($1, $2, $3)',
+            [tournament.id, player.id, club.id]
         );
 
         const playerResponse = await request(app)

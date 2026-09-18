@@ -26,6 +26,7 @@ const attachmentParams = z.object({ clubId: id, announcementId: id, attachmentId
 const content = z.object({
     title: z.string().trim().min(1).max(200),
     contentHtml: z.string().min(1).max(100_000),
+    notificationEnabled: z.boolean().optional(),
 }).strict();
 const listQuery = z.object({
     status: z.enum(['draft', 'published', 'archived']).optional(),

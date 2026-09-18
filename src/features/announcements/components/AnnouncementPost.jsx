@@ -28,6 +28,7 @@ function AnnouncementPostContent({ announcement, club }) {
             <span className="announcement-avatar" aria-hidden="true">{author?.slice(0, 1).toUpperCase()}</span>
             <div className="announcement-post-author"><strong>{author}</strong>
                 <time dateTime={announcement.publishedAt || announcement.updatedAt}>{new Date(announcement.publishedAt || announcement.updatedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time>
+                {announcement.editedAt && <span className="muted">Updated <time dateTime={announcement.editedAt}>{new Date(announcement.editedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</time></span>}
             </div>
             {announcement.status !== 'published' && <span className={`announcement-status announcement-status--${announcement.status}`}>{announcement.status}</span>}
         </header>

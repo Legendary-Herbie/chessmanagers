@@ -1,0 +1,90 @@
+name: onechessclub
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: chessmanagers
+      POSTGRES_USER: chessmanagers
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.vps}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U "$${POSTGRES_USER}" -d "$${POSTGRES_DB}"']
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    stop_grace_period: 60s
+    logging: *logging
+
+  app:
+    build: .
+    image: onechessclub-app:${APP_VERSION:-local}
+    init: true
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      SERVE_FRONTEND: "true"
+      PORT: "5000"
+      # Plaintext connection stays inside this VPS's Docker network; no database port is published.
+      DATABASE_URL: postgres://chessmanagers:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}@db:5432/chessmanagers?sslmode=disable
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env.vps}
+      FRONTEND_URL: https://${APP_DOMAIN:?Set APP_DOMAIN in .env.vps}
+      CORS_ORIGIN: https://${APP_DOMAIN:?Set APP_DOMAIN in .env.vps}
+      COOKIE_SAME_SITE: lax
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_SECURE: ${SMTP_SECURE:-false}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: https://${APP_DOMAIN}/api/v1/auth/google/callback
+    volumes:
+      - uploads:/app/server/uploads
+    healthcheck:
+      test: [CMD, node, /app/server/src/database/containerHealthcheck.js]
+      interval: 30s
+      timeout: 10s
+      start_period: 120s
+      retries: 3
+    stop_grace_period: 60s
+    security_opt:
+      - no-new-privileges:true
+    logging: *logging
+
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      app:
+        condition: service_healthy
+    environment:
+      APP_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    logging: *logging
+
+volumes:
+  postgres_data:
+  uploads:
+  caddy_data:
+  caddy_config:

@@ -259,26 +259,33 @@
 
 @media print { .tournament-print-sheet td:first-child { font-size:20pt; font-weight:700; } .tournament-print-sheet td:nth-child(2), .tournament-print-sheet td:nth-child(4) { font-size:16pt; font-weight:600; } .print-result-boxes { white-space:nowrap; line-height:1.8; font:12pt Arial,sans-serif; } }
 
-.tiebreak-help { position:relative; cursor:help; border-bottom:1px dotted currentColor; }.tiebreak-help [role=tooltip] { display:none; position:absolute; bottom:100%; right:0; width:220px; padding:.75rem; white-space:normal; background:var(--bg-surface); color:var(--text); border:1px solid var(--border); border-radius:.5rem; box-shadow:var(--shadow); z-index:10; }.tiebreak-help:hover [role=tooltip], .tiebreak-help:focus [role=tooltip] { display:block; }.tiebreak-settings { padding:1rem; }.tiebreak-settings summary { cursor:pointer; }.tiebreak-settings fieldset { border:0; padding:0; }.tiebreak-settings label { display:block; margin:.75rem 0; }.tiebreak-settings li { margin:.5rem 0; }
+.tiebreak-help { appearance:none; padding:6px 0; border:0; border-radius:0; background:transparent; color:inherit; font:inherit; text-align:inherit; cursor:help; text-decoration:underline dotted; text-underline-offset:4px; }
+.tiebreak-help:focus-visible { outline:2px solid var(--primary); outline-offset:3px; }
+.tiebreak-tooltip { position:fixed; z-index:1600; width:240px; max-width:calc(100vw - 16px); box-sizing:border-box; padding:12px; white-space:normal; overflow-wrap:anywhere; background:var(--bg-surface); color:var(--text); border:1px solid var(--border); border-radius:8px; box-shadow:var(--shadow-sm); font-size:13px; font-weight:400; line-height:1.5; text-align:left; }
+@media print { .tiebreak-tooltip { display:none; } }
+.tiebreak-settings { padding:1rem; }.tiebreak-settings summary { cursor:pointer; }.tiebreak-settings fieldset { border:0; padding:0; }.tiebreak-settings label { display:block; margin:.75rem 0; }.tiebreak-settings li { margin:.5rem 0; }
 
 /* Compact tournament workspace; all colors follow the shared light/dark tokens. */
 .tournament-workspace [hidden] { display:none !important; }
 .tournament-hero { background:var(--bg-surface); border:1px solid var(--border); border-radius:16px; padding:20px; box-shadow:var(--shadow-sm); }
-.tournament-hero__top { display:flex; justify-content:space-between; align-items:flex-start; gap:20px; }
+.tournament-hero__eyebrow { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:16px; }
+.tournament-hero__top { display:flex; justify-content:space-between; align-items:center; gap:24px; }
 .tournament-hero__top > div:first-child { flex:1; min-width:0; }
 .tournament-back { font-size:12px; }
 .tournament-hero .tournament-heading { margin:12px 0; flex-wrap:wrap; }
 .tournament-hero h1 { margin:0; font-size:28px; line-height:1.2; letter-spacing:-.03em; overflow-wrap:anywhere; }
-.tournament-hero__chips { display:flex; flex-wrap:wrap; gap:8px; }
-.tournament-hero__chips > span { display:inline-flex; align-items:center; gap:6px; padding:5px 8px; border-radius:6px; background:var(--bg-muted); font-size:12px; }
+.tournament-hero__chips { display:flex; flex-wrap:wrap; gap:8px 16px; margin-top:10px; color:var(--text-muted); }
+.tournament-hero__chips > span { display:inline-flex; align-items:center; gap:6px; font-size:13px; }
 .tournament-status--dot { display:inline-flex; align-items:center; gap:6px; }
 .tournament-status--dot::before { content:''; width:6px; height:6px; background:currentColor; border-radius:50%; }
 .tournament-status.archived { background:var(--status-neutral-bg); color:var(--status-neutral-text); }
-.tournament-hero .tournament-actions { max-width:330px; gap:8px; }
-.tournament-hero__metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(120px,1fr)); gap:16px; border-top:1px solid var(--border); margin:20px 0 0; padding-top:16px; }
-.tournament-hero__metrics > div { display:flex; flex-direction:column-reverse; gap:4px; }
+.tournament-hero .tournament-actions { flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; max-width:360px; gap:8px; align-items:center; }
+.tournament-hero .copy-public-link { margin:0; max-width:100%; }
+.tournament-hero__metrics { display:flex; flex-wrap:wrap; gap:16px 32px; border-top:1px solid var(--border); margin:20px 0 0; padding-top:14px; }
+.tournament-hero__metrics > div { display:flex; align-items:baseline; flex-direction:row-reverse; gap:8px; }
 .tournament-hero__metrics dt { color:var(--text-muted); font-size:12px; }
-.tournament-hero__metrics dd { margin:0; font-size:24px; font-weight:700; color:var(--text-strong); font-variant-numeric:tabular-nums; }
+.tournament-hero__metrics dd { margin:0; font-size:18px; font-weight:700; color:var(--text-strong); font-variant-numeric:tabular-nums; }
+.tournament-hero__total { color:var(--text-muted); font-size:12px; font-weight:400; }
 .tournament-hero__metrics .needs-attention dd { color:var(--status-warning-text); }
 .tournament-workspace-tabs { display:flex; gap:4px; border-bottom:1px solid var(--border); overflow-x:auto; padding:4px 0; }
 .tournament-workspace-tabs button { display:flex; align-items:center; justify-content:center; gap:8px; flex-shrink:0; min-height:44px; padding:10px 14px; border:0; border-radius:8px; background:transparent; color:var(--text-muted); font:inherit; font-size:14px; cursor:pointer; transition:background 120ms ease,color 120ms ease; }
@@ -310,14 +317,16 @@
 .tournament-workspace .name-link:hover { text-decoration:underline; text-underline-offset:3px; }
 .tournament-lifecycle-note { border-top:1px solid var(--border); padding-top:16px; margin-top:20px; max-width:65ch; }
 .tournament-lifecycle-note h3 { font-size:16px; }
+@media(max-width:1000px) {
+    .tournament-hero__top { flex-direction:column; align-items:stretch; gap:16px; }
+    .tournament-hero .tournament-actions { max-width:none; justify-content:flex-start; }
+}
 @media(max-width:760px) {
-    .tournament-hero__top { flex-direction:column; gap:16px; }
-    .tournament-hero .tournament-actions { max-width:none; }
     .tournament-workspace .pairing-row { grid-template-columns:36px minmax(0,1fr) 40px minmax(0,1fr); gap:8px; }
     .tournament-workspace .pairing-score-buttons { grid-column:2 / -1; margin-top:8px; }
     .tournament-workspace .pairing-score-buttons button { flex:1; }
     .tournament-workspace .pairing-item { padding:12px; }
-    .tournament-hero__metrics { grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+    .tournament-hero__metrics { gap:12px 24px; }
     .tournament-hero h1 { font-size:24px; }
 }
 @media(prefers-reduced-motion:reduce) { .tournament-workspace-tabs button, .tournament-workspace .pairing-item { transition:none; } }

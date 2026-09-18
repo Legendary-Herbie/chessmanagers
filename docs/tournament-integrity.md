@@ -1,0 +1,16 @@
+# Tournament integrity rules
+
+- Tournament entries, rounds and both pairing players must belong to the tournament's club. PostgreSQL composite foreign keys enforce this independently of API checks. Migration 23 backfills roster club IDs from the owning tournament and rejects invalid historical relationships rather than deleting chess records.
+- Match points are resolved first. Each configured tiebreak then splits only the groups still tied. Head-to-head totals use the group reaching that criterion; subsequent criteria resolve remaining ties without restarting earlier criteria. An omitted head-to-head criterion is not calculated. Empty criteria fall back to player name and ID after points.
+- Round Robin rosters freeze when round one is generated. No late additions or withdrawals are accepted after that point. The ordered roster is saved with the first round and reused for every Berger round, independent of later names, ratings or seeds. An inactive original player blocks further pairing until restored. Existing tournaments without a saved roster must have prior rounds consistent with the reconstructed table; incompatible history is rejected rather than rescheduled.
+- Swiss history includes byes. Before persistence, output must cover every eligible player exactly once, contain no unknown or repeated players or opponents, and have exactly the required zero or one bye. A player cannot receive another bye while an eligible player has had none. Color assignments cannot produce a balance beyond two or three successive games with the same color. Invalid output fails without saving a round.
+- Status changes, registration, withdrawal and round generation lock the tournament before checking its current state. Completion requires the current round to be complete. Repeated status requests are idempotent.
+# Knockout tournaments
+
+Single elimination uses the same setup, result entry, match history, print sheets, and lifecycle endpoints as other formats. The opening bracket is seeded deterministically and padded to a power of two; opening byes advance players without creating rated matches. Adjacent bracket winners meet in the next stage. Rosters freeze when the first round is paired.
+
+Draws remain actual match records. After the round is complete, **Pair tiebreak games** creates a separate round containing only the unresolved bracket slots, with colors reversed. These games retain the tournament's rating category and rated setting. Another draw requires another replay; no player advances on a draw or by an administrative winner override. Decisive winners wait while other slots resolve.
+
+Standings rank advancement rather than cumulative points. Players eliminated in the same bracket stage share a rank, even if some played extra tiebreak games. Print and public standings use the same server ranking. A tournament can be completed only after a decisive final.
+
+Earlier results cannot change once a later knockout round has been paired. Voiding or deleting such a match is also blocked transactionally, preserving downstream bracket integrity. Current-round corrections remain available while active; notes and played-time corrections can still be made to earlier games without changing their outcome. Archive and permanent tournament deletion retain the existing club-scoped behavior.

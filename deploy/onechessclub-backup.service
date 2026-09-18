@@ -1,0 +1,11 @@
+[Unit]
+Description=1chessclub database and uploads backup
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/onechessclub
+ExecStart=/bin/bash /opt/onechessclub/deploy/backup.sh
+UMask=0077

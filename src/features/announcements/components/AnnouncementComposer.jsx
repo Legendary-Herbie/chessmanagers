@@ -4,6 +4,8 @@ import Button from '../../../shared/common/Button.jsx';
 import RichTextEditor from './RichTextEditor.jsx';
 import { announcementApi } from '../api/announcementApi.js';
 
+import { ATTACHMENT_ACCEPT, validateAttachments } from '../attachmentValidation.js';
+
 function SelectedFile({ file }) {
     const [url, setUrl] = useState(null);
     useEffect(() => {
@@ -21,13 +23,15 @@ export default function AnnouncementComposer({ clubId, onClose, onComplete }) {
     const [files, setFiles] = useState([]);
     const [working, setWorking] = useState(false);
     const [error, setError] = useState('');
+    const [notificationEnabled, setNotificationEnabled] = useState(true);
     const draftId = useRef(null);
     const uploaded = useRef(new Map());
     const inFlight = useRef(false);
     const addFiles = chosen => {
         if (working || !chosen.length) return;
-        if (chosen.some(file => file.size > 5 * 1024 * 1024 || !['image/jpeg', 'image/png', 'image/webp', 'application/pdf'].includes(file.type))) {
-            setError('Choose JPEG, PNG, WebP, or PDF files under 5 MB each.');
+        const validationError = validateAttachments(chosen);
+        if (validationError) {
+            setError(validationError);
         } else { setFiles(current => [...current, ...chosen]); setError(''); }
     };
     const save = async (event, publish) => {
@@ -37,9 +41,9 @@ export default function AnnouncementComposer({ clubId, onClose, onComplete }) {
         setWorking(true); setError('');
         try {
             if (!draftId.current) {
-                const result = await announcementApi.create(clubId, { title, contentHtml });
+                const result = await announcementApi.create(clubId, { title, contentHtml, notificationEnabled });
                 draftId.current = result.announcement.id;
-            } else await announcementApi.update(clubId, draftId.current, { title, contentHtml });
+            } else await announcementApi.update(clubId, draftId.current, { title, contentHtml, notificationEnabled });
             // Retry only unfinished uploads; the draft is retained until every file is ready.
             for (const file of files) {
                 if (!uploaded.current.has(file)) {
@@ -64,14 +68,20 @@ export default function AnnouncementComposer({ clubId, onClose, onComplete }) {
         } catch (removeError) { setError(removeError.message); }
         finally { setWorking(false); }
     };
-    return <Dialog title="New announcement" className="announcement-composer-dialog" busy={working} onClose={onClose}>
+    const close = () => {
+        if ((title.trim() || contentHtml !== '<p></p>' || files.length || draftId.current)
+            && !window.confirm('Discard unsaved announcement changes?')) return;
+        onClose();
+    };
+    return <Dialog title="New announcement" className="announcement-composer-dialog" busy={working} onClose={close}>
         <form onSubmit={event => save(event, true)}>
             <fieldset disabled={working} className="announcement-composer">
                 {error && <p className="announcement-error" role="alert">{error}</p>}
                 <label>Title<input className="input" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} required placeholder="Give your update a title" /></label>
+                <label className="announcement-notification-toggle"><input type="checkbox" checked={notificationEnabled} onChange={event => setNotificationEnabled(event.target.checked)} /> Notify club members when published</label>
                 <div><span className="composer-label">Content</span><RichTextEditor value={contentHtml} onChange={setContentHtml} disabled={working} onFiles={addFiles} /></div>
                 <label className="announcement-file-picker" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); addFiles([...event.dataTransfer.files]); }}>Add, drop, or paste images and PDFs
-                    <input type="file" multiple accept="image/jpeg,image/png,image/webp,application/pdf" onChange={event => {
+                    <input type="file" multiple accept={ATTACHMENT_ACCEPT} onChange={event => {
                         addFiles([...event.target.files]);
                         event.target.value = '';
                     }} />

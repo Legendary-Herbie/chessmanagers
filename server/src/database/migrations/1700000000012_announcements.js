@@ -5,6 +5,7 @@ export const ANNOUNCEMENTS_SQL = `
         title TEXT NOT NULL,
         content_html TEXT NOT NULL,
         content_text TEXT NOT NULL,
+        notification_enabled BOOLEAN NOT NULL DEFAULT TRUE,
         status TEXT NOT NULL DEFAULT 'draft',
         created_by TEXT NOT NULL,
         updated_by TEXT NOT NULL,

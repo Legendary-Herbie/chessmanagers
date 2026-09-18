@@ -270,8 +270,8 @@ export const deleteMatchSchema = z.object({
 
 export const createTournamentSchema = z.object({
     name:      z.string().trim().min(1, 'Tournament name is required.').max(150),
-    type:      z.enum(['round_robin', 'swiss'], {
-        errorMap: () => ({ message: "Type must be 'round_robin' or 'swiss'." }),
+    type:      z.enum(['round_robin', 'swiss', 'knockout'], {
+        errorMap: () => ({ message: "Type must be 'round_robin', 'swiss', or 'knockout'." }),
     }),
     startDate: z.string().datetime({ message: 'startDate must be a valid ISO datetime.' }),
     endDate:   z.string().datetime().optional().nullable(),

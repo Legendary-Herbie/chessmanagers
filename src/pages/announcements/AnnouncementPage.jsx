@@ -9,6 +9,8 @@ import RichTextEditor from '../../features/announcements/components/RichTextEdit
 import Button from '../../shared/common/Button.jsx';
 import '../../styles/announcements.css';
 
+import { ATTACHMENT_ACCEPT, validateAttachments } from '../../features/announcements/attachmentValidation.js';
+
 export default function AnnouncementPage() {
     const { announcementId } = useParams();
     const navigate = useNavigate();
@@ -22,6 +24,7 @@ export default function AnnouncementPage() {
     const [working, setWorking] = useState(false);
     const [error, setError] = useState(null);
     const [confirmAction, setConfirmAction] = useState(null);
+    const [notificationEnabled, setNotificationEnabled] = useState(true);
 
     useEffect(() => {
         if (!club?.id || announcement?.id !== announcementId || announcement?.status !== 'published') return;
@@ -41,6 +44,7 @@ export default function AnnouncementPage() {
             setAnnouncement(result.announcement);
             setTitle(result.announcement.title);
             setContentHtml(result.announcement.contentHtml);
+            setNotificationEnabled(result.announcement.notificationEnabled !== false);
         } catch (loadError) {
             setError(loadError.message || 'Could not load announcement.');
         } finally {
@@ -54,7 +58,7 @@ export default function AnnouncementPage() {
         setWorking(true);
         setError(null);
         try {
-            const result = await announcementApi.update(club.id, announcementId, { title, contentHtml });
+            const result = await announcementApi.update(club.id, announcementId, { title, contentHtml, notificationEnabled });
             setAnnouncement(current => ({ ...current, ...result.announcement, attachments: current.attachments }));
             setEditing(false);
         } catch (saveError) {
@@ -85,6 +89,12 @@ export default function AnnouncementPage() {
     const upload = async event => {
         const file = event.target.files?.[0];
         if (!file) return;
+        const validationError = validateAttachments([file]);
+        if (validationError) {
+            setError(validationError);
+            event.target.value = '';
+            return;
+        }
         setWorking(true);
         setError(null);
         try {
@@ -122,10 +132,12 @@ export default function AnnouncementPage() {
                     <input className="input announcement-title-input" value={title} onChange={event => setTitle(event.target.value)} maxLength={200} />
                 ) : <h1>{announcement.title}</h1>}
                 <time>{new Date(announcement.publishedAt || announcement.updatedAt).toLocaleString()}</time>
+                {announcement.editedAt && <p className="muted">Updated <time dateTime={announcement.editedAt}>{new Date(announcement.editedAt).toLocaleString()}</time></p>}
                 {announcement.status === 'published' && <p>{announcement.viewCount ?? 0} views</p>}
             </header>
 
             {error && <p className="announcement-error" role="alert">{error}</p>}
+            {editing && announcement.status === 'published' && <p className="muted">Changes stay published and show an updated timestamp. Members will not be notified again.</p>}
             {editing ? (
                 <RichTextEditor value={contentHtml} onChange={setContentHtml} disabled={working} />
             ) : (
@@ -137,6 +149,7 @@ export default function AnnouncementPage() {
                     {editable && !editing && <Button variant="secondary" onClick={() => setEditing(true)}>Edit</Button>}
                     {editing && <Button onClick={save} loading={working}>Save changes</Button>}
                     {editing && <Button variant="secondary" onClick={() => setEditing(false)}>Cancel</Button>}
+                    {editing && announcement.status === 'draft' && <label className="announcement-notification-toggle"><input type="checkbox" checked={notificationEnabled} onChange={event => setNotificationEnabled(event.target.checked)} /> Notify members on publish</label>}
                     {announcement.status === 'draft' && <Button onClick={() => setConfirmAction('publish')}>Publish</Button>}
                     {announcement.status === 'published' && <Button variant="secondary" onClick={() => setConfirmAction('archive')}>Archive</Button>}
                     <Button variant="danger" onClick={() => setConfirmAction('delete')}>Delete</Button>
@@ -146,7 +159,7 @@ export default function AnnouncementPage() {
             {editable && (
                 <label className="announcement-upload">
                     <span>Add image or PDF</span>
-                    <input type="file" accept="image/jpeg,image/png,image/webp,application/pdf" disabled={working} onChange={upload} />
+                    <input type="file" accept={ATTACHMENT_ACCEPT} disabled={working} onChange={upload} />
                 </label>
             )}
 

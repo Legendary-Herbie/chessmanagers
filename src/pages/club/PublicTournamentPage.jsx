@@ -29,9 +29,9 @@ export default function PublicTournamentPage() {
             <p><RatingCategoryIcon category={data.tournament.ratingCategory} />{data.tournament.ratingCategory[0].toUpperCase() + data.tournament.ratingCategory.slice(1)} · {data.tournament.isRated ? 'Rated' : 'Unrated'}</p></header>
         <section className="public-card public-section"><h2>Standings</h2>
             {data.standings.length ? <div className="public-table-wrap"><table className="public-table">
-                <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">Score</th></tr></thead>
+                <thead><tr><th scope="col">Rank</th><th scope="col">Player</th><th scope="col">{data.tournament.type === 'knockout' ? 'Progress' : 'Score'}</th></tr></thead>
                 <tbody>{data.standings.map((standing, index) => <tr key={standing.publicPlayerId}>
-                    <td>{index + 1}</td><td>{standing.name}</td><td><strong>{standing.score}</strong></td>
+                    <td>{standing.rank ?? index + 1}</td><td>{standing.name}</td><td><strong>{standing.knockoutStatus ?? standing.score}</strong></td>
                 </tr>)}</tbody>
             </table></div> : <p>No standings are available yet.</p>}
         </section>

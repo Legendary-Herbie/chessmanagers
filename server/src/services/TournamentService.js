@@ -2,7 +2,7 @@ import db from '../database/database.js';
 import { TournamentModel } from '../models/Tournament.js';
 import { createMatch, updateMatch } from './MatchService.js';
 import { notifyLinkedPlayers } from './NotificationService.js';
-import { bergerSchedule, calculateStandings, swissPairings } from './TournamentPairingService.js';
+import { bergerSchedule, calculateStandings, knockoutPairings, knockoutProgress, playerOrder, swissPairings } from './TournamentPairingService.js';
 
 const failure = (code, details = {}) => ({ ok: false, code, ...details });
 
@@ -37,6 +37,9 @@ function toPairing(row) {
         notes: row.match_notes ?? null,
         isBye: row.is_bye,
         status: row.status,
+        bracketSlot: row.bracket_slot,
+        isPlayoff: row.is_playoff,
+        ratingCategory: row.rating_category,
     };
 }
 
@@ -44,27 +47,6 @@ function eligibleParticipants(participants, roundNumber) {
     return participants.filter(player => player.status === 'active'
         && player.playerStatus === 'active'
         && player.registrationRound <= roundNumber);
-}
-
-function chooseRoundRobinPairings(participants, completedPairings) {
-    const played = new Set(completedPairings.filter(pairing => !pairing.isBye).map(pairing => (
-        [pairing.whitePlayerId, pairing.blackPlayerId].sort().join(':')
-    )));
-    const byeCounts = new Map(participants.map(player => [player.id, player.byeCount]));
-    const candidates = bergerSchedule(participants).map((round, index) => {
-        const remaining = round.filter(pairing => pairing.isBye
-            ? (byeCounts.get(pairing.whitePlayerId) ?? 0) === 0
-            : !played.has([pairing.whitePlayerId, pairing.blackPlayerId].sort().join(':')));
-        return {
-            index,
-            pairings: remaining,
-            games: remaining.filter(pairing => !pairing.isBye).length,
-            repeatByes: remaining.filter(pairing => pairing.isBye
-                && (byeCounts.get(pairing.whitePlayerId) ?? 0) > 0).length,
-        };
-    }).filter(candidate => candidate.pairings.length > 0);
-    candidates.sort((a, b) => b.games - a.games || a.repeatByes - b.repeatByes || a.index - b.index);
-    return candidates[0]?.pairings ?? [];
 }
 
 async function currentRoundPayload(trx, tournament) {
@@ -91,7 +73,7 @@ export async function generateNextRound({ clubId, tournamentId, trx: existingTra
         });
         if (!tournament) return failure('TOURNAMENT_NOT_FOUND');
         if (tournament.status !== 'active') return failure('TOURNAMENT_NOT_ACTIVE');
-        if (!['swiss', 'round_robin'].includes(tournament.type)) {
+        if (!['swiss', 'round_robin', 'knockout'].includes(tournament.type)) {
             return failure('UNSUPPORTED_TOURNAMENT_FORMAT');
         }
 
@@ -112,11 +94,26 @@ export async function generateNextRound({ clubId, tournamentId, trx: existingTra
             [tournamentId, clubId]
         ).then(result => result.rows);
         const completedPairings = completedRows.map(toPairing);
+        const frozenRoster = tournament.round_robin_roster
+            ?? [...eligible].sort(playerOrder).map(player => player.id);
+        if (tournament.type === 'round_robin' && (eligible.length !== frozenRoster.length
+            || frozenRoster.some(id => !eligible.some(player => player.id === id)))) {
+            return failure('ROUND_ROBIN_ROSTER_CHANGED');
+        }
         let generated;
         try {
-            generated = tournament.type === 'swiss'
-                ? swissPairings(eligible, completedPairings)
-                : chooseRoundRobinPairings(eligible, completedPairings);
+            if (tournament.type === 'knockout') {
+                generated = knockoutPairings(eligible, completedPairings, roundNumber);
+            } else if (tournament.type === 'round_robin') {
+                const schedule = bergerSchedule(frozenRoster.map((id, seed) => ({ id, seed, name: id })));
+                if (completedPairings.some(game => !schedule[game.roundNumber - 1]?.some(expected =>
+                    expected.whitePlayerId === game.whitePlayerId && expected.blackPlayerId === game.blackPlayerId))) {
+                    return failure('ROUND_ROBIN_ROSTER_CHANGED');
+                }
+                generated = schedule[roundNumber - 1] ?? [];
+            } else {
+                generated = swissPairings(eligible, completedPairings, roundNumber);
+            }
         } catch (error) {
             return failure('PAIRING_FAILED', { reason: error.message });
         }
@@ -130,18 +127,23 @@ export async function generateNextRound({ clubId, tournamentId, trx: existingTra
         const createdPairings = await trx.query(
             `INSERT INTO tournament_pairings (
                 club_id, tournament_id, round_id, round_number, board,
-                white_player_id, black_player_id, result, is_bye, status
+              white_player_id, black_player_id, result, is_bye, status,
+              bracket_slot, is_playoff, rating_category
              ) SELECT $1, $2, $3, $4, entry.board::INTEGER,
-                      entry.white_id, entry.black_id,
-                      CASE WHEN entry.is_bye THEN 'bye' ELSE NULL END,
-                      entry.is_bye, CASE WHEN entry.is_bye THEN 'completed' ELSE 'scheduled' END
-               FROM UNNEST($5::TEXT[], $6::TEXT[], $7::BOOLEAN[]) WITH ORDINALITY
-                    AS entry(white_id, black_id, is_bye, board)
+                    entry.white_id, entry.black_id,
+                    CASE WHEN entry.is_bye THEN 'bye' ELSE NULL END,
+                    entry.is_bye, CASE WHEN entry.is_bye THEN 'completed' ELSE 'scheduled' END,
+                    entry.bracket_slot, entry.is_playoff, entry.rating_category
+             FROM UNNEST($5::TEXT[], $6::TEXT[], $7::BOOLEAN[], $8::INTEGER[], $9::BOOLEAN[], $10::TEXT[]) WITH ORDINALITY
+                  AS entry(white_id, black_id, is_bye, bracket_slot, is_playoff, rating_category, board)
              RETURNING *`,
             [clubId, tournamentId, round.id, roundNumber,
                 generated.map(pairing => pairing.whitePlayerId),
                 generated.map(pairing => pairing.blackPlayerId ?? null),
-                generated.map(pairing => Boolean(pairing.isBye))]
+                generated.map(pairing => Boolean(pairing.isBye)),
+                generated.map((pairing, index) => pairing.bracketSlot ?? index + 1),
+                generated.map(pairing => Boolean(pairing.isPlayoff)),
+                generated.map(() => tournament.rating_category)]
         ).then(result => result.rows.sort((a, b) => a.board - b.board));
         const pairings = createdPairings.map(toPairing);
         for (const created of createdPairings) {
@@ -179,8 +181,9 @@ export async function generateNextRound({ clubId, tournamentId, trx: existingTra
             round.completed_at = new Date();
         }
         await trx.query(
-            `UPDATE tournaments SET current_round = $1, updated_at = NOW() WHERE id = $2`,
-            [roundNumber, tournamentId]
+            `UPDATE tournaments SET current_round = $1, updated_at = NOW(),
+                round_robin_roster = CASE WHEN type = 'round_robin' THEN $3::TEXT[] ELSE round_robin_roster END WHERE id = $2`,
+            [roundNumber, tournamentId, frozenRoster]
         );
         return { ok: true, round, pairings, alreadyGenerated: false };
     });
@@ -238,12 +241,27 @@ export async function getTournamentDetail(clubId, tournamentId) {
         completedAt: round.completed_at,
         pairings: pairingsByRound.get(round.round_number) ?? [],
     }));
+    const knockout = tournament.type === 'knockout' ? knockoutProgress(pairings) : null;
+    let standings = calculateStandings(participants, pairings, tournament.tiebreaks);
+    if (knockout) {
+        standings = standings.sort((a, b) => (knockout.eliminationRounds.get(b.playerId) ?? Infinity) - (knockout.eliminationRounds.get(a.playerId) ?? Infinity)
+            || a.playerName.localeCompare(b.playerName));
+        let lastStage;
+        let rank = 0;
+        standings = standings.map((row, index) => {
+            const stage = knockout.eliminationRounds.get(row.playerId) ?? Infinity;
+            if (stage !== lastStage) rank = index + 1;
+            lastStage = stage;
+            return { ...row, rank, knockoutStatus: row.playerId === knockout.championId ? 'Champion' : Number.isFinite(stage) ? 'Eliminated' : 'In contention' };
+        });
+    }
     return {
         ok: true,
         tournament,
         participants,
         rounds,
-        standings: calculateStandings(participants, pairings, tournament.tiebreaks),
+        standings,
+        ...(knockout ? { knockout: { championId: knockout.championId, needsPlayoff: knockout.needsPlayoff } } : {}),
     };
 }
 
@@ -251,7 +269,8 @@ export async function recordPairingResult({
     clubId, tournamentId, pairingId, actorUserId, result, playedAt, notes, confirmDuplicate,
 }) {
     const pairing = await db.query(
-        `SELECT pairing.*, tournament.rating_category, tournament.is_rated
+        `SELECT pairing.*, tournament.rating_category AS tournament_rating_category,
+                tournament.is_rated AS tournament_is_rated
          FROM tournament_pairings pairing
          JOIN tournaments tournament ON tournament.id = pairing.tournament_id
            AND tournament.club_id = pairing.club_id
@@ -278,7 +297,7 @@ export async function recordPairingResult({
         blackPlayerId: pairing.black_player_id,
         result,
         ratingCategory: pairing.rating_category,
-        isRated: pairing.is_rated,
+        isRated: pairing.tournament_is_rated,
         tournamentId,
         tournamentPairingId: pairingId,
         playedAt,

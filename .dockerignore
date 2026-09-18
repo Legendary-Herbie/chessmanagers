@@ -7,3 +7,6 @@ dist
 coverage
 **/coverage
 *.log
+backups
+restore
+deploy/*.env

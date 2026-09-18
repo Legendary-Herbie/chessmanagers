@@ -233,8 +233,8 @@ describe('canonical match lifecycle', () => {
         const outsider = await createPlayer(club);
         const tournament = await createTournament(club, { ratingCategory: 'rapid', isRated: false, status: 'active' });
         await db.query(
-            `INSERT INTO tournament_players (tournament_id, player_id) VALUES ($1, $2), ($1, $3)`,
-            [tournament.id, white.id, black.id]
+            `INSERT INTO tournament_players (tournament_id, player_id, club_id) VALUES ($1, $2, $4), ($1, $3, $4)`,
+            [tournament.id, white.id, black.id, club.id]
         );
         const base = `/api/v1/clubs/${club.id}/matches`;
         const token = authorization(owner);

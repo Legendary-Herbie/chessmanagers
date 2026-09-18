@@ -95,12 +95,19 @@ async function validateParticipants(trx, clubId, whitePlayerId, blackPlayerId) {
 async function validateTournament(trx, values) {
     if (!values.tournamentId) return { ok: true };
     const tournament = await trx.query(
-        `SELECT id, club_id, rating_category, is_rated, status, deleted_at
+        `SELECT id, club_id, type, rating_category, is_rated, status, deleted_at
          FROM tournaments WHERE id = $1 AND club_id = $2 FOR UPDATE`,
         [values.tournamentId, values.clubId]
     ).then(result => result.first);
     if (!tournament || tournament.deleted_at) return failure('TOURNAMENT_NOT_FOUND');
-    if (tournament.rating_category !== values.ratingCategory || tournament.is_rated !== values.isRated) {
+    const pairing = values.tournamentPairingId
+        ? await trx.query(
+            'SELECT rating_category FROM tournament_pairings WHERE id = $1 AND club_id = $2',
+            [values.tournamentPairingId, values.clubId]
+        ).then(result => result.first)
+        : null;
+    const expectedCategory = pairing?.rating_category ?? tournament.rating_category;
+    if (expectedCategory !== values.ratingCategory || tournament.is_rated !== values.isRated) {
         return failure('TOURNAMENT_RATING_MISMATCH');
     }
     if (tournament.status !== 'active') return failure('TOURNAMENT_NOT_ACTIVE');
@@ -143,7 +150,7 @@ async function lockTournamentPairing(trx, values, matchId = null) {
         return failure('TOURNAMENT_PAIRING_ALREADY_COMPLETED');
     }
     const round = await trx.query(
-        `SELECT round.status, round.round_number, tournament.current_round
+        `SELECT round.status, round.round_number, tournament.current_round, tournament.type
          FROM tournament_rounds round
          JOIN tournaments tournament ON tournament.id = round.tournament_id AND tournament.club_id = round.club_id
          WHERE round.id = $1 AND round.tournament_id = $2 AND round.club_id = $3`,
@@ -151,6 +158,8 @@ async function lockTournamentPairing(trx, values, matchId = null) {
     ).then(result => result.first);
     // A completed round accepts corrections to its existing games, never new results.
     const correction = matchId && pairing.match_id === matchId && pairing.status === 'completed';
+    if (correction && round?.type === 'knockout' && round.current_round > pairing.round_number
+        && values.result !== pairing.result) return failure('KNOCKOUT_BRACKET_LOCKED');
     if (!round || round.round_number !== pairing.round_number
         || (correction
             ? !['paired', 'completed'].includes(round.status) || round.round_number > round.current_round
@@ -205,6 +214,11 @@ async function completeTournamentPairing(trx, pairing, match) {
 }
 
 async function reopenTournamentPairing(trx, matchId) {
+    const blocked = await trx.query(`SELECT pairing.id FROM tournament_pairings pairing
+        JOIN tournaments tournament ON tournament.id = pairing.tournament_id AND tournament.club_id = pairing.club_id
+        WHERE pairing.match_id = $1 AND tournament.type = 'knockout'
+        AND (tournament.current_round > pairing.round_number OR tournament.status <> 'active')`, [matchId]).then(result => result.first);
+    if (blocked) throw Object.assign(new Error('This knockout result is locked because play has advanced. Its match cannot be removed.'), { status: 409 });
     const pairing = await trx.query(
         `UPDATE tournament_pairings
          SET result = NULL, match_id = NULL, status = 'scheduled', updated_at = NOW()

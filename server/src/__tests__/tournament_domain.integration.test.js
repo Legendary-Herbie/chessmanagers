@@ -37,7 +37,7 @@ describe('tournament domain lifecycle', () => {
         )).first.status).toBe('active');
     });
 
-    it('accepts only Swiss and Round-Robin tournaments and provides searchable pagination', async () => {
+    it('rejects unsupported tournament formats and provides searchable pagination', async () => {
         const owner = await createUser();
         const club = await createClub(owner);
         const token = authorization(owner);
@@ -51,7 +51,7 @@ describe('tournament domain lifecycle', () => {
         };
 
         await request(app).post(base).set('Authorization', token)
-            .send({ ...payload, type: 'knockout' }).expect(400);
+            .send({ ...payload, type: 'unsupported' }).expect(400);
         const created = await request(app).post(base).set('Authorization', token)
             .send(payload).expect(201);
         expect(created.body.tournament).toMatchObject({

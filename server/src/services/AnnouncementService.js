@@ -26,10 +26,12 @@ function dto(row, attachments = undefined) {
         title: row.title,
         contentHtml: row.content_html,
         contentText: row.content_text,
+        notificationEnabled: row.notification_enabled !== false,
         status: row.status,
         publishedAt: row.published_at,
         createdAt: row.created_at,
         updatedAt: row.updated_at,
+        editedAt: row.edited_at ?? null,
         authorName: row.author_name ?? null,
         viewCount: Number(row.view_count ?? 0),
     };
@@ -61,14 +63,14 @@ async function audit(trx, { clubId, announcementId, actorUserId, eventType, oldS
     );
 }
 
-export async function createAnnouncement({ clubId, actorUserId, title, contentHtml }) {
+export async function createAnnouncement({ clubId, actorUserId, title, contentHtml, notificationEnabled = true }) {
     const content = sanitizeAnnouncementHtml(contentHtml);
     return db.transaction(async trx => {
         const announcement = await trx.query(
             `INSERT INTO announcements
-                (club_id, title, content_html, content_text, created_by, updated_by)
-             VALUES ($1, $2, $3, $4, $5, $5) RETURNING *`,
-            [clubId, title.trim(), content.contentHtml, content.contentText, actorUserId]
+                (club_id, title, content_html, content_text, notification_enabled, created_by, updated_by)
+             VALUES ($1, $2, $3, $4, $5, $6, $6) RETURNING *`,
+            [clubId, title.trim(), content.contentHtml, content.contentText, notificationEnabled, actorUserId]
         ).then(result => result.first);
         await audit(trx, {
             clubId, announcementId: announcement.id, actorUserId,
@@ -84,7 +86,8 @@ export async function listAnnouncements(clubId, {
     const params = [clubId, canManage, status, q, limit, offset];
     const result = await db.query(
         `SELECT announcement.*, users.name AS author_name,
-                (SELECT COUNT(*)::int FROM announcement_views v WHERE v.announcement_id = announcement.id) AS view_count,
+                (SELECT COUNT(*)::int FROM announcement_views v
+                 WHERE v.announcement_id = announcement.id AND v.club_id = announcement.club_id) AS view_count,
                 COUNT(*) OVER ()::INTEGER AS total_count
          FROM announcements announcement
          LEFT JOIN users ON users.id = announcement.created_by
@@ -112,7 +115,8 @@ export async function listAnnouncements(clubId, {
 export async function getAnnouncement({ clubId, announcementId, canManage = false }) {
     const announcement = await db.query(
         `SELECT announcements.*, (SELECT name FROM users WHERE id = announcements.created_by) AS author_name,
-            (SELECT COUNT(*)::int FROM announcement_views WHERE announcement_id = announcements.id) AS view_count
+            (SELECT COUNT(*)::int FROM announcement_views
+             WHERE announcement_id = announcements.id AND club_id = announcements.club_id) AS view_count
          FROM announcements
          WHERE id = $1 AND club_id = $2 AND deleted_at IS NULL
            AND ($3::BOOLEAN OR status = 'published')`,
@@ -135,12 +139,12 @@ export async function recordAnnouncementView({ clubId, announcementId, userId })
         if (!announcement) return null;
         await trx.query(`INSERT INTO announcement_views (club_id, announcement_id, user_id)
             VALUES ($1, $2, $3) ON CONFLICT DO NOTHING`, [clubId, announcementId, userId]);
-        return trx.query('SELECT COUNT(*)::int AS "viewCount" FROM announcement_views WHERE announcement_id = $1',
-            [announcementId]).then(r => r.first);
+        return trx.query('SELECT COUNT(*)::int AS "viewCount" FROM announcement_views WHERE announcement_id = $1 AND club_id = $2',
+            [announcementId, clubId]).then(r => r.first);
     });
 }
 
-export async function updateAnnouncement({ clubId, announcementId, actorUserId, title, contentHtml }) {
+export async function updateAnnouncement({ clubId, announcementId, actorUserId, title, contentHtml, notificationEnabled }) {
     const content = sanitizeAnnouncementHtml(contentHtml);
     return db.transaction(async trx => {
         const existing = await trx.query(
@@ -152,9 +156,11 @@ export async function updateAnnouncement({ clubId, announcementId, actorUserId, 
         if (existing.status === 'archived') return { ok: false, code: 'ANNOUNCEMENT_ARCHIVED' };
         const updated = await trx.query(
             `UPDATE announcements SET title = $3, content_html = $4, content_text = $5,
-                    updated_by = $6, updated_at = NOW()
+                    notification_enabled = COALESCE($6, notification_enabled), updated_by = $7, updated_at = NOW(),
+                    edited_at = CASE WHEN status = 'published' AND (title IS DISTINCT FROM $3 OR content_html IS DISTINCT FROM $4)
+                        THEN NOW() ELSE edited_at END
              WHERE id = $1 AND club_id = $2 RETURNING *`,
-            [announcementId, clubId, title.trim(), content.contentHtml, content.contentText, actorUserId]
+            [announcementId, clubId, title.trim(), content.contentHtml, content.contentText, notificationEnabled ?? null, actorUserId]
         ).then(result => result.first);
         await audit(trx, {
             clubId, announcementId, actorUserId, eventType: 'announcement.updated',
@@ -186,13 +192,15 @@ export async function publishAnnouncement({ clubId, announcementId, actorUserId 
             clubId, announcementId, actorUserId, eventType: 'announcement.published',
             oldState: existing, newState: published,
         });
-        await notifyClubMembers({
-            trx,
-            clubId,
-            eventType: 'announcement.published',
-            dedupeKey: `announcement:${announcementId}:published`,
-            payload: { announcementId, title: published.title },
-        });
+        if (published.notification_enabled) {
+            await notifyClubMembers({
+                trx,
+                clubId,
+                eventType: 'announcement.published',
+                dedupeKey: `announcement:${announcementId}:published`,
+                payload: { announcementId, title: published.title },
+            });
+        }
         return { ok: true, announcement: dto(published), alreadyPublished: false };
     });
 }
@@ -264,6 +272,8 @@ export async function addAttachmentRecord({ clubId, announcementId, actorUserId,
             clubId, announcementId, actorUserId, eventType: 'announcement.attachment_added',
             newState: { attachmentId: attachment.id, originalName: attachment.original_name },
         });
+        await trx.query(`UPDATE announcements SET edited_at = NOW(), updated_at = NOW(), updated_by = $3
+            WHERE id = $1 AND club_id = $2 AND status = 'published'`, [announcementId, clubId, actorUserId]);
         return { ok: true, attachment: attachmentDto(attachment) };
     });
 }
@@ -291,6 +301,8 @@ export async function deleteAttachment({ clubId, announcementId, attachmentId, a
             [attachmentId, announcementId, clubId, actorUserId]
         ).then(result => result.first);
         if (!attachment) return { ok: false, code: 'ATTACHMENT_NOT_FOUND' };
+        await trx.query(`UPDATE announcements SET edited_at = NOW(), updated_at = NOW(), updated_by = $3
+            WHERE id = $1 AND club_id = $2 AND status = 'published'`, [announcementId, clubId, actorUserId]);
         await audit(trx, {
             clubId, announcementId, actorUserId, eventType: 'announcement.attachment_deleted',
             oldState: { attachmentId, originalName: attachment.original_name },

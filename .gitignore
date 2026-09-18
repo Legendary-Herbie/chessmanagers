@@ -29,6 +29,9 @@ server/uploads/
 *.env.*
 !.env.example
 !server/.env.example
+!deploy/*.env.example
+/backups/
+/restore/
 
 # Logs
 logs

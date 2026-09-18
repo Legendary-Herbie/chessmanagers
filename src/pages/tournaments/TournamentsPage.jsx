@@ -83,7 +83,7 @@ export default function TournamentsPage() {
     return (
         <div className="tournaments-page">
             <div className="page-header">
-                <div><h1>Tournaments</h1><p className="muted">Run deterministic Swiss and Round-Robin events.</p></div>
+                <div><h1>Tournaments</h1><p className="muted">Organize Swiss and Round Robin tournaments.</p></div>
                 {isAdmin && <Button onClick={() => { setForm(emptyForm()); setModalOpen(true); }}>New tournament</Button>}
             </div>
             {error && !modalOpen && <div className="error" role="alert"><p>Couldn’t load tournaments. Try again. {error}</p><Button variant="secondary" disabled={loading} onClick={() => load()}>Retry</Button></div>}
@@ -117,7 +117,7 @@ export default function TournamentsPage() {
                     <div className="modal-body">
                         {error && <div className="error" role="alert">{error}</div>}
                         <label className="form-row"><span className="label">Name</span><input className="input" required maxLength={150} value={form.name} onChange={event => setForm({ ...form, name: event.target.value })} /></label>
-                        <label className="form-row"><span className="label">Format</span><select className="input" value={form.type} onChange={event => setForm({ ...form, type: event.target.value })}><option value="swiss">Swiss</option><option value="round_robin">Round Robin</option></select></label>
+                        <label className="form-row"><span className="label">Format</span><select className="input" value={form.type} onChange={event => setForm({ ...form, type: event.target.value })}>                        <option value="swiss">Swiss</option><option value="round_robin">Round Robin</option></select></label>
                         <label className="form-row"><span className="label">Rating category</span><select className="input" value={form.ratingCategory} onChange={event => setForm({ ...form, ratingCategory: event.target.value })}><option value="blitz">Blitz</option><option value="rapid">Rapid</option><option value="classical">Classical</option></select></label>
                         <label className="rated-toggle"><input type="checkbox" checked={form.isRated} onChange={event => setForm({ ...form, isRated: event.target.checked })} />Rated tournament</label>
                         <label className="form-row"><span className="label">Starts</span><input type="datetime-local" className="input" required value={form.startDate} onChange={event => setForm({ ...form, startDate: event.target.value })} /></label>

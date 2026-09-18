@@ -58,6 +58,7 @@ describe('TournamentsPage', () => {
         expect(screen.getByLabelText('Format')).toBeTruthy();
         expect(screen.getByRole('option', { name: 'Swiss' })).toBeTruthy();
         expect(screen.getByRole('option', { name: 'Round Robin' })).toBeTruthy();
+        expect(screen.queryByRole('option', { name: 'Knockout' })).toBeNull();
     });
 
     it('submits the canonical tournament fields and hides mutation controls from members', async () => {

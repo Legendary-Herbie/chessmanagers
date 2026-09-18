@@ -9,6 +9,7 @@ import {
 import { toMatchDto } from '../utils/matchDtos.js';
 
 const FAILURES = {
+    KNOCKOUT_BRACKET_LOCKED: [409, 'Later knockout pairings depend on this result. It cannot be changed after play advances.'],
     REQUEST_ID_CONFLICT: [409, 'This submission ID was already used for a different match.'],
     MATCH_NOT_FOUND: [404, 'Match not found.'],
     MATCH_CHANGED: [409, 'The match settings changed during this request. Refresh and try again.'],
