@@ -189,7 +189,7 @@ export default function PlayersPage() {
                 <div className="roster-stat-cards">
                     <div><span>Total players</span><strong>{stats.totalPlayers}</strong></div>
                     <div><span>Players with games</span><strong>{stats.activePlayers}</strong></div>
-                    {['blitz', 'rapid', 'classical'].map(category => <div key={category}><span>{category[0].toUpperCase() + category.slice(1)} average</span><strong>{stats.averageRatings[category] ?? '—'}</strong><small>Elo rating</small></div>)}
+                    {['blitz', 'rapid', 'classical'].map(category => <div key={category}><span>{category[0].toUpperCase() + category.slice(1)} average</span><strong>{stats.averageRatings[category] ?? 'â€”'}</strong><small>Elo rating</small></div>)}
                 </div>
             </Disclosure>
 

@@ -29,8 +29,12 @@ describe('CreateClub', () => {
         </ClubContext.Provider></AuthContext.Provider>);
         fireEvent.click(screen.getByRole('button', { name: 'Create Club' }));
         expect(clubApi.create).not.toHaveBeenCalled();
-        fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'New club' } });
-        fireEvent.change(screen.getByLabelText('Federation'), { target: { value: 'GHA' } });
+        expect(screen.getByLabelText(/Name \(required\)/).required).toBe(true);
+        expect(screen.getByLabelText(/Federation \(required\)/).required).toBe(true);
+        expect(screen.getByLabelText(/Name \(required\)/).getAttribute('aria-invalid')).toBe('true');
+        expect(screen.getByLabelText(/Federation \(required\)/).getAttribute('aria-invalid')).toBe('true');
+        fireEvent.change(screen.getByLabelText(/Name \(required\)/), { target: { value: 'New club' } });
+        fireEvent.change(screen.getByLabelText(/Federation \(required\)/), { target: { value: 'GHA' } });
         const advanced = screen.getByRole('button', { name: 'Advanced rating rules (optional)' });
         expect(advanced.getAttribute('aria-expanded')).toBe('false');
         fireEvent.click(screen.getByRole('button', { name: 'Create Club' }));
@@ -52,12 +56,12 @@ describe('CreateClub', () => {
         );
 
         expect(screen.getByLabelText('Visibility')).toBeTruthy();
-        fireEvent.change(screen.getByLabelText('Name'), {
+        fireEvent.change(screen.getByLabelText(/Name \(required\)/), {
             target: { value: 'Downtown Chess' },
         });
         expect(screen.getByRole('option', { name: 'GHA' })).toBeTruthy();
         expect(screen.getByRole('option', { name: 'USA' })).toBeTruthy();
-        fireEvent.change(screen.getByLabelText('Federation'), { target: { value: 'USA' } });
+        fireEvent.change(screen.getByLabelText(/Federation \(required\)/), { target: { value: 'USA' } });
         const badge = new File(['badge'], 'badge.png', { type: 'image/png' });
         fireEvent.change(screen.getByLabelText('Club badge'), { target: { files: [badge] } });
         fireEvent.click(screen.getByRole('button', { name: 'Advanced rating rules (optional)' }));

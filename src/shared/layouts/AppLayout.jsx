@@ -262,7 +262,7 @@ export default function AppLayout() {
                             type="button"
                             className="app-nav__menu-button"
                             aria-haspopup="menu"
-                            aria-controls="account-menu"
+                            aria-controls={menuOpen ? 'account-menu' : undefined}
                             aria-label={`${menuOpen ? 'Close' : 'Open'} account menu for ${displayName}`}
                             title={sidebarCollapsed ? displayName : undefined}
                             aria-expanded={menuOpen}

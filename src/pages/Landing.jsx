@@ -43,7 +43,7 @@ export default function Landing() {
                     <p className="landing-hero__note">For school clubs, local communities, and the people who bring them to life.</p>
                 </div>
 
-                <div className="landing-outcome-card" aria-label="Your club community on 1chessclub">
+                <div className="landing-outcome-card" role="group" aria-label="Your club community on 1chessclub">
                     <div className="landing-outcome-card__header"><span>Your club, together</span><strong>Connected</strong></div>
                     <div className="landing-outcome-card__metrics">
                         <div><strong>Join</strong><span>find your community</span></div>

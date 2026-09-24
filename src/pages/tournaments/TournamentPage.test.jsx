@@ -63,7 +63,7 @@ describe('TournamentPage duplicate result protection', () => {
         expect(screen.queryByRole('button', { name: 'Complete', exact: true })).toBeNull();
         fireEvent.change(screen.getByLabelText('Select round'), { target: { value: '1' } });
         expect(screen.queryByRole('group', { name: 'Result for round 1, board 1' })).toBeNull();
-        expect(within(screen.getByRole('region', { name: 'Pairings' })).getByText('½–½')).toBeTruthy();
+        expect(within(screen.getByRole('region', { name: 'Pairings' })).getByText('½–½', { selector: '.pairing-result' })).toBeTruthy();
     });
 
     it('shows knockout advancement instead of point tiebreaks and permits completing a final', async () => {

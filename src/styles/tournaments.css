@@ -105,6 +105,7 @@
     padding: 2rem;
     text-align: center;
 }
+.empty-tournaments .muted { color: var(--text); }
 
 .tournament-detail-header { margin-bottom: 1.5rem; }
 

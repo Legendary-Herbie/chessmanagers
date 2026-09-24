@@ -84,7 +84,8 @@ it('clears filters even while the filter panel is closed', async () => {
 
     it('shows explicit chronology, category, and rated controls', async () => {
         renderPage();
-        fireEvent.click(await screen.findByRole('button', { name: 'Add Match' }));
+        expect(await screen.findByRole('navigation', { name: 'Match results pagination' })).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'Add Match' }));
 
         expect(screen.getByLabelText('Played at').value).toBeTruthy();
         expect(screen.queryByLabelText('Tournament (optional)')).toBeNull();

@@ -14,7 +14,7 @@
     transform: translateY(-150%);
     padding: 0.65rem 0.9rem;
     border-radius: var(--radius-md);
-    background: var(--primary);
+    background: var(--primary-action);
     color: var(--primary-contrast);
     font-weight: var(--font-bold);
 }
@@ -60,9 +60,9 @@
     text-decoration: none;
     font-weight: var(--font-bold);
 }
-.public-nav a:hover, .public-nav a[aria-current='page'] { color: var(--primary); background: var(--bg-muted); }
-.public-nav .public-nav__button { background: var(--primary); color: var(--primary-contrast); }
-.public-nav .public-nav__button:hover { background: var(--primary-600); color: var(--primary-contrast); }
+.public-nav a:hover, .public-nav a[aria-current='page'] { color: var(--primary-text); background: var(--bg-muted); }
+.public-nav .public-nav__button { background: var(--primary-action); color: var(--primary-contrast); }
+.public-nav .public-nav__button:hover { background: var(--primary-action-hover); color: var(--primary-contrast); }
 
 .public-main {
     width: min(1120px, calc(100% - 2rem));
@@ -113,14 +113,14 @@
     padding: 0.65rem 1rem;
     border: 1px solid transparent;
     border-radius: var(--radius-md);
-    background: var(--primary);
+    background: var(--primary-action);
     color: var(--primary-contrast);
     font: inherit;
     font-weight: var(--font-bold);
     text-decoration: none;
     cursor: pointer;
 }
-.public-button:hover, .public-link-button:hover { background: var(--primary-600); }
+.public-button:hover, .public-link-button:hover { background: var(--primary-action-hover); }
 .public-button:focus-visible, .public-link-button:focus-visible { outline: none; box-shadow: var(--focus-ring); }
 .public-button:disabled { opacity: 0.55; cursor: not-allowed; }
 .public-button--secondary { border-color: var(--border); background: var(--bg-surface); color: var(--text-strong); }
@@ -161,7 +161,7 @@
 .public-club-metrics span { color: var(--text-muted); font-size: var(--font-size-xs); text-transform: capitalize; }
 .public-category-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-bottom: 1rem; }
 .public-category-tabs button { min-height: 38px; padding: 0 0.8rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--bg-surface); color: var(--text-muted); font: inherit; cursor: pointer; }
-.public-category-tabs button.active { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--bg-surface)); color: var(--primary); }
+.public-category-tabs button.active { border-color: var(--primary); background: color-mix(in srgb, var(--primary) 10%, var(--bg-surface)); color: var(--primary-text); }
 .public-membership-state { padding: 0.65rem 0.8rem; border-radius: var(--radius-md); background: var(--bg-muted); color: var(--text); }
 .public-membership-state--success { color: var(--text-green); }
 
@@ -169,14 +169,14 @@
 .public-section { padding: clamp(1.25rem, 3vw, 1.75rem); }
 .public-section h2, .public-section h3 { margin-top: 0; color: var(--text-strong); }
 .public-section p:last-child { margin-bottom: 0; }
-.public-back-link { color: var(--primary); font-weight: var(--font-bold); text-decoration: none; }
+.public-back-link { color: var(--primary-text); font-weight: var(--font-bold); text-decoration: none; }
 .public-back-link:hover { text-decoration: underline; }
 
 .public-leaderboard { margin: 0; padding: 0; list-style: none; display: grid; gap: 0.55rem; counter-reset: rank; }
 .public-leaderboard li { counter-increment: rank; display: grid; grid-template-columns: 28px minmax(0, 1fr) auto; gap: 0.6rem; align-items: center; padding: 0.7rem; border-radius: var(--radius-md); background: var(--bg-muted); }
 .public-leaderboard li::before { content: counter(rank); font-weight: var(--font-black); color: var(--text-muted); }
 .public-leaderboard a { color: var(--text-strong); font-weight: var(--font-bold); text-decoration: none; }
-.public-leaderboard strong { color: var(--primary); }
+.public-leaderboard strong { color: var(--primary-text); }
 
 .public-profile { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 1.5rem; align-items: start; }
 .public-profile__photo { width: 120px; height: 120px; border-radius: var(--radius-xl); object-fit: cover; }

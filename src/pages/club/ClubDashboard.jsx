@@ -37,7 +37,7 @@ export default function ClubDashboard({ data, onCategoryChange, canManageMembers
 
         <div className="dash-columns">
             <div className="dash-panel">
-                <h3 className="dash-panel__title">Games by category</h3>
+                <h2 className="dash-panel__title">Games by category</h2>
                 <div className="dash-category-bars">{CATEGORIES.map(category => {
                     const count = categoryCounts[category];
                     return <div key={category} className="dash-category-row">
@@ -50,7 +50,7 @@ export default function ClubDashboard({ data, onCategoryChange, canManageMembers
 
             <div className="dash-panel">
                 <div className="dash-panel__header">
-                    <h3 className="dash-panel__title">Top players</h3>
+                    <h2 className="dash-panel__title">Top players</h2>
                     <select aria-label="Top player category" value={selectedCategory}
                         onChange={event => onCategoryChange?.(event.target.value)}>
                         {CATEGORIES.map(category => <option key={category} value={category}>{title(category)}</option>)}
@@ -66,7 +66,7 @@ export default function ClubDashboard({ data, onCategoryChange, canManageMembers
         </div>
 
         <div className="dash-panel">
-            <div className="dash-panel__header"><h3 className="dash-panel__title">Recent matches</h3><Link className="text-link" to="/matches">View match history</Link></div>
+            <div className="dash-panel__header"><h2 className="dash-panel__title">Recent matches</h2><Link className="text-link" to="/matches">View match history</Link></div>
             {!recentMatches.length ? <p className="muted">No matches recorded yet.</p> : <div className="dash-matches-table-wrap" role="region" aria-label="Recent matches table" tabIndex="0"><table className="dash-matches-table">
                 <thead><tr><th>Date</th><th>White</th><th>Black</th><th>Result</th><th>Rating category</th></tr></thead>
                 <tbody>{recentMatches.map(match => <tr key={match.id}>

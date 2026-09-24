@@ -32,7 +32,7 @@
     padding: 20px 24px;
     border-bottom: 1px solid var(--border);
 }
-.app-dialog > .modal-header h3 { margin: 0; color: var(--text-strong); }
+.app-dialog > .modal-header h2 { margin: 0; color: var(--text-strong); font-size: var(--font-size-lg); }
 .app-dialog .modal-body { padding: 24px; display: grid; gap: 20px; }
 .app-dialog .form-row { display: grid; gap: 8px; margin: 0; }
 .app-dialog .input {

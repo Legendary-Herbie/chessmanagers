@@ -281,7 +281,7 @@
 
 .app-nav__link--active {
     background: color-mix(in srgb, var(--primary) 12%, transparent);
-    color: var(--primary);
+    color: var(--primary-text);
 }
 
 .app-nav__account {
@@ -576,7 +576,7 @@
     display: inline-grid;
     place-items: center;
     border-radius: var(--radius-md);
-    background: var(--primary);
+    background: var(--primary-action);
     color: var(--primary-contrast);
     font-size: var(--font-size-sm);
     font-weight: var(--font-bold);

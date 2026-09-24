@@ -12,6 +12,11 @@ function selectContents(element) {
 }
 
 describe('RichTextEditor', () => {
+    it('identifies its formatting controls as a toolbar', () => {
+        render(<RichTextEditor value="" onChange={vi.fn()} />);
+        expect(screen.getByRole('toolbar', { name: 'Formatting controls' })).toBeTruthy();
+    });
+
     afterEach(cleanup);
 
     it('retains shortcut formatting and the caret when controlled content updates while typing', () => {

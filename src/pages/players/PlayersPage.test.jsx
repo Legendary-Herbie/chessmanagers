@@ -50,6 +50,14 @@ it('announces a failed roster load and retries without claiming the roster is em
     } finally { consoleError.mockRestore(); }
 });
 
+it('uses a readable dash when a roster has no average ratings yet', async () => {
+    playerApi.fetchPlayers.mockResolvedValue([]);
+    playerApi.fetchRosterSummary.mockResolvedValue({ totalPlayers: 0, activePlayers: 0, averageRatings: {} });
+    playerApi.fetchPendingLinks.mockResolvedValue([]);
+    render(<MemoryRouter><AuthContext.Provider value={{ user: { id: 'u' } }}><ClubContext.Provider value={{ club: { id: 'c', name: 'Club' }, capabilities: {} }}><NotificationsContext.Provider value={{ notify: vi.fn() }}><PlayersPage /></NotificationsContext.Provider></ClubContext.Provider></AuthContext.Provider></MemoryRouter>);
+    expect(await screen.findAllByText('—')).toHaveLength(3);
+});
+
 it('shows all ratings without category selectors, filters the roster, and clears filters', async () => {
     playerApi.fetchPlayers.mockReset().mockResolvedValue([{ id: 'a', name: 'Ada', link_status: 'approved' }, { id: 'b', name: 'Beth' }]);
     playerApi.fetchRosterSummary.mockResolvedValue({ totalPlayers: 2, activePlayers: 0, averageRatings: {} });

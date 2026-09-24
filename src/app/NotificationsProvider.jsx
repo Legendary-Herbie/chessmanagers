@@ -26,7 +26,7 @@ export function NotificationsProvider({ children }) {
     return (
         <NotificationsContext.Provider value={{ notifications, notify, dismiss }}>
             {children}
-            <div className="app-toast-stack" aria-label="Notifications">{notifications.map(notification => <Toast key={notification.id} notification={notification} dismiss={dismiss} />)}</div>
+            <div className="app-toast-stack">{notifications.map(notification => <Toast key={notification.id} notification={notification} dismiss={dismiss} />)}</div>
         </NotificationsContext.Provider>
     );
 }

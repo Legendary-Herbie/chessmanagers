@@ -22,7 +22,7 @@ export default function Dialog({ title, onClose, busy = false, children, classNa
                     if (!busy) onClose();
                 }
             }}>
-            <div className="modal-header"><h3 id={titleId}>{title}</h3>
+            <div className="modal-header"><h2 id={titleId}>{title}</h2>
                 <Button variant="secondary" aria-label="Close" disabled={busy} onClick={onClose}><Icon name="x" /></Button>
             </div>
             {children}

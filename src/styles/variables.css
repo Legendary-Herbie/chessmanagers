@@ -3,6 +3,11 @@
   --primary: #6366f1;
   --primary-600: #4f46e5;
   --primary-700: #4338ca;
+  /* Keep the brand accent vivid while guaranteeing AA contrast for controls and text. */
+  --primary-action: #4f46e5;
+  --primary-action-hover: #4338ca;
+  --primary-action-pressed: #3730a3;
+  --primary-text: #4f46e5;
   --primary-contrast: #ffffff;
   --primary-color-hover: #4f46e5;
 
@@ -111,6 +116,7 @@
 
 /* Dark theme overrides */
 [data-theme='dark'] {
+  --primary-text: #a5b4fc;
   --status-error-text: #fca5a5;
   --status-error-bg: #450a0a;
   --status-success-text: #86efac;

@@ -5,7 +5,7 @@ a.text-link, a.name-link, a.title-link, button.name-link {
     transition:color 160ms ease, background-color 160ms ease;
     border-radius:3px;
 }
-a.text-link { color:var(--primary); font-weight:600; overflow-wrap:anywhere; }
+a.text-link { color:var(--primary-text); font-weight:600; overflow-wrap:anywhere; }
 a.name-link, a.title-link, button.name-link { color:var(--text-strong); font-weight:650; }
 a.title-link { font-weight:inherit; }
 button.name-link { background:transparent; border:0; box-shadow:none; padding:6px 0; min-height:44px; font:inherit; font-weight:650; text-align:left; cursor:pointer; }
@@ -13,11 +13,11 @@ a:focus-visible, button.name-link:focus-visible {
     outline:2px solid var(--primary); outline-offset:4px; border-radius:4px;
 }
 a.text-link:focus-visible, a.name-link:focus-visible, a.title-link:focus-visible, button.name-link:focus-visible {
-    color:var(--primary); text-decoration:underline;
+    color:var(--primary-text); text-decoration:underline;
 }
 @media(hover:hover) {
     a.text-link:hover, a.name-link:hover, a.title-link:hover, button.name-link:hover {
-        color:var(--primary); text-decoration:underline;
+        color:var(--primary-text); text-decoration:underline;
     }
     a.text-link:hover { color:var(--text-strong); }
 }
@@ -30,7 +30,7 @@ a:is(.btn-primary,.btn-secondary,.public-link-button,.landing-button,.public-nav
         text-decoration:none; box-shadow:0 0 0 2px color-mix(in srgb,var(--primary) 22%,transparent);
     }
     a:is(.tournament-card,.dash-stat-card):hover { text-decoration:none; }
-    a.tournament-card:hover h2 { color:var(--primary); }
+    a.tournament-card:hover h2 { color:var(--primary-text); }
 }
 a:is(.tournament-card,.dash-stat-card):focus-visible {
     border-color:var(--primary); outline:2px solid var(--primary); outline-offset:4px;

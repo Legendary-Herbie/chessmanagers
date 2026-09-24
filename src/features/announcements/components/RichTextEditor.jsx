@@ -137,7 +137,7 @@ export default function RichTextEditor({ value, onChange, disabled = false, onFi
 
     return (
         <div className="rich-editor">
-            <div className="rich-editor__toolbar" aria-label="Formatting controls">
+            <div className="rich-editor__toolbar" role="toolbar" aria-label="Formatting controls">
                 {commands.map(([command, label]) => (
                     <button key={command} type="button" disabled={disabled} aria-pressed={active.includes(command)}
                         onMouseDown={event => event.preventDefault()} onClick={() => format(command)}>

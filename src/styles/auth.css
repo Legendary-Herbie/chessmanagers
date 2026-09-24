@@ -360,7 +360,7 @@
 }
 
 .auth-link {
-    color: var(--primary);
+    color: var(--primary-text);
     font-weight: var(--font-medium);
     text-decoration: none;
 }

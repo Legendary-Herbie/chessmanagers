@@ -342,7 +342,7 @@ export default function MatchesPage() {
                 )}
             </div>
 
-            <div className="matches-pagination" aria-label="Match results pagination">
+            <div className="matches-pagination" role="navigation" aria-label="Match results pagination">
                 <span>{firstResult}–{lastResult} of {total}</span>
                 <div>
                     <Button variant="secondary" disabled={page === 0 || loading} onClick={() => setPage(current => Math.max(0, current - 1))}>Previous</Button>

@@ -7,9 +7,9 @@
     font-weight:600; line-height:1.35; text-decoration:none; cursor:pointer;
     transition:background-color 150ms ease,border-color 150ms ease;
 }
-.btn-primary { color:var(--primary-contrast); background:var(--primary); }
-.btn-primary:hover:not(:disabled) { background:var(--primary-600); }
-.btn-primary:active:not(:disabled) { background:var(--primary-700); }
+.btn-primary { color:var(--primary-contrast); background:var(--primary-action); }
+.btn-primary:hover:not(:disabled) { background:var(--primary-action-hover); }
+.btn-primary:active:not(:disabled) { background:var(--primary-action-pressed); }
 .btn-secondary { color:var(--text-strong); background:var(--bg-muted); border-color:var(--border); }
 .btn-secondary:hover:not(:disabled) { background:var(--bg-surface); border-color:var(--primary); }
 .btn-danger { color:var(--status-error-text); background:var(--status-error-bg); border-color:var(--danger); }
@@ -30,7 +30,7 @@ textarea:is(.input,.form-input,.form-textarea) { min-height:100px; resize:vertic
 input[type='checkbox'], input[type='radio'] { accent-color:var(--primary); }
 .category-switcher { display:inline-flex; flex-wrap:wrap; gap:4px; padding:4px; border:1px solid var(--border); border-radius:12px; background:var(--bg-muted); }
 .category-switcher button { min-height:44px; padding:8px 12px; border:0; border-radius:8px; background:transparent; color:var(--text); font:inherit; cursor:pointer; }
-.category-switcher button.active { background:var(--primary); color:var(--primary-contrast); }
+.category-switcher button.active { background:var(--primary-action); color:var(--primary-contrast); }
 .category-switcher button:hover:not(.active) { background:var(--bg-surface); }
 .category-switcher button:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
 @media(prefers-reduced-motion:reduce) { :is(.btn,.btn-primary,.btn-secondary,.btn-danger,.btn-warning) { transition:none; } }
@@ -95,5 +95,5 @@ input[type='checkbox'], input[type='radio'] { accent-color:var(--primary); }
 .error,.error-box { background:var(--status-error-bg); color:var(--status-error-text); }
 .success,.success-box { background:var(--status-success-bg); color:var(--status-success-text); }
 .modal-header,.modal-footer { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; }
-.modal-header h3 { margin:0; color:var(--text-strong); }
+.modal-header h2 { margin:0; color:var(--text-strong); font-size:var(--font-size-lg); }
 .modal-body { display:grid; gap:16px; margin-top:16px; min-width:0; }

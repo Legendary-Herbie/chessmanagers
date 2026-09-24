@@ -234,9 +234,9 @@
 }
 
 .match-category-switcher button.active {
-    border-color: var(--primary);
-    background: var(--primary);
-    color: #fff;
+    border-color: var(--primary-action);
+    background: var(--primary-action);
+    color: var(--primary-contrast);
 }
 
 .rated-toggle {

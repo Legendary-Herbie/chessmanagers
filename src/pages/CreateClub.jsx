@@ -133,14 +133,14 @@ export default function CreateClub() {
       <form onSubmit={handleSubmit} noValidate>
         <fieldset className="form-fieldset" disabled={loading || created}>
           <section>
-            <label htmlFor="create-name">Name</label>
-            <input id="create-name" className="" placeholder="e.g. Royal Gambit Chess Academy" value={name} onChange={(e) => setName(e.target.value)} />
+            <label htmlFor="create-name">Name <span className="form-required">(required)</span></label>
+            <input id="create-name" className="" required aria-invalid={Boolean(errors.name)} placeholder="e.g. Royal Gambit Chess Academy" value={name} onChange={(e) => setName(e.target.value)} />
             {errors.name && <div className="error" role="alert">{errors.name}</div>}
 
             <div className="create-club__identity-grid">
               <div>
-                <label htmlFor="create-federation">Federation</label>
-                <select id="create-federation" value={federation} onChange={(e) => setFederation(e.target.value)}>
+                <label htmlFor="create-federation">Federation <span className="form-required">(required)</span></label>
+                <select id="create-federation" required aria-invalid={Boolean(errors.federation)} value={federation} onChange={(e) => setFederation(e.target.value)}>
                   <option value="">Select federation</option>
                   {FEDERATION_CODES.map(code => <option value={code} key={code}>{code}</option>)}
                 </select>

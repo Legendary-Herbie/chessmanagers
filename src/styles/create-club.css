@@ -19,6 +19,7 @@
 .create-club .progress-bar { height: 100%; background: linear-gradient(90deg, var(--primary-700), var(--primary)); transition: width 220ms ease; }
 
 .create-club label { display: block; margin-bottom: 8px; color: var(--text-strong); font-weight: 600; }
+.create-club .form-required { color: var(--text-muted); font-size: var(--font-size-xs); font-weight: 500; }
 .create-club input:not([type='checkbox']),
 .create-club select {
   width: 100%;
@@ -65,7 +66,7 @@
 .create-club .btn { min-height: 44px; padding: 10px 14px; border: 1px solid transparent; border-radius: var(--radius-md); cursor: pointer; font-weight: 600; }
 .create-club .btn:disabled { opacity: 0.6; cursor: not-allowed; }
 .create-club .btn-secondary { border-color: var(--border); background: var(--bg-muted); color: var(--text-strong); }
-.create-club .btn-primary { background: var(--primary); color: var(--primary-contrast); }
+.create-club .btn-primary { background: var(--primary-action); color: var(--primary-contrast); }
 .create-club .emblem-preview img { max-width: 140px; border: 1px solid var(--border); border-radius: var(--radius-md); }
 
 .create-club__identity-grid,

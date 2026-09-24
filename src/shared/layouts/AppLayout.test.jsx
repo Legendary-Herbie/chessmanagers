@@ -99,6 +99,20 @@ describe('AppLayout navigation', () => {
         await waitFor(() => expect(stored.get('chess-managers-sidebar')).toBe('collapsed'));
     });
 
+    it('only references the account menu while the menu is rendered', () => {
+        renderLayout();
+        const menuButton = screen.getByRole('button', { name: /account menu for Club Owner/ });
+
+        expect(menuButton.hasAttribute('aria-controls')).toBe(false);
+        fireEvent.click(menuButton);
+        expect(menuButton.getAttribute('aria-controls')).toBe('account-menu');
+        expect(screen.getByRole('menu', { name: 'Account menu' }).id).toBe('account-menu');
+
+        fireEvent.click(menuButton);
+        expect(menuButton.hasAttribute('aria-controls')).toBe(false);
+        expect(screen.queryByRole('menu', { name: 'Account menu' })).toBeNull();
+    });
+
     it('switches clubs directly while keeping the sidebar collapsed', async () => {
         const selectClub = vi.fn().mockResolvedValue(true);
         const { container } = renderLayout({ context: { selectClub, activeClubs: [

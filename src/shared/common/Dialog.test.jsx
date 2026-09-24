@@ -9,6 +9,7 @@ describe('shared dialog keyboard behavior', () => {
         document.body.style.overflow = 'auto';
         const { container, unmount } = render(<Dialog title="Result" onClose={() => {}} />);
         expect(container.contains(screen.getByRole('dialog'))).toBe(false);
+        expect(screen.getByRole('heading', { name: 'Result', level: 2 })).toBeTruthy();
         expect(document.body.style.overflow).toBe('hidden');
         unmount();
         expect(document.body.style.overflow).toBe('auto');

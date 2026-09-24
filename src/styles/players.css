@@ -188,7 +188,7 @@
   padding: 0 12px;
   border: none;
   background: transparent;
-  color: var(--text-muted);
+  color: var(--text);
   font-size: var(--font-size-xs, 0.75rem);
   font-weight: 600;
   border-radius: var(--radius-sm, 4px);
@@ -201,7 +201,7 @@
 
 .view-toggle__button--active {
   background-color: var(--bg-surface);
-  color: var(--primary);
+  color: var(--primary-text);
   box-shadow: var(--shadow-sm);
 }
 
@@ -412,7 +412,7 @@
 
 .players-table th {
   background-color: var(--bg-muted);
-  color: var(--text-muted);
+  color: var(--text);
   font-weight: 700;
   font-size: var(--font-size-xs, 0.75rem);
   text-transform: uppercase;
@@ -644,7 +644,7 @@
 .roster-control-label { display: grid; gap: 5px; color: var(--text-muted); font-size: .8rem; flex: 1; min-width: 0; }
 .roster-control-label select { width: 100%; min-width: 0; height: 44px; }
 .roster-controls .view-toggle__button { height: 40px; }
-.roster-controls .view-toggle__button:hover { color: var(--primary); background: var(--bg-surface); }
+.roster-controls .view-toggle__button:hover { color: var(--primary-text); background: var(--bg-surface); }
 .roster-controls :is(select, button):focus-visible { outline: 2px solid var(--primary); outline-offset: 3px; }
 .roster-results { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; min-height: 56px; color: var(--text-muted); font-size: .85rem; }
 .roster-results p { margin: 8px 0; }
