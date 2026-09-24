@@ -25,7 +25,12 @@ services:
     logging: *logging
 
   app:
-    build: .
+    build:
+      context: .
+      args:
+        VITE_UMAMI_SCRIPT_URL: ${UMAMI_SCRIPT_URL:-}
+        VITE_UMAMI_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
+        VITE_UMAMI_DOMAIN: ${APP_DOMAIN:?Set APP_DOMAIN in .env.vps}
     image: onechessclub-app:${APP_VERSION:-local}
     init: true
     restart: unless-stopped
@@ -51,6 +56,8 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: https://${APP_DOMAIN}/api/v1/auth/google/callback
+      ANALYTICS_SCRIPT_URL: ${UMAMI_SCRIPT_URL:-}
+      ANALYTICS_WEBSITE_ID: ${UMAMI_WEBSITE_ID:-}
     volumes:
       - uploads:/app/server/uploads
     healthcheck:

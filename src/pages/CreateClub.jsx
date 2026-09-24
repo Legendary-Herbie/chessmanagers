@@ -7,6 +7,7 @@ import { getFieldErrors, isValidationError } from '../config/api.js';
 import { useAuth, useClub } from '../app/contextHooks.js';
 import { clubApi } from '../features/clubs/api/clubApi.js';
 import { FEDERATION_CODES } from '../features/clubs/federations.js';
+import { trackEvent } from '../shared/analytics.js';
 import '../styles/create-club.css';
 
 export default function CreateClub() {
@@ -89,6 +90,7 @@ export default function CreateClub() {
       const data = await clubApi.create(payload);
       createdClub = data.club;
       setCreated(true);
+      trackEvent('club_created');
 
       // Refresh the account session returned alongside the new club. Club
       // permissions remain scoped to the membership loaded by ClubProvider.

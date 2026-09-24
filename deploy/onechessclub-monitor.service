@@ -1,0 +1,9 @@
+[Unit]
+Description=1chessclub production health monitor
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/onechessclub
+ExecStart=/usr/bin/bash /opt/onechessclub/deploy/production-monitor.sh

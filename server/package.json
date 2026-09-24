@@ -24,7 +24,7 @@
         "jsonwebtoken": "^9.0.3",
         "multer": "^2.2.0",
         "node-pg-migrate": "^8.0.4",
-        "nodemailer": "^9.0.6",
+        "nodemailer": "^9.1.1",
         "pg": "^8.18.0",
         "sanitize-html": "^2.17.7",
         "zod": "^3.25.76"
@@ -40,6 +40,7 @@
         "test": "vitest run",
         "test:ui": "vitest run --ui",
         "lint": "eslint .",
+        "smtp:check": "node src/scripts/smtpCheck.js",
         "migrate:create": "node-pg-migrate create --migrations-dir src/database/migrations --envPath .env",
         "migrate:up": "node-pg-migrate up --migrations-dir src/database/migrations --migrations-table pgmigrations --envPath .env",
         "migrate:down": "node-pg-migrate down --migrations-dir src/database/migrations --migrations-table pgmigrations --envPath .env",

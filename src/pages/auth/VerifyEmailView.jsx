@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { authApi } from '../../features/auth/api/authApi.js';
 import { continuationFromParams, continuationQuery } from '../../features/auth/continuation.js';
+import { trackEvent } from '../../shared/analytics.js';
 
 export default function VerifyEmailView() {
     const [params] = useSearchParams();
@@ -22,6 +23,7 @@ export default function VerifyEmailView() {
         authApi.verifyEmail(token)
             .then(() => {
                 if (!active) return;
+                trackEvent('email_verified');
                 setState({ loading: false, message: 'Your email is verified. Your account is ready.', isError: false });
             })
             .catch(error => {

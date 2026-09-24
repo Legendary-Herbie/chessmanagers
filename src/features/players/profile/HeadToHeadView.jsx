@@ -17,10 +17,13 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
         if (!clubId || !playerA?.id || !selectedPlayerBId) {
             setSummary(null);
             setMatches([]);
+            setLoading(false);
+            setError(null);
             return;
         }
 
         setLoading(true);
+        setSummary(null);
         setError(null);
 
         try {
@@ -82,7 +85,7 @@ export default function HeadToHeadView({ clubId, playerA, allPlayers = [] }) {
 
             {error && <div className="error-box" role="alert">{error}</div>}
 
-            {!loading && selectedPlayerBId && summary && (
+            {!loading && !error && selectedPlayerBId && selectedSummary && (
                 <div className="rivalry-content">
                     <div className="category-switcher" role="group" aria-label="Head-to-head category">
                         {['overall', 'blitz', 'rapid', 'classical'].map(value => (

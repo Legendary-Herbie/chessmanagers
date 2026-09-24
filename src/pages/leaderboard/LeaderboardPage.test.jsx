@@ -1,5 +1,5 @@
 import React from 'react';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter, useLocation } from 'react-router-dom';
 import { ClubContext } from '../../app/contextHooks.js';
@@ -24,29 +24,25 @@ describe('LeaderboardPage URL state', () => {
     });
     afterEach(cleanup);
 
-    it('ignores late history from a closed player and restores keyboard focus', async () => {
+    it('shows a chart-free summary without fetching history and restores keyboard focus', async () => {
         const entries = ['Ada', 'Beth'].map((name, index) => ({
             playerId: name, playerName: name, rank: index + 1, selectedRating: 1500,
             blitzRating: 1500, rapidRating: 1500, classicalRating: 1500, totalGames: 2,
         }));
         leaderboardApi.fetchLeaderboard.mockResolvedValue({ entries, total: 2 });
-        let resolveAda;
-        playerApi.fetchRatingHistory.mockImplementation((clubId, playerId) => playerId === 'Ada'
-            ? new Promise(resolve => { resolveAda = resolve; }) : Promise.resolve([]));
         render(<ClubContext.Provider value={{ club: { id: 'club_1' } }}>
             <MemoryRouter><LeaderboardPage /></MemoryRouter>
         </ClubContext.Provider>);
-        const opener = await screen.findByRole('button', { name: 'View Ada rating history' });
+        const opener = await screen.findByRole('button', { name: 'View Ada summary' });
         opener.focus();
         fireEvent.click(opener);
         expect(screen.getByRole('dialog', { name: 'Ada' })).toBeTruthy();
         fireEvent.keyDown(document.activeElement, { key: 'Escape' });
         expect(document.activeElement).toBe(opener);
-        fireEvent.click(screen.getByRole('button', { name: 'View Beth rating history' }));
-        await screen.findByText('No rating history yet.');
-        await act(async () => resolveAda([{ ratingAfter: 900 }, { ratingAfter: 1900 }]));
-        expect(screen.getByRole('dialog', { name: 'Beth' }).querySelector('svg.chart-svg')).toBeNull();
-        expect(screen.getByText('No rating history yet.')).toBeTruthy();
+        fireEvent.click(screen.getByRole('button', { name: 'View Beth summary' }));
+        expect(screen.getByRole('dialog', { name: 'Beth' }).querySelector('.sparkline-chart')).toBeNull();
+        expect(playerApi.fetchRatingHistory).not.toHaveBeenCalled();
+        expect(screen.getByRole('link', { name: /View player profile/ }).getAttribute('href')).toBe('/players/Beth');
     });
 
     it('restores category, page, and search and keeps changes in the URL', async () => {

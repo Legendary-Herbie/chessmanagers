@@ -112,6 +112,22 @@ const envSchema = z.object({
     SMTP_USER:   z.string().optional(),
     SMTP_PASS:   z.string().optional(),
     SMTP_FROM:   z.string().optional(),
+
+    // Public, optional Umami tracker configuration. The website ID is not a secret.
+    ANALYTICS_SCRIPT_URL: z.preprocess(emptyToUndefined, z.string().url().startsWith('https://')
+        .refine(value => {
+            const url = new URL(value);
+            return !url.username && !url.password && !url.search && !url.hash;
+        }, 'ANALYTICS_SCRIPT_URL must not contain credentials, a query, or a fragment').optional()),
+    ANALYTICS_WEBSITE_ID: z.preprocess(emptyToUndefined, z.string().uuid().optional()),
+}).superRefine((value, context) => {
+    if (Boolean(value.ANALYTICS_SCRIPT_URL) !== Boolean(value.ANALYTICS_WEBSITE_ID)) {
+        context.addIssue({
+            code: z.ZodIssueCode.custom,
+            path: ['ANALYTICS_SCRIPT_URL'],
+            message: 'Set both ANALYTICS_SCRIPT_URL and ANALYTICS_WEBSITE_ID, or leave both empty',
+        });
+    }
 });
 
 // ─── Parse ────────────────────────────────────────────────────────────────────

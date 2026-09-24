@@ -5,12 +5,23 @@ import PlayerRatingChart from './PlayerRatingChart.jsx';
 import { playerApi } from '../api/playerApi.js';
 vi.mock('../api/playerApi.js', () => ({ playerApi:{ fetchRatingTimeline:vi.fn() } }));
 afterEach(() => { cleanup(); vi.clearAllMocks(); });
-it('shows opponent and result accessibly and loads all categories and date filters', async () => {
+it('shows a date/rating tooltip without player names and loads categories and date filters', async () => {
     const game = { matchId:'m1', category:'rapid', ratingBefore:1500, ratingAfter:1520, playedAt:new Date().toISOString(), opponentName:'Sam', outcome:'win' };
     playerApi.fetchRatingTimeline.mockResolvedValue([game]);
     render(<PlayerRatingChart clubId="c" playerId="p" history={[game]} />);
-    const dot = screen.getByRole('button',{ name:/Win vs. Sam/ }); fireEvent.focus(dot);
-    expect(screen.getByRole('status').textContent).toContain('Win vs. Sam');
+    expect(screen.getByText('+20 in selected period')).toBeTruthy();
+    expect(screen.getByText('Highest shown')).toBeTruthy();
+    expect(screen.getByLabelText('Rating history by played date').querySelector('polygon')).toBeTruthy();
+    const dot = screen.getByRole('button',{ name:/Rapid: Win, 1520/ }); fireEvent.focus(dot);
+    expect(screen.getByRole('tooltip').textContent).toContain('Rapid: 1520');
+    expect(screen.queryByText(/Sam/)).toBeNull();
+    expect(dot.getAttribute('aria-label')).not.toContain('Sam');
+    fireEvent.keyDown(dot, { key: 'Escape' });
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    fireEvent.click(dot);
+    expect(screen.getByRole('tooltip')).toBeTruthy();
+    fireEvent.mouseLeave(dot.closest('.rating-chart-plot'));
+    expect(screen.queryByRole('tooltip')).toBeNull();
     fireEvent.change(screen.getByLabelText('Timeframe'),{ target:{ value:'all' } });
     await waitFor(() => expect(playerApi.fetchRatingTimeline).toHaveBeenCalledWith('c','p',expect.objectContaining({ category:'rapid',since:undefined })));
     fireEvent.click(screen.getByLabelText('Show all rating categories'));

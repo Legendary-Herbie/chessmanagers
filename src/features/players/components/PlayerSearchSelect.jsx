@@ -1,4 +1,5 @@
 import ClaimedBadge from './ClaimedBadge.jsx';
+import './playerSearchSelect.css';
 import React, { useEffect, useId, useRef, useState } from 'react';
 import { isCancelledError } from '../../../config/api.js';
 import { playerApi } from '../api/playerApi.js';
@@ -115,6 +116,7 @@ export default function PlayerSearchSelect({
         setResults([]);
         setActiveIndex(-1);
         onChange('');
+        onSelect?.(null);
     }
 
     function handleInputChange(event) {

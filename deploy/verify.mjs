@@ -17,7 +17,7 @@ assert.equal(config.services.proxy.depends_on.app.condition, 'service_healthy');
 assert.ok(config.services.app.volumes.includes('uploads:/app/server/uploads'));
 assert.ok(config.services.db.volumes.includes('postgres_data:/var/lib/postgresql/data'));
 assert.ok(config.services.app.environment.DATABASE_URL.endsWith('?sslmode=disable'));
-for (const name of ['compose.sh', 'preflight.sh', 'backup.sh', 'restore-drill.sh']) {
+for (const name of ['compose.sh', 'preflight.sh', 'backup.sh', 'restore-drill.sh', 'production-monitor.sh']) {
     const result = spawnSync(bash, ['-n', path.join(root, 'deploy', name)], { encoding: 'utf8' });
     assert.equal(result.status, 0, result.stderr || result.error?.message);
 }

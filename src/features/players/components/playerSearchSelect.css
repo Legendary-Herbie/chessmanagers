@@ -1,0 +1,12 @@
+.player-search-select { position: relative; display: grid; gap: 8px; min-width: 0; }
+.player-search-select__label { color: var(--text-muted); font-size: .85rem; font-weight: 600; }
+.player-search-select__control { position: relative; }
+.player-search-select__control .input { width: 100%; padding-right: 48px; min-height: 44px; }
+.player-search-select__clear { position: absolute; top: 50%; right: 4px; transform: translateY(-50%); width: 36px; height: 36px; border: 0; border-radius: 8px; background: var(--bg-muted); color: var(--text); cursor: pointer; font-size: 1.25rem; }
+.player-search-select__results { position: absolute; z-index: 40; top: calc(100% + 6px); left: 0; right: 0; max-height: 280px; overflow-y: auto; overscroll-behavior: contain; padding: 6px; border: 1px solid var(--border); border-radius: 12px; background: var(--bg-surface); box-shadow: 0 12px 32px rgb(0 0 0 / 18%); }
+.player-search-select__option { display: grid; gap: 5px; width: 100%; padding: 12px; border: 0; border-radius: 8px; background: transparent; color: var(--text); text-align: left; cursor: pointer; overflow-wrap: anywhere; }
+.player-search-select__option.active, .player-search-select__option:hover { background: var(--bg-muted); }
+.player-search-select__option[aria-selected='true'] { box-shadow: inset 3px 0 var(--primary); }
+.player-search-select__option small, .player-search-select__status { color: var(--text-muted); font-size: .8rem; }
+.player-search-select__status { padding: 12px; }
+.rivalry-search { flex-basis: 320px; }

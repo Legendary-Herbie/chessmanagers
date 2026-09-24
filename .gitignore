@@ -32,6 +32,8 @@ server/uploads/
 !deploy/*.env.example
 /backups/
 /restore/
+/playwright-report/
+/test-results/
 
 # Logs
 logs

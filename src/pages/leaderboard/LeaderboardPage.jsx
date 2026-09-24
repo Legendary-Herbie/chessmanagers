@@ -2,12 +2,11 @@ import { useClubQuery } from '../../shared/query/useClubQuery.js';
 import ClaimedBadge from '../../features/players/components/ClaimedBadge.jsx';
 import RatingCategoryIcon from '../../shared/common/RatingCategoryIcon.jsx';
 import Icon from '../../shared/common/Icon.jsx';
-import React, { memo, useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import '../../styles/leaderboard.css';
 import Button from '../../shared/common/Button.jsx';
 import Dialog from '../../shared/common/Dialog.jsx';
-import { playerApi } from '../../features/players/api/playerApi.js';
 import { useClub } from '../../app/contextHooks.js';
 import { leaderboardApi } from '../../features/leaderboard/api/leaderboardApi.js';
 import NoClubState from '../../shared/common/NoClubState.jsx';
@@ -15,27 +14,6 @@ import NoClubState from '../../shared/common/NoClubState.jsx';
 const CATEGORIES = ['blitz', 'rapid', 'classical'];
 const PAGE_SIZE = 25;
 const label = category => category[0].toUpperCase() + category.slice(1);
-
-const Sparkline = memo(function Sparkline({ points = [] }) {
-    if (!points.length) return <div className="sparkline empty">No rating history yet.</div>;
-    const width = 360;
-    const height = 120;
-    const padding = 8;
-    const ratings = points.map(point => point.ratingAfter);
-    const min = Math.min(...ratings);
-    const max = Math.max(...ratings);
-    const dx = (width - padding * 2) / Math.max(1, points.length - 1);
-    const scaleY = value => max === min ? height / 2
-        : padding + (1 - (value - min) / (max - min)) * (height - padding * 2);
-    const path = points.map((point, index) => (
-        `${index === 0 ? 'M' : 'L'} ${padding + index * dx} ${scaleY(point.ratingAfter)}`
-    )).join(' ');
-    return (
-        <svg className="sparkline-chart" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-            <path d={path} fill="none" stroke="var(--primary)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-    );
-});
 
 function RatingCells({ entry, selectedCategory }) {
     return CATEGORIES.map(category => (
@@ -60,24 +38,8 @@ export default function LeaderboardPage() {
     );
     const error = queryError?.message || '';
     const [selectedPlayer, setSelectedPlayer] = useState(null);
-    const [ratingHistory, setRatingHistory] = useState([]);
-    const [historyLoading, setHistoryLoading] = useState(false);
-    const [historyError, setHistoryError] = useState('');
 
     useEffect(() => { setSelectedPlayer(null); }, [club?.id, selectedCategory]);
-
-    useEffect(() => {
-        if (!selectedPlayer || selectedPlayer.clubId !== club?.id || selectedPlayer.category !== selectedCategory) return;
-        let active = true;
-        setRatingHistory([]);
-        setHistoryError('');
-        setHistoryLoading(true);
-        playerApi.fetchRatingHistory(club.id, selectedPlayer.playerId, selectedCategory)
-            .then(data => { if (active) setRatingHistory(data); })
-            .catch(error => { if (active) setHistoryError(error.message || 'Unable to load rating history.'); })
-            .finally(() => { if (active) setHistoryLoading(false); });
-        return () => { active = false; };
-    }, [club?.id, selectedCategory, selectedPlayer]);
 
     const updateQuery = useCallback((changes) => {
         const next = new URLSearchParams(searchParams);
@@ -91,7 +53,6 @@ export default function LeaderboardPage() {
 
     function openPlayer(entry) {
         setSelectedPlayer({ ...entry, clubId: club.id, category: selectedCategory });
-        setRatingHistory([]);
     }
 
     const totalPages = Math.max(1, Math.ceil(leaderboard.total / PAGE_SIZE));
@@ -131,7 +92,7 @@ export default function LeaderboardPage() {
                                         <td className={`rank ${entry.rank <= 3 ? `top${entry.rank}` : ''}`}>{entry.rank}</td>
                                         <td><button type="button" className="name-link"
                                             onClick={event => { event.stopPropagation(); openPlayer(entry); }}
-                                            aria-label={`View ${entry.playerName} rating history`}>{entry.playerName} <ClaimedBadge status={entry.isClaimed ? 'approved' : null} /></button></td>
+                                            aria-label={`View ${entry.playerName} summary`}>{entry.playerName} <ClaimedBadge status={entry.isClaimed ? 'approved' : null} /></button></td>
                                         <RatingCells entry={entry} selectedCategory={selectedCategory} />
                                         <td>{entry.totalGames}</td>
                                     </tr>
@@ -172,9 +133,7 @@ export default function LeaderboardPage() {
                                 <div><strong>Peak:</strong> {selectedPlayer.peakRating}</div>
                                 <div><strong>Weighted win rate:</strong> {Math.round(selectedPlayer.weightedWinRate * 100)}%</div>
                             </div>
-                            <div className="rating-history"><h4>{label(selectedCategory)} rating history</h4>
-                                {historyLoading ? <p role="status">Loading rating history…</p>
-                                    : historyError ? <p role="alert">{historyError}</p> : <Sparkline points={ratingHistory} />}</div>
+                            <Link to={`/players/${selectedPlayer.playerId}`}>View player profile →</Link>
                         </div>
                 </Dialog>
             )}

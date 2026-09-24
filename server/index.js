@@ -34,6 +34,12 @@ import { notFound, errorHandler } from './src/middleware/errorHandler.js';
 
 const app = express();
 const { PORT, CORS_ORIGIN, NODE_ENV, SERVE_FRONTEND } = env;
+const analyticsOrigin = env.ANALYTICS_SCRIPT_URL
+    ? new URL(env.ANALYTICS_SCRIPT_URL).origin
+    : null;
+const analyticsConnectionOrigins = analyticsOrigin
+    ? [analyticsOrigin, ...(analyticsOrigin === 'https://cloud.umami.is' ? ['https://gateway.umami.is'] : [])]
+    : [];
 
 // ─── CORS ─────────────────────────────────────────────────────────────────────
 
@@ -94,12 +100,12 @@ app.use(helmet({
             baseUri: ["'self'"],
             objectSrc: ["'none'"],
             frameAncestors: ["'none'"],
-            scriptSrc: ["'self'"],
+            scriptSrc: ["'self'", ...(analyticsOrigin ? [analyticsOrigin] : [])],
             // React style props are still used in several existing components.
             styleSrc: ["'self'", "'unsafe-inline'"],
             imgSrc: ["'self'", 'data:', 'blob:'],
             fontSrc: ["'self'", 'data:'],
-            connectSrc: ["'self'"],
+            connectSrc: ["'self'", ...analyticsConnectionOrigins],
             formAction: ["'self'"],
             // Do not upgrade local HTTP development requests to HTTPS.
             upgradeInsecureRequests: NODE_ENV === 'production' ? [] : null,

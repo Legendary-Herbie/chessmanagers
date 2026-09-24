@@ -3,6 +3,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
+ARG VITE_UMAMI_SCRIPT_URL
+ARG VITE_UMAMI_WEBSITE_ID
+ARG VITE_UMAMI_DOMAIN
 RUN npm run build
 
 FROM node:22-alpine AS production

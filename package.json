@@ -18,6 +18,9 @@
     "preview": "vite preview",
     "test": "vitest",
     "test:all": "vitest run && npm --prefix server test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "deploy:verify": "node deploy/verify.mjs",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage"
   },
@@ -36,7 +39,6 @@
     "glob": "^13.0.6",
     "jsdom": "^26.0.0",
     "node-pg-migrate": "^8.0.4",
-    "nodemailer": "^9.0.5",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -50,6 +52,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
+    "@playwright/test": "^1.63.0",
     "@testing-library/jest-dom": "^6.9.1",
     "concurrently": "^9.2.1",
     "dom-accessibility-api": "^0.7.1",

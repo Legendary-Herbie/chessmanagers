@@ -62,6 +62,42 @@ sudo systemctl list-timers onechessclub-backup.timer
 sudo journalctl -u onechessclub-backup.service
 ```
 
+## SMTP and Google sign-in checks
+
+After configuring production SMTP, send a real delivery probe to an inbox you control from the running app image:
+
+```sh
+bash deploy/compose.sh exec -e SMTP_TEST_RECIPIENT=you@your-domain.example app npm run smtp:check
+```
+
+Confirm receipt rather than relying only on the SMTP acceptance response. Inspect SPF, DKIM and DMARC results, then complete registration verification and password reset through the public HTTPS site. If Google sign-in is enabled, its authorized redirect URI must exactly match `https://APP_DOMAIN/api/v1/auth/google/callback`; test both a new Google account and linking an address already registered with a password. Keep Google variables empty when OAuth is disabled.
+
+## Site analytics
+
+Optional site analytics use Umami Cloud or a separately hosted Umami instance with tracker version 2.18 or newer. Create a website in Umami, then set `UMAMI_SCRIPT_URL` and `UMAMI_WEBSITE_ID` in `.env.vps` before running `bash deploy/compose.sh build app`. The script URL must use HTTPS. Both values are public tracker configuration, not credentials. The build uses `APP_DOMAIN` to limit collection to the production hostname, and the server adds the tracker host to its Content Security Policy. For Umami Cloud it also allows its collection gateway. Rebuild the app after changing these values.
+
+Umami records page views on SPA navigation automatically. The app also records three named events after successful actions: `account_created`, `email_verified`, and `club_created`. The before-send filter removes search parameters, URL fragments, custom event fields, and referrer paths before transmission; it allows only those three event names. Browser Do Not Track is respected. Do not enable session replay, user identification, or custom event fields without a separate privacy review. Validate one visit and one test account in the Umami dashboard, then exclude your own browser from reports if desired.
+
+Analytics is optional; leaving both settings blank loads no tracker. A separately hosted frontend can set `VITE_UMAMI_SCRIPT_URL`, `VITE_UMAMI_WEBSITE_ID`, and `VITE_UMAMI_DOMAIN` at build time, and must allow the tracker origin in its own CSP.
+
+## Production monitoring
+
+Set the repository Actions variable `PRODUCTION_URL` to the HTTPS origin. The external GitHub Actions probe checks `/health` and warns when the certificate has fewer than 14 days remaining. Configure repository notifications so a failed scheduled workflow reaches the operator.
+
+Use a separate dead-man heartbeat for VPS/container/disk checks:
+
+```sh
+cp deploy/monitoring.env.example .env.monitoring
+chmod 600 .env.monitoring
+# Set OPS_HEARTBEAT_URL, then test both the success and /fail alert paths.
+bash deploy/production-monitor.sh
+sudo cp deploy/onechessclub-monitor.service deploy/onechessclub-monitor.timer /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now onechessclub-monitor.timer
+```
+
+The operations heartbeat and backup heartbeat must be separate checks with separate missing-ping alerts. Docker logs are locally rotated, but centralized retention still requires choosing and configuring a provider/agent (for example the VPS provider's log service or a managed OpenTelemetry-compatible collector). Do not declare monitoring complete until an intentional app failure, backup failure, disk threshold breach, and synthetic certificate failure each reach the on-call destination.
+
 Edit the service paths if not using `/opt/onechessclub`. Keep this checkout and parent directory writable only by trusted administrators because this job runs as root. Persistent timers catch up after downtime, potentially causing a brief daytime interruption.
 
 ## Restore rehearsal

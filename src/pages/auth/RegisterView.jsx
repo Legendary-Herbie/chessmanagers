@@ -4,6 +4,7 @@ import { useAuth } from '../../app/contextHooks.js';
 import Button from '../../shared/common/Button.jsx';
 import { continuationFromParams, continuationQuery } from '../../features/auth/continuation.js';
 import { getFieldErrors, isValidationError } from '../../config/api.js';
+import { trackEvent } from '../../shared/analytics.js';
 
 const FIELD_ORDER = ['fullName', 'email', 'password', 'confirmPassword'];
 
@@ -67,6 +68,7 @@ export default function RegisterView() {
                 password: fields.password,
                 continuation: destination,
             });
+            trackEvent('account_created');
             navigate(`/auth/verification-pending?email=${encodeURIComponent(normalizedEmail)}${continuation ? `&${continuation.slice(1)}` : ''}`);
         } catch (err) {
             if (isValidationError(err)) {
